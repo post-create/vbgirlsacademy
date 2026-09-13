@@ -9,14 +9,28 @@ function coachOut(row) {
   return { id: row.id, name: row.name, email: row.email || "" };
 }
 
+// "Setup needed" means no coach can currently log in — not just "zero
+// coaches". Login was added after this app already had real coach rows in
+// production (created back when there was no login at all), so a fresh
+// migration there has coaches with password_hash = '' rather than an empty
+// table. Gating on row count alone would 409 the setup screen shut while
+// leaving every real coach permanently locked out.
+async function loadSetupState() {
+  const { rows } = await pool.query(
+    "select id, name, email from coaches where password_hash = '' order by name"
+  );
+  const { rows: securedCount } = await pool.query(
+    "select count(*)::int as n from coaches where password_hash <> ''"
+  );
+  return { setupNeeded: securedCount[0].n === 0, claimableCoaches: rows.map(coachOut) };
+}
+
 // GET /api/auth/status — the client calls this on load to decide what to
-// show: the one-time setup screen (no coach exists at all yet — this app
-// had no login before, so a fresh install/migration always starts here),
-// the login screen, or the app itself.
+// show: the setup screen (see loadSetupState above), the login screen, or
+// the app itself.
 router.get("/status", async (req, res, next) => {
   try {
-    const { rows } = await pool.query("select count(*)::int as n from coaches");
-    const setupNeeded = rows[0].n === 0;
+    const { setupNeeded, claimableCoaches } = await loadSetupState();
     let coach = null;
     if (req.session.coachId) {
       const c = await pool.query("select id, name, email from coaches where id = $1", [
@@ -27,27 +41,57 @@ router.get("/status", async (req, res, next) => {
       // clear it rather than keep pointing at nothing.
       if (!coach) req.session.coachId = null;
     }
-    res.json({ setupNeeded, coach });
+    res.json({ setupNeeded, claimableCoaches: setupNeeded ? claimableCoaches : [], coach });
   } catch (err) {
     next(err);
   }
 });
 
-// POST /api/auth/setup — only reachable while the coaches table is empty.
-// Creates the first coach account and logs it straight in. Once any coach
-// exists, this always 409s — from then on, new coaches are only created
-// from the (now login-protected) Trænere screen.
+// POST /api/auth/setup — only reachable while setupNeeded (see above).
+// Two shapes: { claimCoachId, email, password } sets a password on an
+// existing passwordless coach row (their evaluations/goals/followups history
+// stays exactly as it was — nothing is deleted or recreated); { name, email,
+// password } creates a brand new coach, same as the very first install.
+// Once at least one coach has a password, this always 409s — from then on,
+// new coaches are only created from the (login-protected) Trænere screen,
+// and an existing one's password only changes from there too.
 router.post("/setup", async (req, res, next) => {
   try {
-    const { rows: existing } = await pool.query("select count(*)::int as n from coaches");
-    if (existing[0].n > 0) {
+    const { setupNeeded } = await loadSetupState();
+    if (!setupNeeded) {
       return res.status(409).json({ error: "Der findes allerede en konto — log ind i stedet." });
     }
-    const { name, email, password } = req.body || {};
-    if (!name || !email || !password || password.length < 6) {
-      return res
-        .status(400)
-        .json({ error: "Navn, e-mail og en adgangskode på mindst 6 tegn er påkrævet." });
+
+    const { claimCoachId, name, email, password } = req.body || {};
+    if (!password || password.length < 6) {
+      return res.status(400).json({ error: "Adgangskoden skal være mindst 6 tegn." });
+    }
+
+    if (claimCoachId) {
+      const { rows: existing } = await pool.query(
+        "select id, name, email, password_hash from coaches where id = $1",
+        [claimCoachId]
+      );
+      const coach = existing[0];
+      if (!coach || coach.password_hash) {
+        return res.status(404).json({ error: "Kunne ikke finde den valgte konto." });
+      }
+      const trimmedEmail = (email || coach.email || "").trim();
+      if (!trimmedEmail) {
+        return res.status(400).json({ error: "E-mail er påkrævet for at kunne logge ind." });
+      }
+      const passwordHash = await bcrypt.hash(password, 12);
+      const { rows } = await pool.query(
+        `update coaches set email = $2, password_hash = $3 where id = $1
+         returning id, name, email`,
+        [claimCoachId, trimmedEmail, passwordHash]
+      );
+      req.session.coachId = rows[0].id;
+      return res.status(200).json(coachOut(rows[0]));
+    }
+
+    if (!name || !email) {
+      return res.status(400).json({ error: "Navn og e-mail er påkrævet." });
     }
     const passwordHash = await bcrypt.hash(password, 12);
     const { rows } = await pool.query(

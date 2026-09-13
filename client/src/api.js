@@ -26,8 +26,8 @@ export function getAuthStatus() {
   return request("GET", "/api/auth/status");
 }
 
-export function setupAccount({ name, email, password }) {
-  return request("POST", "/api/auth/setup", { name, email, password });
+export function setupAccount({ claimCoachId, name, email, password }) {
+  return request("POST", "/api/auth/setup", { claimCoachId, name, email, password });
 }
 
 export function login({ email, password }) {

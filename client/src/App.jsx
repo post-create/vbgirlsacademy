@@ -502,14 +502,42 @@ function AuthShell({ title, subtitle, children }) {
 // or a fresh migration) — see GET /api/auth/status. After this succeeds
 // there is always at least one coach, so it never shows again; every coach
 // after the first is created from the (login-protected) Trænere screen.
-function SetupScreen({ onSuccess }) {
+// claimableCoaches is non-empty exactly when this app had coach rows
+// already (created back when there was no login), so setup means "claim
+// one of these by setting its first password" rather than "create the
+// very first account from scratch". Either path lands here; a coach with
+// no matching row yet can still fall back to creating a new one.
+function SetupScreen({ onSuccess, claimableCoaches }) {
+  const [claiming, setClaiming] = useState(null); // the coach being claimed, or null
+  const [creatingNew, setCreatingNew] = useState(claimableCoaches.length === 0);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
-  const submit = async (e) => {
+  const startClaim = (coach) => {
+    setClaiming(coach);
+    setEmail(coach.email || "");
+    setPassword("");
+    setError("");
+  };
+
+  const submitClaim = async (e) => {
+    e.preventDefault();
+    setError("");
+    setSubmitting(true);
+    try {
+      const coach = await api.setupAccount({ claimCoachId: claiming.id, email: email.trim(), password });
+      onSuccess(coach);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const submitCreate = async (e) => {
     e.preventDefault();
     setError("");
     setSubmitting(true);
@@ -523,12 +551,84 @@ function SetupScreen({ onSuccess }) {
     }
   };
 
+  if (claiming) {
+    return (
+      <AuthShell title="Vælg en adgangskode" subtitle={`Til ${claiming.name}s konto.`}>
+        <form onSubmit={submitClaim}>
+          {error && <div style={styles.errorBannerRow}>{error}</div>}
+          <div style={{ marginBottom: 12 }}>
+            <div style={styles.fieldLabel}>E-mail</div>
+            <input
+              style={styles.input}
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+              autoFocus
+            />
+          </div>
+          <div style={{ marginBottom: 16 }}>
+            <div style={styles.fieldLabel}>Adgangskode (mindst 6 tegn)</div>
+            <input
+              style={styles.input}
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              minLength={6}
+              required
+            />
+          </div>
+          <button style={{ ...styles.primaryBtn, width: "100%", justifyContent: "center" }} disabled={submitting}>
+            {submitting ? "Gemmer…" : "Sæt adgangskode og log ind"}
+          </button>
+          <button
+            type="button"
+            style={{ ...styles.linkBtn, marginTop: 12, justifyContent: "center", width: "100%" }}
+            onClick={() => setClaiming(null)}
+          >
+            Tilbage
+          </button>
+        </form>
+      </AuthShell>
+    );
+  }
+
+  if (!creatingNew) {
+    return (
+      <AuthShell
+        title="Velkommen til VB Pige Akademi"
+        subtitle="Login er nyt her — vælg din eksisterende trænerkonto for at sætte en adgangskode. Dine registrerede opfølgninger og andet er uændret."
+      >
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {claimableCoaches.map((c) => (
+            <button
+              key={c.id}
+              type="button"
+              style={styles.claimCoachBtn}
+              onClick={() => startClaim(c)}
+            >
+              <div style={{ fontWeight: 700 }}>{c.name}</div>
+              <div style={styles.subtext}>{c.email || "Ingen e-mail registreret"}</div>
+            </button>
+          ))}
+        </div>
+        <button
+          type="button"
+          style={{ ...styles.linkBtn, marginTop: 16, justifyContent: "center", width: "100%" }}
+          onClick={() => setCreatingNew(true)}
+        >
+          Ingen af disse er mig — opret en ny konto
+        </button>
+      </AuthShell>
+    );
+  }
+
   return (
     <AuthShell
       title="Velkommen til VB Pige Akademi"
-      subtitle="Der er ingen trænerkonti endnu — opret den første herunder. Flere trænere kan tilføjes bagefter under Indstillinger → Trænere."
+      subtitle="Opret en trænerkonto herunder. Flere trænere kan tilføjes bagefter under Indstillinger → Trænere."
     >
-      <form onSubmit={submit}>
+      <form onSubmit={submitCreate}>
         {error && <div style={styles.errorBannerRow}>{error}</div>}
         <div style={{ marginBottom: 12 }}>
           <div style={styles.fieldLabel}>Navn</div>
@@ -558,6 +658,15 @@ function SetupScreen({ onSuccess }) {
         <button style={{ ...styles.primaryBtn, width: "100%", justifyContent: "center" }} disabled={submitting}>
           {submitting ? "Opretter…" : "Opret konto og log ind"}
         </button>
+        {claimableCoaches.length > 0 && (
+          <button
+            type="button"
+            style={{ ...styles.linkBtn, marginTop: 12, justifyContent: "center", width: "100%" }}
+            onClick={() => setCreatingNew(false)}
+          >
+            Tilbage til listen over eksisterende trænere
+          </button>
+        )}
       </form>
     </AuthShell>
   );
@@ -814,7 +923,8 @@ export default function AcademyApp() {
     );
   }
 
-  if (authStatus?.setupNeeded) return <SetupScreen onSuccess={handleAuthed} />;
+  if (authStatus?.setupNeeded)
+    return <SetupScreen onSuccess={handleAuthed} claimableCoaches={authStatus.claimableCoaches || []} />;
   if (!authStatus?.coach) return <LoginScreen onSuccess={handleAuthed} />;
 
   if (!data) return null;
@@ -6677,6 +6787,16 @@ const styles = {
     textAlign: "center",
     margin: "0 0 20px",
     lineHeight: 1.5,
+  },
+  claimCoachBtn: {
+    display: "block",
+    width: "100%",
+    textAlign: "left",
+    background: "#F6F3EC",
+    border: "1px solid #D9D4C7",
+    borderRadius: 10,
+    padding: "10px 14px",
+    cursor: "pointer",
   },
   header: {
     position: "sticky",
