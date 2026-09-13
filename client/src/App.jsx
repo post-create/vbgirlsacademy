@@ -4575,11 +4575,16 @@ function PrintableReport({ player, teamName, config, goals, colA, colB }) {
                   <strong>{meta.skill.name}</strong> — Mål: {goal.target}
                   {goal.note ? ` — Målsætning: ${goal.note}` : ""}
                   {goal.focusAreas ? ` — Fokusområder: ${goal.focusAreas}` : ""}
-                  {goal.progressLog && goal.progressLog.length > 0
-                    ? ` — Selvevalueringer: ${formatProgressLog(goal.progressLog.slice(-4))}`
-                    : typeof goal.progress === "number"
-                    ? ` — Fremskridt: ${goal.progress}/10`
-                    : ""}
+                  {goal.progressLog && goal.progressLog.length > 0 ? (
+                    <>
+                      <br />
+                      Selvevalueringer: {formatProgressLog(goal.progressLog.slice(-4))}
+                    </>
+                  ) : typeof goal.progress === "number" ? (
+                    ` — Fremskridt: ${goal.progress}/10`
+                  ) : (
+                    ""
+                  )}
                 </div>
               );
             })}
