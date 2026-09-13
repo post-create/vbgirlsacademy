@@ -4691,17 +4691,6 @@ function PrintableReport({ player, teamName, config, goals, colA, colB }) {
         </div>
       </div>
 
-      {GOAL_HORIZON_FIELDS.some((f) => player[f.key]) && (
-        <div style={pstyles.horizonRow}>
-          {GOAL_HORIZON_FIELDS.filter((f) => player[f.key]).map((f) => (
-            <div key={f.key} style={pstyles.horizonCell}>
-              <div style={pstyles.horizonLabel}>{f.label}</div>
-              <div>{player[f.key]}</div>
-            </div>
-          ))}
-        </div>
-      )}
-
       <div style={pstyles.grid}>
         {CATEGORY_META.map((cat) => {
           const skills = categorySkillsForPlayer(config, player, cat.key);
@@ -4772,6 +4761,17 @@ function PrintableReport({ player, teamName, config, goals, colA, colB }) {
           );
         })}
       </div>
+
+      {GOAL_HORIZON_FIELDS.some((f) => player[f.key]) && (
+        <div style={pstyles.horizonRow}>
+          {GOAL_HORIZON_FIELDS.filter((f) => player[f.key]).map((f) => (
+            <div key={f.key} style={pstyles.horizonCell}>
+              <div style={pstyles.horizonLabel}>{f.label}</div>
+              <div>{player[f.key]}</div>
+            </div>
+          ))}
+        </div>
+      )}
 
       <div style={pstyles.footerRow}>
         <table style={pstyles.legendTable}>
