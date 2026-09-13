@@ -193,6 +193,17 @@ create table if not exists coaches (
   team_id text references teams(id) on delete set null
 );
 
+-- The app was originally login-free by design (see README). Adding a login
+-- screen for the coach side (never for the player self-eval link, which
+-- stays token-only) means each coach needs credentials. password_hash is a
+-- bcrypt hash, never the plaintext password; '' means "no password set
+-- yet" and that account cannot log in until one is set from the Trænere
+-- screen. email must be unique (and non-empty) to log in with it, but the
+-- column itself stays nullable/non-unique at the DB level so existing rows
+-- with a blank email don't break the migration — routes/auth.js enforces
+-- uniqueness among non-empty emails at write time instead.
+alter table coaches add column if not exists password_hash text not null default '';
+
 create table if not exists followups (
   id text primary key,
   player_id text not null references players(id) on delete cascade,

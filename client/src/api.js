@@ -22,6 +22,22 @@ export function getBootstrap() {
   return request("GET", "/api/bootstrap");
 }
 
+export function getAuthStatus() {
+  return request("GET", "/api/auth/status");
+}
+
+export function setupAccount({ name, email, password }) {
+  return request("POST", "/api/auth/setup", { name, email, password });
+}
+
+export function login({ email, password }) {
+  return request("POST", "/api/auth/login", { email, password });
+}
+
+export function logout() {
+  return request("POST", "/api/auth/logout");
+}
+
 export function createTeam(name) {
   return request("POST", "/api/teams", { name });
 }
@@ -142,8 +158,8 @@ export function setSelfGoalProgress(token, periodId, skillId, progress) {
   );
 }
 
-export function createCoach({ name, email, teamId }) {
-  return request("POST", "/api/coaches", { name, email, teamId });
+export function createCoach({ name, email, teamId, password }) {
+  return request("POST", "/api/coaches", { name, email, teamId, password });
 }
 
 export function updateCoach(id, patch) {

@@ -49,6 +49,7 @@ import {
   ChevronDown,
   List,
   ListOrdered,
+  LogOut,
 } from "lucide-react";
 import * as api from "./api.js";
 
@@ -411,7 +412,7 @@ const NAV_ITEMS = [
   },
 ];
 
-function ClubHeader({ view, setView, setSelectedId }) {
+function ClubHeader({ view, setView, setSelectedId, coach, onLogout }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const current = NAV_ITEMS.find((item) => item.isActive(view)) || NAV_ITEMS[0];
   const CurrentIcon = current.icon;
@@ -429,7 +430,15 @@ function ClubHeader({ view, setView, setSelectedId }) {
             <span style={styles.brandText}>VB PIGE AKADEMI</span>
             <span style={styles.brandSub}>Spillerudvikling</span>
           </div>
-          <img src={LOGO_SRC} alt="Klublogo" style={styles.logoImg} />
+          <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+            {coach && (
+              <button style={styles.logoutBtn} onClick={onLogout} title="Log ud">
+                <span style={styles.coachNameTag}>{coach.name}</span>
+                <LogOut size={14} />
+              </button>
+            )}
+            <img src={LOGO_SRC} alt="Klublogo" style={styles.logoImg} />
+          </div>
         </div>
       </div>
       <div style={styles.headerNavBar}>
@@ -473,6 +482,140 @@ function ClubHeader({ view, setView, setSelectedId }) {
   );
 }
 
+// Shared shell for the two screens shown before any coach is logged in —
+// same dark full-bleed background + centered card as the loading screen,
+// so the very first thing a coach sees doesn't look like a different app.
+function AuthShell({ title, subtitle, children }) {
+  return (
+    <div style={styles.authWrap}>
+      <img src={LOGO_SRC} alt="Klublogo" style={{ width: 56, height: 56, marginBottom: 4 }} />
+      <div style={styles.authCard}>
+        <h1 style={styles.authTitle}>{title}</h1>
+        {subtitle && <p style={styles.authSubtitle}>{subtitle}</p>}
+        {children}
+      </div>
+    </div>
+  );
+}
+
+// Shown once, exactly when the coaches table is empty (a brand new install
+// or a fresh migration) — see GET /api/auth/status. After this succeeds
+// there is always at least one coach, so it never shows again; every coach
+// after the first is created from the (login-protected) Trænere screen.
+function SetupScreen({ onSuccess }) {
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
+  const submit = async (e) => {
+    e.preventDefault();
+    setError("");
+    setSubmitting(true);
+    try {
+      const coach = await api.setupAccount({ name: name.trim(), email: email.trim(), password });
+      onSuccess(coach);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <AuthShell
+      title="Velkommen til VB Pige Akademi"
+      subtitle="Der er ingen trænerkonti endnu — opret den første herunder. Flere trænere kan tilføjes bagefter under Indstillinger → Trænere."
+    >
+      <form onSubmit={submit}>
+        {error && <div style={styles.errorBannerRow}>{error}</div>}
+        <div style={{ marginBottom: 12 }}>
+          <div style={styles.fieldLabel}>Navn</div>
+          <input style={styles.input} value={name} onChange={(e) => setName(e.target.value)} required autoFocus />
+        </div>
+        <div style={{ marginBottom: 12 }}>
+          <div style={styles.fieldLabel}>E-mail</div>
+          <input
+            style={styles.input}
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+          />
+        </div>
+        <div style={{ marginBottom: 16 }}>
+          <div style={styles.fieldLabel}>Adgangskode (mindst 6 tegn)</div>
+          <input
+            style={styles.input}
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            minLength={6}
+            required
+          />
+        </div>
+        <button style={{ ...styles.primaryBtn, width: "100%", justifyContent: "center" }} disabled={submitting}>
+          {submitting ? "Opretter…" : "Opret konto og log ind"}
+        </button>
+      </form>
+    </AuthShell>
+  );
+}
+
+function LoginScreen({ onSuccess }) {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
+  const submit = async (e) => {
+    e.preventDefault();
+    setError("");
+    setSubmitting(true);
+    try {
+      const coach = await api.login({ email: email.trim(), password });
+      onSuccess(coach);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <AuthShell title="VB Pige Akademi" subtitle="Log ind for at fortsætte.">
+      <form onSubmit={submit}>
+        {error && <div style={styles.errorBannerRow}>{error}</div>}
+        <div style={{ marginBottom: 12 }}>
+          <div style={styles.fieldLabel}>E-mail</div>
+          <input
+            style={styles.input}
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+            autoFocus
+          />
+        </div>
+        <div style={{ marginBottom: 16 }}>
+          <div style={styles.fieldLabel}>Adgangskode</div>
+          <input
+            style={styles.input}
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+          />
+        </div>
+        <button style={{ ...styles.primaryBtn, width: "100%", justifyContent: "center" }} disabled={submitting}>
+          {submitting ? "Logger ind…" : "Log ind"}
+        </button>
+      </form>
+    </AuthShell>
+  );
+}
+
 function SettingsSubNav({ view, setView }) {
   return (
     <div style={styles.teamFilterRow}>
@@ -509,39 +652,62 @@ export default function AcademyApp() {
   const [newSkillGroupId, setNewSkillGroupId] = useState("");
   const [confirmDelete, setConfirmDelete] = useState(null);
   const [urlToken] = useState(getUrlToken);
+  // null while checking; otherwise { setupNeeded, coach } — coach is null
+  // when logged out. Only relevant off the self-eval link: a player never
+  // sees or triggers any of this, urlToken skips straight to api.getSelf.
+  const [authStatus, setAuthStatus] = useState(null);
 
   useEffect(() => {
     (async () => {
       try {
         if (urlToken) {
           // Self-eval link: fetch only this one player's scoped data, never
-          // the full roster (the server enforces the token match).
+          // the full roster, and never touches coach auth — the server
+          // enforces the token match on its own, with no login involved.
           const result = await api.getSelf(urlToken);
           setSelfData(result);
         } else {
-          const result = await api.getBootstrap();
-          setData(result);
+          const status = await api.getAuthStatus();
+          setAuthStatus(status);
+          if (!status.setupNeeded && status.coach) {
+            const result = await api.getBootstrap();
+            setData(result);
+          }
         }
       } catch (e) {
         if (urlToken) {
           setSelfInvalid(true);
-        } else {
-          setData({
-            config: makeDefaultConfig(),
-            players: [],
-            periods: [],
-            evaluations: {},
-            goals: {},
-            teams: [],
-            coaches: [],
-            followups: {},
-          });
         }
+        // Off the self-eval link, leaving authStatus/data unset here is
+        // deliberate: a failed status check (server unreachable) falls
+        // through to the login screen's own error state on next attempt
+        // rather than a silently empty roster.
       } finally {
         setLoading(false);
       }
     })();
   }, [urlToken]);
+
+  // Called by LoginScreen/SetupScreen once the server confirms a session;
+  // loads the real roster right after, so the coach lands in the app
+  // itself rather than on a second blank beat.
+  const handleAuthed = async (coach) => {
+    setAuthStatus({ setupNeeded: false, coach });
+    setLoading(true);
+    try {
+      const result = await api.getBootstrap();
+      setData(result);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleLogout = () =>
+    runMutation(async () => {
+      await api.logout();
+      setData(null);
+      setAuthStatus({ setupNeeded: false, coach: null });
+    });
 
   useEffect(() => {
     if (!newSkillGroupId && data?.config?.groups?.length) {
@@ -554,6 +720,14 @@ export default function AcademyApp() {
       await action();
       setSaveError(false);
     } catch (e) {
+      // The session expired (or was revoked) mid-use — send the coach back
+      // to the login screen instead of a generic save-failed banner they
+      // can't act on.
+      if (e.message === "Not authenticated") {
+        setData(null);
+        setAuthStatus({ setupNeeded: false, coach: null });
+        return;
+      }
       setSaveError(true);
     }
   }, []);
@@ -639,6 +813,9 @@ export default function AcademyApp() {
       />
     );
   }
+
+  if (authStatus?.setupNeeded) return <SetupScreen onSuccess={handleAuthed} />;
+  if (!authStatus?.coach) return <LoginScreen onSuccess={handleAuthed} />;
 
   if (!data) return null;
 
@@ -937,24 +1114,40 @@ export default function AcademyApp() {
       setData({ ...data, players });
     });
 
-  const createCoach = async (name, email, teamId) => {
-    let created = null;
-    await runMutation(async () => {
-      created = await api.createCoach({ name, email, teamId });
-      setData({ ...data, coaches: [...(data.coaches || []), created] });
-    });
-    return created ? created.id : null;
+  // Coach create/update/delete have real, user-fixable validation errors
+  // (duplicate e-mail, too-short password, "can't delete the last coach")
+  // — unlike runMutation's other callers, these need to reach CoachesView's
+  // own inline error display rather than being swallowed into the generic
+  // "couldn't save" banner. The one thing still worth sharing with
+  // runMutation is the "session expired" redirect.
+  const withCoachAuthRedirect = async (fn) => {
+    try {
+      return await fn();
+    } catch (e) {
+      if (e.message === "Not authenticated") {
+        setData(null);
+        setAuthStatus({ setupNeeded: false, coach: null });
+      }
+      throw e;
+    }
   };
 
+  const createCoach = (name, email, teamId, password) =>
+    withCoachAuthRedirect(async () => {
+      const created = await api.createCoach({ name, email, teamId, password });
+      setData({ ...data, coaches: [...(data.coaches || []), created] });
+      return created;
+    });
+
   const updateCoach = (coachId, patch) =>
-    runMutation(async () => {
+    withCoachAuthRedirect(async () => {
       const updated = await api.updateCoach(coachId, patch);
       const coaches = (data.coaches || []).map((c) => (c.id === coachId ? updated : c));
       setData({ ...data, coaches });
     });
 
   const deleteCoach = (coachId) =>
-    runMutation(async () => {
+    withCoachAuthRedirect(async () => {
       await api.deleteCoach(coachId);
       const coaches = (data.coaches || []).filter((c) => c.id !== coachId);
       const followups = {};
@@ -992,7 +1185,13 @@ export default function AcademyApp() {
   return (
     <div style={styles.app}>
       <PrintStyles />
-      <ClubHeader view={view} setView={setView} setSelectedId={setSelectedId} />
+      <ClubHeader
+        view={view}
+        setView={setView}
+        setSelectedId={setSelectedId}
+        coach={authStatus.coach}
+        onLogout={handleLogout}
+      />
 
       <main style={styles.main}>
         {saveError && (
@@ -2476,37 +2675,69 @@ function CoachesView({ coaches, teams, onCreate, onUpdate, onDelete }) {
   const [creating, setCreating] = useState(false);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [teamId, setTeamId] = useState("");
+  const [createError, setCreateError] = useState("");
   const [editingId, setEditingId] = useState(null);
   const [editName, setEditName] = useState("");
   const [editEmail, setEditEmail] = useState("");
+  const [editPassword, setEditPassword] = useState("");
   const [editTeamId, setEditTeamId] = useState("");
+  const [editError, setEditError] = useState("");
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
+  const [deleteError, setDeleteError] = useState("");
 
   const submitCreate = async () => {
     if (!name.trim()) return;
-    await onCreate(name.trim(), email.trim(), teamId || null);
-    setName("");
-    setEmail("");
-    setTeamId("");
-    setCreating(false);
+    setCreateError("");
+    try {
+      await onCreate(name.trim(), email.trim(), teamId || null, password);
+      setName("");
+      setEmail("");
+      setPassword("");
+      setTeamId("");
+      setCreating(false);
+    } catch (e) {
+      setCreateError(e.message);
+    }
   };
 
   const startEdit = (coach) => {
     setEditingId(coach.id);
     setEditName(coach.name);
     setEditEmail(coach.email || "");
+    setEditPassword("");
     setEditTeamId(coach.teamId || "");
+    setEditError("");
   };
 
   const submitEdit = async () => {
     if (!editName.trim()) return;
-    await onUpdate(editingId, {
-      name: editName.trim(),
-      email: editEmail.trim(),
-      teamId: editTeamId || null,
-    });
-    setEditingId(null);
+    setEditError("");
+    try {
+      await onUpdate(editingId, {
+        name: editName.trim(),
+        email: editEmail.trim(),
+        teamId: editTeamId || null,
+        // Omitted (not even sent as "") when left blank, so the server
+        // leaves the existing password alone — see routes/coaches.js.
+        ...(editPassword ? { password: editPassword } : {}),
+      });
+      setEditingId(null);
+    } catch (e) {
+      setEditError(e.message);
+    }
+  };
+
+  const confirmDelete = async () => {
+    const id = confirmDeleteId;
+    setDeleteError("");
+    try {
+      await onDelete(id);
+      setConfirmDeleteId(null);
+    } catch (e) {
+      setDeleteError(e.message);
+    }
   };
 
   const teamName = (id) => teams.find((t) => t.id === id)?.name || null;
@@ -2527,6 +2758,7 @@ function CoachesView({ coaches, teams, onCreate, onUpdate, onDelete }) {
 
       {creating && (
         <div style={styles.addCardCol}>
+          {createError && <div style={styles.errorBannerRow}>{createError}</div>}
           <input
             style={styles.input}
             placeholder="Navn"
@@ -2537,9 +2769,16 @@ function CoachesView({ coaches, teams, onCreate, onUpdate, onDelete }) {
           <input
             style={styles.input}
             type="email"
-            placeholder="E-mail"
+            placeholder="E-mail (bruges til login)"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
+          />
+          <input
+            style={styles.input}
+            type="password"
+            placeholder="Adgangskode (mindst 6 tegn)"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
           />
           {teams.length > 0 && (
             <div>
@@ -2579,6 +2818,7 @@ function CoachesView({ coaches, teams, onCreate, onUpdate, onDelete }) {
         <div key={c.id} style={styles.periodRow}>
           {editingId === c.id ? (
             <div style={{ display: "flex", gap: 10, flexWrap: "wrap", flex: 1 }}>
+              {editError && <div style={{ ...styles.errorBannerRow, width: "100%" }}>{editError}</div>}
               <input
                 style={styles.input}
                 value={editName}
@@ -2590,6 +2830,13 @@ function CoachesView({ coaches, teams, onCreate, onUpdate, onDelete }) {
                 type="email"
                 value={editEmail}
                 onChange={(e) => setEditEmail(e.target.value)}
+              />
+              <input
+                style={styles.input}
+                type="password"
+                placeholder="Ny adgangskode (lad stå tom for at beholde)"
+                value={editPassword}
+                onChange={(e) => setEditPassword(e.target.value)}
               />
               {teams.length > 0 && (
                 <select
@@ -2646,17 +2893,18 @@ function CoachesView({ coaches, teams, onCreate, onUpdate, onDelete }) {
               Tidligere registrerede opfølgninger bevares, men vises ikke længere med trænerens
               navn.
             </div>
+            {deleteError && <div style={styles.errorBannerRow}>{deleteError}</div>}
             <div style={styles.modalActions}>
-              <button style={styles.ghostBtn} onClick={() => setConfirmDeleteId(null)}>
-                Annuller
-              </button>
               <button
-                style={styles.dangerBtn}
+                style={styles.ghostBtn}
                 onClick={() => {
-                  onDelete(confirmDeleteId);
                   setConfirmDeleteId(null);
+                  setDeleteError("");
                 }}
               >
+                Annuller
+              </button>
+              <button style={styles.dangerBtn} onClick={confirmDelete}>
                 Slet
               </button>
             </div>
@@ -6449,6 +6697,38 @@ const styles = {
     justifyContent: "center",
     gap: 12,
   },
+  authWrap: {
+    minHeight: "100vh",
+    background: "#111111",
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 4,
+    padding: 20,
+  },
+  authCard: {
+    width: "100%",
+    maxWidth: 380,
+    background: "#FFFFFF",
+    borderRadius: 14,
+    padding: "28px 26px",
+    boxSizing: "border-box",
+  },
+  authTitle: {
+    fontFamily: "'Oswald', sans-serif",
+    fontSize: 20,
+    fontWeight: 700,
+    margin: "0 0 6px",
+    textAlign: "center",
+  },
+  authSubtitle: {
+    fontSize: 13,
+    color: "#6B6B6B",
+    textAlign: "center",
+    margin: "0 0 20px",
+    lineHeight: 1.5,
+  },
   header: {
     position: "sticky",
     top: 0,
@@ -6489,6 +6769,21 @@ const styles = {
     height: 40,
     objectFit: "contain",
     flexShrink: 0,
+  },
+  logoutBtn: {
+    display: "flex",
+    alignItems: "center",
+    gap: 6,
+    background: "transparent",
+    border: "1px solid #D9D4C7",
+    borderRadius: 8,
+    padding: "6px 10px",
+    color: "#4A4A4A",
+    cursor: "pointer",
+  },
+  coachNameTag: {
+    fontSize: 12,
+    fontWeight: 600,
   },
   headerNavBar: {
     background: "#111111",
