@@ -1174,6 +1174,7 @@ function PlayerSelfEvalApp({ player, config, periods, coachEvaluations, goals, d
   const [printPanelOpen, setPrintPanelOpen] = useState(false);
   const [printColBMode, setPrintColBMode] = useState("goal");
   const [printColBPeriodId, setPrintColBPeriodId] = useState(null);
+  const [planExpanded, setPlanExpanded] = useState(false);
 
   useEffect(() => {
     if (!selectedPeriodId && periods.length) {
@@ -1235,30 +1236,6 @@ function PlayerSelfEvalApp({ player, config, periods, coachEvaluations, goals, d
           Her kan du se din træners vurdering og opdatere din egen indsats på dine udviklingsmål.
           Du kan ikke ændre selve scoren — det gør din træner.
         </div>
-
-        {hasDevelopmentPlanContent(developmentPlan) && (
-          <div style={styles.goalsOverviewCard}>
-            <div style={styles.goalsOverviewHead}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <ClipboardList size={16} color="#1A1A1A" />
-                <span style={styles.categoryLabel}>Din udviklingsplan</span>
-                {developmentPlan.seasonLabel && (
-                  <span style={styles.goalOverviewCat}>{developmentPlan.seasonLabel}</span>
-                )}
-              </div>
-              <button
-                style={styles.linkBtn}
-                onClick={() => printDevelopmentPlan(player, developmentPlan)}
-              >
-                <Printer size={12} /> Print
-              </button>
-            </div>
-            <div
-              className="rp-content"
-              dangerouslySetInnerHTML={{ __html: developmentPlan.contentHtml }}
-            />
-          </div>
-        )}
 
         {hasGoals && (
           <div style={styles.goalsOverviewCard}>
@@ -1322,6 +1299,37 @@ function PlayerSelfEvalApp({ player, config, periods, coachEvaluations, goals, d
             <div style={{ color: "#6B6B6B", fontSize: 14 }}>
               Din træner har ikke sat nogen mål for dig endnu.
             </div>
+          </div>
+        )}
+
+        {hasDevelopmentPlanContent(developmentPlan) && (
+          <div style={styles.goalsOverviewCard}>
+            <div style={styles.goalsOverviewHead}>
+              <button
+                type="button"
+                style={styles.collapseHeaderBtn}
+                onClick={() => setPlanExpanded((v) => !v)}
+              >
+                {planExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                <ClipboardList size={16} color="#1A1A1A" />
+                <span style={styles.categoryLabel}>Din udviklingsplan</span>
+                {developmentPlan.seasonLabel && (
+                  <span style={styles.goalOverviewCat}>{developmentPlan.seasonLabel}</span>
+                )}
+              </button>
+              <button
+                style={styles.linkBtn}
+                onClick={() => printDevelopmentPlan(player, developmentPlan)}
+              >
+                <Printer size={12} /> Print
+              </button>
+            </div>
+            {planExpanded && (
+              <div
+                className="rp-content"
+                dangerouslySetInnerHTML={{ __html: developmentPlan.contentHtml }}
+              />
+            )}
           </div>
         )}
 
@@ -1756,6 +1764,7 @@ function RichTextEditor({ value, onChange }) {
 // why print/read views can safely no-op when nothing has been written yet.
 function DevelopmentPlanCard({ player, plan, onSave }) {
   const [editing, setEditing] = useState(false);
+  const [expanded, setExpanded] = useState(false);
   const [draft, setDraft] = useState(EMPTY_DEVELOPMENT_PLAN);
   const current = plan || EMPTY_DEVELOPMENT_PLAN;
   const hasContent = hasDevelopmentPlanContent(current);
@@ -1768,15 +1777,24 @@ function DevelopmentPlanCard({ player, plan, onSave }) {
   const save = () => {
     onSave({ seasonLabel: draft.seasonLabel.trim(), contentHtml: draft.contentHtml });
     setEditing(false);
+    setExpanded(true);
   };
 
   return (
     <div style={styles.categoryBlock}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <ClipboardList size={15} color="#1A1A1A" />
-          <span style={styles.categoryLabel}>Udviklingsplan</span>
-        </div>
+        {hasContent && !editing ? (
+          <button type="button" style={styles.collapseHeaderBtn} onClick={() => setExpanded((v) => !v)}>
+            {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+            <ClipboardList size={15} color="#1A1A1A" />
+            <span style={styles.categoryLabel}>Udviklingsplan</span>
+          </button>
+        ) : (
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <ClipboardList size={15} color="#1A1A1A" />
+            <span style={styles.categoryLabel}>Udviklingsplan</span>
+          </div>
+        )}
         <div style={{ display: "flex", gap: 8 }}>
           {!editing && hasContent && (
             <button style={styles.linkBtn} onClick={() => printDevelopmentPlan(player, current)}>
@@ -1795,7 +1813,7 @@ function DevelopmentPlanCard({ player, plan, onSave }) {
         <p style={styles.subtext}>Ingen udviklingsplan skrevet endnu.</p>
       )}
 
-      {!editing && hasContent && (
+      {!editing && hasContent && expanded && (
         <div>
           {current.seasonLabel && (
             <div style={{ fontWeight: 700, marginBottom: 6 }}>{current.seasonLabel}</div>
@@ -3675,8 +3693,6 @@ function PlayerView({
 
       <LongTermGoalsCard player={player} onSave={onUpdateGoalHorizons} />
 
-      <DevelopmentPlanCard player={player} plan={developmentPlan} onSave={onSaveDevelopmentPlan} />
-
       <GoalsOverview
         config={config}
         goals={periodGoals}
@@ -3697,6 +3713,8 @@ function PlayerView({
           selectedPeriod && onSetGoalProgress(selectedPeriod.id, skillId, progress)
         }
       />
+
+      <DevelopmentPlanCard player={player} plan={developmentPlan} onSave={onSaveDevelopmentPlan} />
 
       {periods.length === 0 ? (
         <div style={styles.emptyState}>
@@ -6719,6 +6737,16 @@ const styles = {
     alignItems: "center",
     gap: 10,
     marginTop: 4,
+  },
+  collapseHeaderBtn: {
+    display: "flex",
+    alignItems: "center",
+    gap: 8,
+    background: "transparent",
+    border: "none",
+    padding: 0,
+    cursor: "pointer",
+    textAlign: "left",
   },
   linkBtn: {
     display: "flex",
