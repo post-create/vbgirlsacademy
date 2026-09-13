@@ -19,6 +19,7 @@ const followupsRouter = require("./routes/followups");
 const notificationsRouter = require("./routes/notifications");
 const participationLevelsRouter = require("./routes/participationLevels");
 const matchPlansRouter = require("./routes/matchPlans");
+const developmentPlansRouter = require("./routes/developmentPlans");
 
 const app = express();
 app.use(express.json());
@@ -37,6 +38,7 @@ app.use("/api/self", selfRouter);
 app.use("/api/notifications", notificationsRouter);
 app.use("/api/participation-levels", participationLevelsRouter);
 app.use("/api/match-plans", matchPlansRouter);
+app.use("/api/development-plans", developmentPlansRouter);
 
 if (process.env.NODE_ENV === "production") {
   const clientDist = path.join(__dirname, "..", "client", "dist");

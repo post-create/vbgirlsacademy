@@ -607,6 +607,7 @@ export default function AcademyApp() {
         periods={sortedPeriods(selfData.periods)}
         coachEvaluations={selfData.evaluations}
         goals={selfData.goals}
+        developmentPlan={selfData.developmentPlan}
         onSetGoalProgress={setSelfGoalProgress}
       />
     );
@@ -695,6 +696,13 @@ export default function AcademyApp() {
       await api.updatePlayer(playerId, patch);
       const players = data.players.map((p) => (p.id === playerId ? { ...p, ...patch } : p));
       setData({ ...data, players });
+    });
+
+  const saveDevelopmentPlan = (playerId, plan) =>
+    runMutation(async () => {
+      const saved = await api.saveDevelopmentPlan(playerId, plan);
+      const developmentPlans = { ...data.developmentPlans, [playerId]: saved };
+      setData({ ...data, developmentPlans });
     });
 
   const createParticipationLevel = (name, numericValue) =>
@@ -1077,6 +1085,8 @@ export default function AcademyApp() {
             teams={data.teams}
             evaluations={data.evaluations[selectedPlayer.id] || {}}
             goals={data.goals[selectedPlayer.id] || {}}
+            developmentPlan={(data.developmentPlans || {})[selectedPlayer.id] || null}
+            onSaveDevelopmentPlan={(plan) => saveDevelopmentPlan(selectedPlayer.id, plan)}
             onBack={() => {
               setView("roster");
               setSelectedId(null);
@@ -1129,7 +1139,7 @@ export default function AcademyApp() {
 }
 
 /* ---------- Player self-evaluation (accessed only via a private link) ---------- */
-function PlayerSelfEvalApp({ player, config, periods, coachEvaluations, goals, onSetGoalProgress }) {
+function PlayerSelfEvalApp({ player, config, periods, coachEvaluations, goals, developmentPlan, onSetGoalProgress }) {
   const [selectedPeriodId, setSelectedPeriodId] = useState(
     periods.length ? periods[periods.length - 1].id : null
   );
@@ -1198,6 +1208,72 @@ function PlayerSelfEvalApp({ player, config, periods, coachEvaluations, goals, o
           Her kan du se din træners vurdering og opdatere din egen indsats på dine udviklingsmål.
           Du kan ikke ændre selve scoren — det gør din træner.
         </div>
+
+        {hasDevelopmentPlanContent(developmentPlan) && (
+          <div style={styles.goalsOverviewCard}>
+            <div style={styles.goalsOverviewHead}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <ClipboardList size={16} color="#1A1A1A" />
+                <span style={styles.categoryLabel}>Din udviklingsplan</span>
+                {developmentPlan.seasonLabel && (
+                  <span style={styles.goalOverviewCat}>{developmentPlan.seasonLabel}</span>
+                )}
+              </div>
+              <button
+                style={styles.linkBtn}
+                onClick={() => printDevelopmentPlan(player, developmentPlan)}
+              >
+                <Printer size={12} /> Print
+              </button>
+            </div>
+            {developmentPlan.intro && (
+              <p style={{ margin: "0 0 10px", fontSize: 14, whiteSpace: "pre-wrap" }}>
+                {developmentPlan.intro}
+              </p>
+            )}
+            {developmentPlan.matchPath.length > 0 && (
+              <div style={{ marginBottom: 10 }}>
+                <div style={styles.fieldLabel}>Kampsti</div>
+                <ul style={{ margin: "4px 0 0", paddingLeft: 18, fontSize: 14 }}>
+                  {developmentPlan.matchPath.map((l, i) => (
+                    <li key={i}>{l}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {developmentPlan.selfTraining && (
+              <div style={{ marginBottom: 10 }}>
+                <div style={styles.fieldLabel}>Egentræning</div>
+                <p style={{ margin: 0, fontSize: 14, whiteSpace: "pre-wrap" }}>
+                  {developmentPlan.selfTraining}
+                </p>
+              </div>
+            )}
+            {(developmentPlan.statsIntro || developmentPlan.statsItems.length > 0) && (
+              <div style={{ marginBottom: 10 }}>
+                <div style={styles.fieldLabel}>Statistik vi følger</div>
+                {developmentPlan.statsIntro && (
+                  <p style={{ margin: "0 0 4px", fontSize: 14 }}>{developmentPlan.statsIntro}</p>
+                )}
+                <ul style={{ margin: 0, paddingLeft: 18, fontSize: 14 }}>
+                  {developmentPlan.statsItems.map((l, i) => (
+                    <li key={i}>{l}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {developmentPlan.followups.length > 0 && (
+              <div>
+                <div style={styles.fieldLabel}>Opfølgning</div>
+                <ul style={{ margin: "4px 0 0", paddingLeft: 18, fontSize: 14 }}>
+                  {developmentPlan.followups.map((l, i) => (
+                    <li key={i}>{l}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        )}
 
         {hasGoals && (
           <div style={styles.goalsOverviewCard}>
@@ -1349,33 +1425,38 @@ function PlayerSelfEvalApp({ player, config, periods, coachEvaluations, goals, o
 
             {selectedPeriod &&
               createPortal(
-                <PrintableReport
-                  player={player}
-                  config={config}
-                  goals={periodGoals}
-                  colA={{
-                    label: `${selectedPeriod.label} (${formatDate(selectedPeriod.date)})`,
-                    scores,
-                  }}
-                  colB={
-                    printColBMode === "goal"
-                      ? {
-                          label: "Mål",
-                          scores: Object.fromEntries(
-                            Object.keys(periodGoals).map((id) => [id, periodGoals[id].target])
-                          ),
-                        }
-                      : {
-                          label: (() => {
-                            const p = periods.find((pp) => pp.id === printColBPeriodId);
-                            return p ? `${p.label} (${formatDate(p.date)})` : "Anden periode";
-                          })(),
-                          scores: printColBPeriodId
-                            ? coachEvaluations[printColBPeriodId]?.scores || {}
-                            : {},
-                        }
-                  }
-                />,
+                <>
+                  <PrintableReport
+                    player={player}
+                    config={config}
+                    goals={periodGoals}
+                    colA={{
+                      label: `${selectedPeriod.label} (${formatDate(selectedPeriod.date)})`,
+                      scores,
+                    }}
+                    colB={
+                      printColBMode === "goal"
+                        ? {
+                            label: "Mål",
+                            scores: Object.fromEntries(
+                              Object.keys(periodGoals).map((id) => [id, periodGoals[id].target])
+                            ),
+                          }
+                        : {
+                            label: (() => {
+                              const p = periods.find((pp) => pp.id === printColBPeriodId);
+                              return p ? `${p.label} (${formatDate(p.date)})` : "Anden periode";
+                            })(),
+                            scores: printColBPeriodId
+                              ? coachEvaluations[printColBPeriodId]?.scores || {}
+                              : {},
+                          }
+                    }
+                  />
+                  {hasDevelopmentPlanContent(developmentPlan) && (
+                    <DevelopmentPlanPrintSection player={player} plan={developmentPlan} />
+                  )}
+                </>,
                 document.body
               )}
 
@@ -1598,6 +1679,258 @@ function LongTermGoalsCard({ player, onSave }) {
               />
             </div>
           ))}
+          <div style={{ display: "flex", gap: 8 }}>
+            <button style={styles.primaryBtnSm} onClick={save}>
+              Gem
+            </button>
+            <button style={styles.ghostBtn} onClick={() => setEditing(false)}>
+              Annuller
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+const EMPTY_DEVELOPMENT_PLAN = {
+  seasonLabel: "",
+  intro: "",
+  matchPath: [],
+  selfTraining: "",
+  statsIntro: "",
+  statsItems: [],
+  followups: [],
+};
+
+// True once there's anything worth printing — used to hide the plan section
+// from both print flows (and the standalone print button) for a player
+// nobody has written a plan for yet, rather than printing an empty shell.
+function hasDevelopmentPlanContent(plan) {
+  if (!plan) return false;
+  return Boolean(
+    (plan.intro || "").trim() ||
+      (plan.matchPath || []).some((l) => l.trim()) ||
+      (plan.selfTraining || "").trim() ||
+      (plan.statsIntro || "").trim() ||
+      (plan.statsItems || []).some((l) => l.trim()) ||
+      (plan.followups || []).some((l) => l.trim())
+  );
+}
+
+// Editor for a list of free-text lines (kampsti phases, stats bullets,
+// opfølgning entries) — same "one line per row, add/remove" shape for all
+// three, so there's one component instead of three near-identical ones.
+function LineListEditor({ lines, onChange, placeholder, addLabel }) {
+  const update = (i, value) => {
+    const next = [...lines];
+    next[i] = value;
+    onChange(next);
+  };
+  const remove = (i) => onChange(lines.filter((_, idx) => idx !== i));
+
+  return (
+    <div>
+      {lines.map((line, i) => (
+        <div key={i} style={{ display: "flex", gap: 6, marginBottom: 6, alignItems: "flex-start" }}>
+          <textarea
+            style={{ ...styles.textarea, minHeight: 36, flex: 1 }}
+            value={line}
+            placeholder={placeholder}
+            onChange={(e) => update(i, e.target.value)}
+          />
+          <button style={styles.ghostBtn} onClick={() => remove(i)} title="Fjern linje">
+            <X size={14} />
+          </button>
+        </div>
+      ))}
+      <button style={styles.linkBtn} onClick={() => onChange([...lines, ""])}>
+        <Plus size={12} /> {addLabel}
+      </button>
+    </div>
+  );
+}
+
+// The one running udviklingsplan for a player — narrative intro, kampsti
+// (match path across leagues/levels), egentræning, tracked stats and the
+// follow-up cadence. Per-skill targets stay in the existing goals table and
+// are pulled in separately when this prints; this card only owns the prose
+// around them. See hasDevelopmentPlanContent for why print/read views can
+// safely no-op when nothing has been written yet.
+function DevelopmentPlanCard({ player, plan, onSave }) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(EMPTY_DEVELOPMENT_PLAN);
+  const current = plan || EMPTY_DEVELOPMENT_PLAN;
+
+  const startEdit = () => {
+    setDraft({
+      seasonLabel: current.seasonLabel || "",
+      intro: current.intro || "",
+      matchPath: current.matchPath && current.matchPath.length ? current.matchPath : [""],
+      selfTraining: current.selfTraining || "",
+      statsIntro: current.statsIntro || "",
+      statsItems: current.statsItems && current.statsItems.length ? current.statsItems : [""],
+      followups: current.followups && current.followups.length ? current.followups : [""],
+    });
+    setEditing(true);
+  };
+
+  const save = () => {
+    onSave({
+      seasonLabel: draft.seasonLabel.trim(),
+      intro: draft.intro.trim(),
+      matchPath: draft.matchPath.map((l) => l.trim()).filter(Boolean),
+      selfTraining: draft.selfTraining.trim(),
+      statsIntro: draft.statsIntro.trim(),
+      statsItems: draft.statsItems.map((l) => l.trim()).filter(Boolean),
+      followups: draft.followups.map((l) => l.trim()).filter(Boolean),
+    });
+    setEditing(false);
+  };
+
+  const hasContent = hasDevelopmentPlanContent(current);
+
+  return (
+    <div style={styles.categoryBlock}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <ClipboardList size={15} color="#1A1A1A" />
+          <span style={styles.categoryLabel}>Udviklingsplan</span>
+        </div>
+        <div style={{ display: "flex", gap: 8 }}>
+          {!editing && hasContent && (
+            <button
+              style={styles.linkBtn}
+              onClick={() => printDevelopmentPlan(player, current)}
+            >
+              <Printer size={12} /> Print udviklingsplan
+            </button>
+          )}
+          {!editing && (
+            <button style={styles.linkBtn} onClick={startEdit}>
+              <Pencil size={12} /> {hasContent ? "Rediger" : "Opret"}
+            </button>
+          )}
+        </div>
+      </div>
+
+      {!editing && !hasContent && (
+        <p style={styles.subtext}>Ingen udviklingsplan skrevet endnu.</p>
+      )}
+
+      {!editing && hasContent && (
+        <div>
+          {current.seasonLabel && (
+            <div style={{ fontWeight: 700, marginBottom: 6 }}>{current.seasonLabel}</div>
+          )}
+          {current.intro && (
+            <p style={{ margin: "0 0 10px", fontSize: 14, whiteSpace: "pre-wrap" }}>{current.intro}</p>
+          )}
+          {current.matchPath.length > 0 && (
+            <div style={{ marginBottom: 10 }}>
+              <div style={styles.fieldLabel}>Kampsti</div>
+              <ul style={{ margin: "4px 0 0", paddingLeft: 18, fontSize: 14 }}>
+                {current.matchPath.map((l, i) => (
+                  <li key={i}>{l}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {current.selfTraining && (
+            <div style={{ marginBottom: 10 }}>
+              <div style={styles.fieldLabel}>Egentræning</div>
+              <p style={{ margin: 0, fontSize: 14, whiteSpace: "pre-wrap" }}>{current.selfTraining}</p>
+            </div>
+          )}
+          {(current.statsIntro || current.statsItems.length > 0) && (
+            <div style={{ marginBottom: 10 }}>
+              <div style={styles.fieldLabel}>Statistik vi følger</div>
+              {current.statsIntro && (
+                <p style={{ margin: "0 0 4px", fontSize: 14 }}>{current.statsIntro}</p>
+              )}
+              <ul style={{ margin: 0, paddingLeft: 18, fontSize: 14 }}>
+                {current.statsItems.map((l, i) => (
+                  <li key={i}>{l}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {current.followups.length > 0 && (
+            <div>
+              <div style={styles.fieldLabel}>Opfølgning</div>
+              <ul style={{ margin: "4px 0 0", paddingLeft: 18, fontSize: 14 }}>
+                {current.followups.map((l, i) => (
+                  <li key={i}>{l}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
+
+      {editing && (
+        <div>
+          <div style={{ marginBottom: 10 }}>
+            <div style={styles.fieldLabel}>Sæson</div>
+            <input
+              style={styles.input}
+              value={draft.seasonLabel}
+              placeholder="fx Efterår 2026 – sommer 2027"
+              onChange={(e) => setDraft({ ...draft, seasonLabel: e.target.value })}
+            />
+          </div>
+          <div style={{ marginBottom: 10 }}>
+            <div style={styles.fieldLabel}>Intro til spilleren</div>
+            <textarea
+              style={{ ...styles.textarea, minHeight: 100 }}
+              value={draft.intro}
+              placeholder="Hej [navn] – her er din udviklingsplan for..."
+              onChange={(e) => setDraft({ ...draft, intro: e.target.value })}
+            />
+          </div>
+          <div style={{ marginBottom: 10 }}>
+            <div style={styles.fieldLabel}>Kampsti (måned for måned)</div>
+            <LineListEditor
+              lines={draft.matchPath}
+              onChange={(matchPath) => setDraft({ ...draft, matchPath })}
+              placeholder="fx September–november 2026: Liga 2 – afprøvning af fokusområder"
+              addLabel="Tilføj fase"
+            />
+          </div>
+          <div style={{ marginBottom: 10 }}>
+            <div style={styles.fieldLabel}>Egentræning</div>
+            <textarea
+              style={{ ...styles.textarea, minHeight: 48 }}
+              value={draft.selfTraining}
+              placeholder="fx 5-10 minutter dagligt, indhold aftales løbende"
+              onChange={(e) => setDraft({ ...draft, selfTraining: e.target.value })}
+            />
+          </div>
+          <div style={{ marginBottom: 10 }}>
+            <div style={styles.fieldLabel}>Statistik vi følger — introsætning</div>
+            <textarea
+              style={{ ...styles.textarea, minHeight: 40 }}
+              value={draft.statsIntro}
+              onChange={(e) => setDraft({ ...draft, statsIntro: e.target.value })}
+            />
+            <div style={{ marginTop: 8 }}>
+              <LineListEditor
+                lines={draft.statsItems}
+                onChange={(statsItems) => setDraft({ ...draft, statsItems })}
+                placeholder="fx Spilletid: 4 kampe, 328 minutter"
+                addLabel="Tilføj statistik-linje"
+              />
+            </div>
+          </div>
+          <div style={{ marginBottom: 10 }}>
+            <div style={styles.fieldLabel}>Opfølgning</div>
+            <LineListEditor
+              lines={draft.followups}
+              onChange={(followups) => setDraft({ ...draft, followups })}
+              placeholder="fx Hver 3. uge: Udviklingsgruppemøde"
+              addLabel="Tilføj opfølgningspunkt"
+            />
+          </div>
           <div style={{ display: "flex", gap: 8 }}>
             <button style={styles.primaryBtnSm} onClick={save}>
               Gem
@@ -3149,6 +3482,8 @@ function PlayerView({
   onUpdateParticipationLevel,
   onUpdateGoalHorizons,
   onGoToPeriods,
+  developmentPlan,
+  onSaveDevelopmentPlan,
 }) {
   const [editingPositions, setEditingPositions] = useState(false);
   const [editingTeam, setEditingTeam] = useState(false);
@@ -3441,6 +3776,8 @@ function PlayerView({
 
       <LongTermGoalsCard player={player} onSave={onUpdateGoalHorizons} />
 
+      <DevelopmentPlanCard player={player} plan={developmentPlan} onSave={onSaveDevelopmentPlan} />
+
       <GoalsOverview
         config={config}
         goals={periodGoals}
@@ -3584,34 +3921,39 @@ function PlayerView({
 
           {selectedPeriod &&
             createPortal(
-              <PrintableReport
-                player={player}
-                teamName={teams.find((t) => t.id === player.teamId)?.name}
-                config={config}
-                goals={periodGoals}
-                colA={{
-                  label: `${selectedPeriod.label} (${formatDate(selectedPeriod.date)})`,
-                  scores,
-                }}
-                colB={
-                  printColBMode === "goal"
-                    ? {
-                        label: "Mål",
-                        scores: Object.fromEntries(
-                          Object.keys(periodGoals).map((id) => [id, periodGoals[id].target])
-                        ),
-                      }
-                    : {
-                        label: (() => {
-                          const p = periods.find((pp) => pp.id === printColBPeriodId);
-                          return p ? `${p.label} (${formatDate(p.date)})` : "Anden periode";
-                        })(),
-                        scores: printColBPeriodId
-                          ? evaluations[printColBPeriodId]?.scores || {}
-                          : {},
-                      }
-                }
-              />,
+              <>
+                <PrintableReport
+                  player={player}
+                  teamName={teams.find((t) => t.id === player.teamId)?.name}
+                  config={config}
+                  goals={periodGoals}
+                  colA={{
+                    label: `${selectedPeriod.label} (${formatDate(selectedPeriod.date)})`,
+                    scores,
+                  }}
+                  colB={
+                    printColBMode === "goal"
+                      ? {
+                          label: "Mål",
+                          scores: Object.fromEntries(
+                            Object.keys(periodGoals).map((id) => [id, periodGoals[id].target])
+                          ),
+                        }
+                      : {
+                          label: (() => {
+                            const p = periods.find((pp) => pp.id === printColBPeriodId);
+                            return p ? `${p.label} (${formatDate(p.date)})` : "Anden periode";
+                          })(),
+                          scores: printColBPeriodId
+                            ? evaluations[printColBPeriodId]?.scores || {}
+                            : {},
+                        }
+                  }
+                />
+                {hasDevelopmentPlanContent(developmentPlan) && (
+                  <DevelopmentPlanPrintSection player={player} plan={developmentPlan} />
+                )}
+              </>,
               document.body
             )}
 
@@ -4428,6 +4770,148 @@ const pstyles = {
   goalsTitle: { fontWeight: 700, fontSize: "8.5pt", marginBottom: 4 },
   goalLine: { marginBottom: 3, lineHeight: 1.35 },
 };
+
+// Appended after PrintableReport in the same portal (see PlayerView and
+// PlayerSelfEvalApp) so "Udskriv rapport" produces one print job covering
+// both the score/goals page and the plan — on its own page via
+// page-break-before, since the two are visually unrelated. Only rendered
+// when hasDevelopmentPlanContent(plan) is true, so a player with no plan
+// yet doesn't get a blank trailing page.
+function DevelopmentPlanPrintSection({ player, plan }) {
+  return (
+    <div className="print-report" style={{ ...pstyles.page, pageBreakBefore: "always" }}>
+      <div style={pstyles.headRow}>
+        <img src={LOGO_SRC} alt="Klublogo" style={pstyles.logo} />
+        <div>
+          <div style={pstyles.title}>Udviklingsplan — {player.name}</div>
+          {plan.seasonLabel && <div style={pstyles.subtitle}>{plan.seasonLabel}</div>}
+        </div>
+      </div>
+
+      {plan.intro && (
+        <div style={{ fontSize: "9pt", lineHeight: 1.5, marginBottom: 10, whiteSpace: "pre-wrap" }}>
+          {plan.intro}
+        </div>
+      )}
+
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+        {plan.matchPath.length > 0 && (
+          <div>
+            <div style={pstyles.goalsTitle}>Kampsti</div>
+            <ul style={{ margin: 0, paddingLeft: 16, fontSize: "8.5pt", lineHeight: 1.5 }}>
+              {plan.matchPath.map((l, i) => (
+                <li key={i}>{l}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+        {plan.followups.length > 0 && (
+          <div>
+            <div style={pstyles.goalsTitle}>Opfølgning</div>
+            <ul style={{ margin: 0, paddingLeft: 16, fontSize: "8.5pt", lineHeight: 1.5 }}>
+              {plan.followups.map((l, i) => (
+                <li key={i}>{l}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+        {plan.selfTraining && (
+          <div>
+            <div style={pstyles.goalsTitle}>Egentræning</div>
+            <p style={{ margin: 0, fontSize: "8.5pt", lineHeight: 1.5, whiteSpace: "pre-wrap" }}>
+              {plan.selfTraining}
+            </p>
+          </div>
+        )}
+        {(plan.statsIntro || plan.statsItems.length > 0) && (
+          <div>
+            <div style={pstyles.goalsTitle}>Statistik vi følger</div>
+            {plan.statsIntro && (
+              <p style={{ margin: "0 0 4px", fontSize: "8.5pt", lineHeight: 1.5 }}>{plan.statsIntro}</p>
+            )}
+            <ul style={{ margin: 0, paddingLeft: 16, fontSize: "8.5pt", lineHeight: 1.5 }}>
+              {plan.statsItems.map((l, i) => (
+                <li key={i}>{l}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// Standalone "print for sig selv" — opens its own window, independent of any
+// period/report-panel state, matching the pattern kpPrintPlan uses for
+// kampplaner. Kept separate from DevelopmentPlanPrintSection (the samlede
+// rapport variant) because that one shares pstyles' A4-landscape sizing with
+// PrintableReport, while this one is a normal A4-portrait letter.
+function printDevelopmentPlan(player, plan) {
+  const printWindow = window.open("", "_blank");
+  if (!printWindow) return false;
+
+  const name = kpEscapeHtml(player.name || "");
+  const season = kpEscapeHtml(plan.seasonLabel || "");
+  const introHtml = (plan.intro || "")
+    .split("\n")
+    .map((line) => (line.trim() ? `<p>${kpEscapeHtml(line)}</p>` : ""))
+    .join("");
+  const listHtml = (items) =>
+    items && items.length ? `<ul>${items.map((l) => `<li>${kpEscapeHtml(l)}</li>`).join("")}</ul>` : "";
+
+  const doc = `<!DOCTYPE html>
+<html lang="da">
+<head>
+<meta charset="UTF-8">
+<title>Udviklingsplan – ${name}</title>
+<style>
+  @page { size: A4; margin: 16mm; }
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 24px; background: #fff; font-family: Arial, sans-serif; color: #111111; }
+  .dp-head { display: flex; align-items: center; gap: 14px; border-bottom: 2px solid #111111; padding-bottom: 10px; margin-bottom: 16px; }
+  .dp-head img { width: 40px; height: 40px; object-fit: contain; }
+  .dp-title { font-size: 20px; font-weight: 700; }
+  .dp-sub { font-size: 13px; color: #4A4A4A; margin-top: 2px; }
+  h2 { font-size: 14px; margin: 20px 0 6px; border-bottom: 1px solid #B0B0B0; padding-bottom: 4px; }
+  p { font-size: 13px; line-height: 1.5; margin: 0 0 8px; }
+  ul { font-size: 13px; line-height: 1.5; margin: 0 0 8px; padding-left: 20px; }
+  .print-bar { display: flex; justify-content: flex-end; margin-bottom: 14px; }
+  .print-bar button {
+    font-weight: 600; font-size: 13px; padding: 8px 16px; border-radius: 6px;
+    border: 1.5px solid #1B4332; background: #1B4332; color: #fff; cursor: pointer;
+  }
+  @media print { .print-bar { display: none; } body { padding: 0; } }
+</style>
+</head>
+<body>
+  <div class="print-bar"><button onclick="window.print()">Print</button></div>
+  <div class="dp-head">
+    <img src="${LOGO_SRC}" alt="Klublogo">
+    <div>
+      <div class="dp-title">Udviklingsplan — ${name}</div>
+      ${season ? `<div class="dp-sub">${season}</div>` : ""}
+    </div>
+  </div>
+  ${introHtml}
+  ${plan.matchPath && plan.matchPath.length ? `<h2>Kampsti</h2>${listHtml(plan.matchPath)}` : ""}
+  ${plan.selfTraining ? `<h2>Egentræning</h2><p>${kpEscapeHtml(plan.selfTraining)}</p>` : ""}
+  ${
+    plan.statsIntro || (plan.statsItems && plan.statsItems.length)
+      ? `<h2>Statistik vi følger</h2>${plan.statsIntro ? `<p>${kpEscapeHtml(plan.statsIntro)}</p>` : ""}${listHtml(
+          plan.statsItems
+        )}`
+      : ""
+  }
+  ${plan.followups && plan.followups.length ? `<h2>Opfølgning</h2>${listHtml(plan.followups)}` : ""}
+</body>
+</html>`;
+
+  printWindow.document.open();
+  printWindow.document.write(doc);
+  printWindow.document.close();
+  printWindow.focus();
+  return true;
+}
 
 function CompareView({ config, periods, evaluations, player }) {
   const [fromId, setFromId] = useState(periods[0].id);

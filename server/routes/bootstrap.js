@@ -18,6 +18,7 @@ router.get("/", async (req, res, next) => {
       goals,
       coaches,
       followups,
+      developmentPlans,
     ] = await Promise.all([
       pool.query("select id, name from teams order by name"),
       pool.query(
@@ -40,6 +41,7 @@ router.get("/", async (req, res, next) => {
       pool.query(
         "select id, player_id, coach_id, note, created_at from followups order by created_at"
       ),
+      pool.query("select * from development_plans"),
     ]);
 
     const playersOut = players.rows.map((p) => ({
@@ -97,6 +99,21 @@ router.get("/", async (req, res, next) => {
       });
     });
 
+    const developmentPlansOut = {};
+    developmentPlans.rows.forEach((row) => {
+      developmentPlansOut[row.player_id] = {
+        playerId: row.player_id,
+        seasonLabel: row.season_label || "",
+        intro: row.intro || "",
+        matchPath: row.match_path || [],
+        selfTraining: row.self_training || "",
+        statsIntro: row.stats_intro || "",
+        statsItems: row.stats_items || [],
+        followups: row.followups || [],
+        updatedAt: row.updated_at,
+      };
+    });
+
     const config = buildConfig(skills.rows, skillGroups.rows, skillGroupMembers.rows);
     config.participationLevels = participationLevels.rows.map((l) => ({
       id: l.id,
@@ -115,6 +132,7 @@ router.get("/", async (req, res, next) => {
       goals: goalsOut,
       coaches: coachesOut,
       followups: followupsOut,
+      developmentPlans: developmentPlansOut,
     });
   } catch (err) {
     next(err);

@@ -268,6 +268,26 @@ begin
   end if;
 end $$;
 
+-- One running development plan per player (not scoped to a period — it's
+-- meant to be edited in place across a season, unlike goals). The narrative
+-- text and match-path/follow-up lists are coach-authored prose, not data the
+-- app needs to query into, so they're plain text / jsonb string arrays
+-- rather than normalized rows — same reasoning as match_plans' jsonb lists.
+-- The season's per-skill targets/notes live in the existing goals table and
+-- are pulled in alongside this when the plan is printed, not duplicated here.
+create table if not exists development_plans (
+  player_id text primary key references players(id) on delete cascade,
+  season_label text not null default '',
+  intro text not null default '',
+  match_path jsonb not null default '[]',
+  self_training text not null default '',
+  stats_intro text not null default '',
+  stats_items jsonb not null default '[]',
+  followups jsonb not null default '[]',
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
 create index if not exists idx_players_team_id on players(team_id);
 create index if not exists idx_evaluations_player_period on evaluations(player_id, period_id);
 create index if not exists idx_goals_player on goals(player_id);

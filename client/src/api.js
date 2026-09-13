@@ -189,3 +189,11 @@ export function deleteMatchPlan(id) {
 export function setMatchPerformanceScore(planId, playerId, score) {
   return request("PUT", `/api/match-plans/${planId}/performance/${playerId}`, { score });
 }
+
+export function saveDevelopmentPlan(playerId, plan) {
+  return request("PUT", `/api/development-plans/${playerId}`, plan);
+}
+
+export function deleteDevelopmentPlan(playerId) {
+  return request("DELETE", `/api/development-plans/${playerId}`);
+}

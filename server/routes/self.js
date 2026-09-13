@@ -22,7 +22,7 @@ router.get("/:token", async (req, res, next) => {
     const player = await loadPlayerByToken(req.params.token);
     if (!player) return res.status(404).json({ error: "Invalid link" });
 
-    const [skills, skillGroups, skillGroupMembers, participationLevels, periods, evaluations, goals] =
+    const [skills, skillGroups, skillGroupMembers, participationLevels, periods, evaluations, goals, developmentPlan] =
       await Promise.all([
         pool.query("select id, category_key, name, enabled from skills order by category_key, sort_order"),
         pool.query("select id, name, sort_order from skill_groups order by sort_order"),
@@ -36,6 +36,7 @@ router.get("/:token", async (req, res, next) => {
           "select period_id, skill_id, target, note, focus_areas, progress, to_char(created_date, 'YYYY-MM-DD') as created_date from goals where player_id = $1",
           [player.id]
         ),
+        pool.query("select * from development_plans where player_id = $1", [player.id]),
       ]);
 
     const evaluationsOut = {};
@@ -82,6 +83,17 @@ router.get("/:token", async (req, res, next) => {
       periods: periods.rows,
       evaluations: evaluationsOut,
       goals: goalsOut,
+      developmentPlan: developmentPlan.rows[0]
+        ? {
+            seasonLabel: developmentPlan.rows[0].season_label || "",
+            intro: developmentPlan.rows[0].intro || "",
+            matchPath: developmentPlan.rows[0].match_path || [],
+            selfTraining: developmentPlan.rows[0].self_training || "",
+            statsIntro: developmentPlan.rows[0].stats_intro || "",
+            statsItems: developmentPlan.rows[0].stats_items || [],
+            followups: developmentPlan.rows[0].followups || [],
+          }
+        : null,
     });
   } catch (err) {
     next(err);
