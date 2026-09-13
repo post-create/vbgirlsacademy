@@ -215,6 +215,24 @@ function getLatestScoredPeriod(data, playerId) {
   return periods.length ? periods[periods.length - 1] : null;
 }
 
+// Scans every goal across every period for this player and returns the
+// single most recent self-evaluation entry (by submission time), or null if
+// the player has never submitted one. Used on the roster card — a coach
+// glancing down the list wants "when did she last self-evaluate, and what
+// did she say", not a breakdown per goal.
+function getLatestSelfEval(data, playerId) {
+  const byPeriod = data.goals[playerId] || {};
+  let latest = null;
+  Object.values(byPeriod).forEach((bySkill) => {
+    Object.values(bySkill).forEach((goal) => {
+      (goal.progressLog || []).forEach((entry) => {
+        if (!latest || entry.createdAt > latest.createdAt) latest = entry;
+      });
+    });
+  });
+  return latest;
+}
+
 function getUrlToken() {
   try {
     const params = new URLSearchParams(window.location.search);
@@ -3027,7 +3045,8 @@ function RosterView({
       (id) => typeof scores[id] === "number" && scores[id] >= goals[id].target
     ).length;
     const level = levelById[p.participationLevelId] || null;
-    return { player: p, scores, overall, goals, goalIds, goalsMet, latestPeriod, level };
+    const latestSelfEval = getLatestSelfEval(data, p.id);
+    return { player: p, scores, overall, goals, goalIds, goalsMet, latestPeriod, level, latestSelfEval };
   });
 
   // Best score (or highest participation level) on top; players with no
@@ -3234,7 +3253,7 @@ function RosterView({
       )}
 
       <div style={styles.grid}>
-        {sortedPlayers.map(({ player: p, scores, overall, goals, goalIds, goalsMet, latestPeriod, level }) => {
+        {sortedPlayers.map(({ player: p, scores, overall, goals, goalIds, goalsMet, latestPeriod, level, latestSelfEval }) => {
           const isSelected = selectedIds.includes(p.id);
           const selectableDisabled = selectMode && !p.email;
           return (
@@ -3325,6 +3344,13 @@ function RosterView({
                   : latestPeriod
                   ? `Seneste vurdering: ${latestPeriod.label} · ${formatDate(latestPeriod.date)}`
                   : "Ikke vurderet endnu"}
+              </div>
+              <div style={styles.evalCountTag}>
+                {latestSelfEval
+                  ? `Seneste selvevaluering: ${latestSelfEval.progress}/10 · ${formatDate(
+                      String(latestSelfEval.createdAt).slice(0, 10)
+                    )}`
+                  : "Ingen selvevaluering endnu"}
               </div>
             </div>
           );
