@@ -1,0 +1,7082 @@
+import React, { useState, useEffect, useCallback } from "react";
+import { createPortal } from "react-dom";
+import {
+  RadarChart,
+  PolarGrid,
+  PolarAngleAxis,
+  PolarRadiusAxis,
+  Radar,
+  ResponsiveContainer,
+  Legend,
+} from "recharts";
+import {
+  Users,
+  Settings,
+  ChevronLeft,
+  Plus,
+  X,
+  Eye,
+  EyeOff,
+  Pencil,
+  Trash2,
+  Shield,
+  GitCompare,
+  ArrowUp,
+  ArrowDown,
+  Minus,
+  Target,
+  CalendarRange,
+  Layers,
+  ClipboardList,
+  ChevronRight,
+  Link2,
+  Copy,
+  Check,
+  Lock,
+  Printer,
+  Mail,
+  UserCog,
+  ArrowUpDown,
+  MessageSquarePlus,
+  History,
+  SlidersHorizontal,
+  BarChart3,
+  Swords,
+  LayoutGrid,
+  Hash,
+  TrendingUp,
+  Menu,
+  ChevronDown,
+} from "lucide-react";
+import * as api from "./api.js";
+
+const LOGO_SRC =
+  "data:image/png;base64,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";
+
+// Grouped under one "Indstillinger" nav item to keep the main nav simple.
+const SETTINGS_VIEWS = ["teams", "coachProfiles", "periods", "settings", "levels"];
+
+const SETTINGS_TABS = [
+  { key: "teams", label: "Hold", icon: Layers },
+  { key: "coachProfiles", label: "Trænere", icon: UserCog },
+  { key: "periods", label: "Perioder", icon: CalendarRange },
+  { key: "settings", label: "Kriterier", icon: SlidersHorizontal },
+  { key: "levels", label: "Niveauer", icon: BarChart3 },
+];
+
+const CATEGORY_META = [
+  { key: "technique", label: "Teknik", accent: "#E2231A", short: "TEK" },
+  { key: "physical", label: "Fysisk", accent: "#1A1A1A", short: "FYS" },
+  { key: "tactical", label: "Taktik", accent: "#5C6B73", short: "TAK" },
+  { key: "mental", label: "Mentalt", accent: "#C9A24B", short: "MEN" },
+];
+
+const DEFAULT_SKILLS = {
+  technique: ["Boldkontrol", "Afleveringer", "Driblinger", "Afslutninger", "Førsteberøring", "Indlæg"],
+  physical: ["Hurtighed", "Styrke", "Udholdenhed", "Smidighed", "Balance", "Eksplosivitet"],
+  tactical: ["Positionering", "Beslutningstagning", "Overblik", "Samarbejde", "Forsvarsspil", "Bevægelse uden bold"],
+  mental: ["Selvtillid", "Ro", "Målrettethed", "Disciplin", "Kommunikation", "Lederskab"],
+};
+
+const POSITIONS = [
+  "MV",
+  "CB",
+  "VB",
+  "HB",
+  "VWB",
+  "HWB",
+  "DM",
+  "CM",
+  "OM",
+  "VM",
+  "HM",
+  "VK",
+  "HK",
+  "CF",
+  "ST",
+  "1",
+  "2",
+  "3",
+  "4",
+  "5",
+  "6",
+  "7",
+  "8",
+  "9",
+  "10",
+  "11",
+];
+
+const EVAL_COLORS = ["#4A4A4A", "#E2231A"];
+const GOAL_COLOR = "#1A1A1A";
+
+function makeDefaultConfig() {
+  const config = {};
+  CATEGORY_META.forEach(({ key }) => {
+    config[key] = DEFAULT_SKILLS[key].map((name, i) => ({
+      id: `${key}-${i}`,
+      name,
+      enabled: true,
+    }));
+  });
+  return config;
+}
+
+function scoreColor(v) {
+  if (v == null) return "#D9D4C7";
+  const colors = { 1: "#B5493F", 2: "#C9803F", 3: "#C9A24B", 4: "#7C9A5C", 5: "#2F5D46" };
+  return colors[v] || "#D9D4C7";
+}
+
+function todayStr() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function formatDate(d) {
+  if (!d) return "";
+  const dt = new Date(d + "T00:00:00");
+  if (isNaN(dt.getTime())) return d;
+  return dt.toLocaleDateString("da-DK", { month: "short", day: "numeric", year: "numeric" });
+}
+
+function findSkillMeta(config, skillId) {
+  for (const cat of CATEGORY_META) {
+    const skill = (config[cat.key] || []).find((s) => s.id === skillId);
+    if (skill) return { skill, category: cat };
+  }
+  return null;
+}
+
+// Every player belongs to exactly one skill group (e.g. "Standard" or
+// "Målmand"). A skill can be a member of any number of groups (or none) —
+// only skills that are members of the player's group ever apply to them,
+// in every category. There's no fallback: a group with no members in a
+// category simply shows nothing there.
+function categorySkillsForPlayer(config, player, catKey) {
+  const groupId = player?.skillGroupId;
+  return (config[catKey] || []).filter(
+    (s) => s.enabled && groupId && (s.groupIds || []).includes(groupId)
+  );
+}
+
+function categoryAverage(config, scores, catKey, player) {
+  const skills = categorySkillsForPlayer(config, player, catKey);
+  if (skills.length === 0) return null;
+  const vals = skills.map((s) => scores?.[s.id]).filter((v) => typeof v === "number");
+  if (vals.length === 0) return null;
+  return vals.reduce((a, b) => a + b, 0) / vals.length;
+}
+
+function overallAverage(config, scores, player) {
+  const cats = CATEGORY_META.map((c) => categoryAverage(config, scores, c.key, player)).filter(
+    (v) => v != null
+  );
+  if (cats.length === 0) return null;
+  return cats.reduce((a, b) => a + b, 0) / cats.length;
+}
+
+function categoryGoalAverage(config, goals, catKey, player) {
+  const skillIds = categorySkillsForPlayer(config, player, catKey).map((s) => s.id);
+  const targets = skillIds.map((id) => goals?.[id]?.target).filter((v) => typeof v === "number");
+  if (targets.length === 0) return null;
+  return targets.reduce((a, b) => a + b, 0) / targets.length;
+}
+
+function categoryTotal(config, scores, catKey, player) {
+  const skills = categorySkillsForPlayer(config, player, catKey);
+  const total = skills.reduce((sum, s) => sum + (scores?.[s.id] || 0), 0);
+  const avg = skills.length ? total / skills.length : 0;
+  return { total, avg, count: skills.length };
+}
+
+function sortedPeriods(periods) {
+  return [...(periods || [])].sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
+}
+
+function getPlayerScores(data, playerId, periodId) {
+  return data.evaluations?.[playerId]?.[periodId]?.scores || {};
+}
+
+function getLatestScoredPeriod(data, playerId) {
+  const periods = sortedPeriods(data.periods);
+  for (let i = periods.length - 1; i >= 0; i--) {
+    const scores = getPlayerScores(data, playerId, periods[i].id);
+    if (Object.keys(scores).length > 0) return periods[i];
+  }
+  return periods.length ? periods[periods.length - 1] : null;
+}
+
+function getUrlToken() {
+  try {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("player")) return params.get("player");
+    const hash = window.location.hash.replace("#", "");
+    const hashParams = new URLSearchParams(hash);
+    if (hashParams.get("player")) return hashParams.get("player");
+  } catch (e) {
+    /* ignore */
+  }
+  return null;
+}
+
+function CategoryAxisTick({ x, y, cx, cy, payload, index, onSelect }) {
+  const cat = CATEGORY_META[index];
+  if (!cat) return null;
+  const anchor = x > cx + 2 ? "start" : x < cx - 2 ? "end" : "middle";
+  return (
+    <text
+      x={x}
+      y={y}
+      textAnchor={anchor}
+      dominantBaseline="central"
+      fill="#1A1A1A"
+      fontSize={12}
+      fontFamily="'Oswald', sans-serif"
+      fontWeight={700}
+      style={{ cursor: onSelect ? "pointer" : "default" }}
+      onClick={() => onSelect && onSelect(cat.key)}
+    >
+      {payload.value}
+    </text>
+  );
+}
+
+function SkillDrilldownRadar({ config, catKey, player, scores, goals, onClose }) {
+  const cat = CATEGORY_META.find((c) => c.key === catKey);
+  if (!cat) return null;
+  const skills = categorySkillsForPlayer(config, player, catKey);
+  const data = skills.map((s) => ({
+    subject: s.name,
+    value: scores?.[s.id] || 0,
+    goal: goals?.[s.id]?.target || 0,
+  }));
+  const hasAnyGoal = skills.some((s) => goals?.[s.id]?.target);
+
+  return (
+    <div style={styles.radarCard}>
+      <div style={styles.drilldownHead}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <div style={{ ...styles.dot, background: cat.accent }} />
+          <span style={styles.categoryLabel}>{cat.label} — detaljer</span>
+        </div>
+        <button style={styles.iconBtnGhost} onClick={onClose} title="Luk">
+          <X size={16} />
+        </button>
+      </div>
+      {skills.length === 0 ? (
+        <div style={styles.noSkills}>Ingen aktive kriterier i denne kategori.</div>
+      ) : (
+        <ResponsiveContainer width="100%" height={260}>
+          <RadarChart data={data} outerRadius="65%">
+            <PolarGrid stroke="#D9D4C7" />
+            <PolarAngleAxis
+              dataKey="subject"
+              tick={{ fill: "#1A1A1A", fontSize: 11, fontFamily: "'Inter', sans-serif" }}
+            />
+            <PolarRadiusAxis domain={[0, 5]} tick={false} axisLine={false} />
+            <Radar
+              name="Score"
+              dataKey="value"
+              stroke={cat.accent}
+              fill={cat.accent}
+              fillOpacity={0.3}
+              strokeWidth={2}
+              isAnimationActive={false}
+            />
+            {hasAnyGoal && (
+              <Radar
+                name="Mål"
+                dataKey="goal"
+                stroke={GOAL_COLOR}
+                fill="transparent"
+                strokeWidth={2}
+                strokeDasharray="5 4"
+                isAnimationActive={false}
+              />
+            )}
+            {hasAnyGoal && (
+              <Legend wrapperStyle={{ fontSize: 12, fontFamily: "'Inter', sans-serif" }} />
+            )}
+          </RadarChart>
+        </ResponsiveContainer>
+      )}
+    </div>
+  );
+}
+
+function PositionPicker({ selected, onToggle }) {
+  return (
+    <div style={styles.positionGrid}>
+      {POSITIONS.map((pos) => {
+        const active = selected.includes(pos);
+        return (
+          <button
+            key={pos}
+            type="button"
+            onClick={() => onToggle(pos)}
+            style={{
+              ...styles.positionChip,
+              background: active ? "#111111" : "#FFFFFF",
+              color: active ? "#FFFFFF" : "#1A1A1A",
+              borderColor: active ? "#111111" : "#D9D4C7",
+            }}
+          >
+            {pos}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+const NAV_ITEMS = [
+  {
+    key: "roster",
+    label: "Spillertrup",
+    icon: Users,
+    isActive: (v) => v === "roster" || v === "player",
+    select: (setView, setSelectedId) => {
+      setView("roster");
+      setSelectedId(null);
+    },
+  },
+  {
+    key: "coaches",
+    label: "Overblik",
+    icon: ClipboardList,
+    isActive: (v) => v === "coaches",
+    select: (setView) => setView("coaches"),
+  },
+  {
+    key: "followupsLog",
+    label: "Opfølgninger",
+    icon: History,
+    isActive: (v) => v === "followupsLog",
+    select: (setView) => setView("followupsLog"),
+  },
+  {
+    key: "matchPlans",
+    label: "Kampplan",
+    icon: Swords,
+    isActive: (v) => v === "matchPlans",
+    select: (setView) => setView("matchPlans"),
+  },
+  {
+    key: "kampScore",
+    label: "Kampscore",
+    icon: TrendingUp,
+    isActive: (v) => v === "kampScore",
+    select: (setView) => setView("kampScore"),
+  },
+  {
+    key: "positionOverview",
+    label: "Positioner",
+    icon: LayoutGrid,
+    isActive: (v) => v === "positionOverview",
+    select: (setView) => setView("positionOverview"),
+  },
+  {
+    key: "settings",
+    label: "Indstillinger",
+    icon: Settings,
+    isActive: (v) => SETTINGS_VIEWS.includes(v),
+    select: (setView) => setView("teams"),
+  },
+];
+
+function ClubHeader({ view, setView, setSelectedId }) {
+  const [menuOpen, setMenuOpen] = useState(false);
+  const current = NAV_ITEMS.find((item) => item.isActive(view)) || NAV_ITEMS[0];
+  const CurrentIcon = current.icon;
+
+  const selectItem = (item) => {
+    item.select(setView, setSelectedId);
+    setMenuOpen(false);
+  };
+
+  return (
+    <header style={styles.header}>
+      <div style={styles.headerTopBar}>
+        <div style={styles.headerTopRow}>
+          <div style={styles.brand}>
+            <span style={styles.brandText}>VB PIGE AKADEMI</span>
+            <span style={styles.brandSub}>Spillerudvikling</span>
+          </div>
+          <img src={LOGO_SRC} alt="Klublogo" style={styles.logoImg} />
+        </div>
+      </div>
+      <div style={styles.headerNavBar}>
+        <div style={styles.headerNavBarRow}>
+          <div style={{ position: "relative" }}>
+            <button style={styles.menuTriggerBtn} onClick={() => setMenuOpen((v) => !v)}>
+              <Menu size={18} />
+              <CurrentIcon size={16} />
+              <span>{current.label}</span>
+              <ChevronDown size={14} />
+            </button>
+            {menuOpen && (
+              <>
+                <div style={styles.menuBackdrop} onClick={() => setMenuOpen(false)} />
+                <div style={styles.menuDropdown}>
+                  {NAV_ITEMS.map((item) => {
+                    const Icon = item.icon;
+                    const active = item.isActive(view);
+                    return (
+                      <button
+                        key={item.key}
+                        style={{
+                          ...styles.menuDropdownItem,
+                          ...(active ? styles.menuDropdownItemActive : {}),
+                        }}
+                        onClick={() => selectItem(item)}
+                      >
+                        <Icon size={16} />
+                        <span>{item.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+      <div style={styles.headerStripes} />
+    </header>
+  );
+}
+
+function SettingsSubNav({ view, setView }) {
+  return (
+    <div style={styles.teamFilterRow}>
+      {SETTINGS_TABS.map(({ key, label, icon: Icon }) => (
+        <button
+          key={key}
+          style={{
+            ...styles.teamFilterChip,
+            ...(view === key ? styles.teamFilterChipActive : {}),
+          }}
+          onClick={() => setView(key)}
+        >
+          <Icon size={14} /> {label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+export default function AcademyApp() {
+  const [data, setData] = useState(null);
+  const [selfData, setSelfData] = useState(null);
+  const [selfInvalid, setSelfInvalid] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [saveError, setSaveError] = useState(false);
+  const [view, setView] = useState("roster");
+  const [selectedId, setSelectedId] = useState(null);
+  const [addingPlayer, setAddingPlayer] = useState(false);
+  const [newName, setNewName] = useState("");
+  const [newPositions, setNewPositions] = useState([]);
+  const [newNumber, setNewNumber] = useState("");
+  const [newEmail, setNewEmail] = useState("");
+  const [newTeamId, setNewTeamId] = useState("");
+  const [newSkillGroupId, setNewSkillGroupId] = useState("");
+  const [confirmDelete, setConfirmDelete] = useState(null);
+  const [urlToken] = useState(getUrlToken);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        if (urlToken) {
+          // Self-eval link: fetch only this one player's scoped data, never
+          // the full roster (the server enforces the token match).
+          const result = await api.getSelf(urlToken);
+          setSelfData(result);
+        } else {
+          const result = await api.getBootstrap();
+          setData(result);
+        }
+      } catch (e) {
+        if (urlToken) {
+          setSelfInvalid(true);
+        } else {
+          setData({
+            config: makeDefaultConfig(),
+            players: [],
+            periods: [],
+            evaluations: {},
+            goals: {},
+            teams: [],
+            coaches: [],
+            followups: {},
+          });
+        }
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, [urlToken]);
+
+  useEffect(() => {
+    if (!newSkillGroupId && data?.config?.groups?.length) {
+      setNewSkillGroupId(data.config.groups[0].id);
+    }
+  }, [data, newSkillGroupId]);
+
+  const runMutation = useCallback(async (action) => {
+    try {
+      await action();
+      setSaveError(false);
+    } catch (e) {
+      setSaveError(true);
+    }
+  }, []);
+
+  const setSelfGoalProgress = (periodId, subskillId, progress) =>
+    runMutation(async () => {
+      const existingPeriod = selfData.goals[periodId] || {};
+      const existing = existingPeriod[subskillId];
+      if (!existing) return;
+      const updated = await api.setSelfGoalProgress(urlToken, periodId, subskillId, progress);
+      setSelfData({
+        ...selfData,
+        goals: {
+          ...selfData.goals,
+          [periodId]: { ...existingPeriod, [subskillId]: { ...existing, ...updated } },
+        },
+      });
+    });
+
+  const setGoalProgress = (playerId, periodId, subskillId, progress) =>
+    runMutation(async () => {
+      const existingPlayer = data.goals[playerId] || {};
+      const existingPeriod = existingPlayer[periodId] || {};
+      const prevGoal = existingPeriod[subskillId];
+      if (!prevGoal) return;
+      const updated = await api.setGoalProgress(playerId, periodId, subskillId, progress);
+      const goals = {
+        ...data.goals,
+        [playerId]: {
+          ...existingPlayer,
+          [periodId]: { ...existingPeriod, [subskillId]: { ...prevGoal, ...updated } },
+        },
+      };
+      setData({ ...data, goals });
+    });
+
+  if (loading) {
+    return (
+      <div style={styles.loadingWrap}>
+        <img src={LOGO_SRC} alt="Klublogo" style={{ width: 56, height: 56, marginBottom: 4 }} />
+        <div style={{ color: "#FFFFFF", fontFamily: "'Oswald', sans-serif", letterSpacing: 1 }}>
+          INDLÆSER TRUP…
+        </div>
+      </div>
+    );
+  }
+
+  // Player self-evaluation via private link — restricted to a single player, no roster access.
+  // The server scopes /api/self/:token to this one player only, so no other
+  // player's data is ever fetched into this browser.
+  if (urlToken) {
+    if (selfInvalid || !selfData) {
+      return (
+        <div style={styles.app}>
+          <div style={styles.headerTopBar}>
+            <div style={styles.headerTopRow}>
+              <div style={styles.brand}>
+                <span style={styles.brandText}>VB PIGE AKADEMI</span>
+              </div>
+              <img src={LOGO_SRC} alt="Klublogo" style={styles.logoImg} />
+            </div>
+          </div>
+          <div style={{ ...styles.main, textAlign: "center", paddingTop: 60 }}>
+            <Lock size={32} color="#B9B2A0" />
+            <div style={{ marginTop: 12, fontWeight: 700, fontSize: 18 }}>Ugyldigt link</div>
+            <p style={styles.subtext}>
+              Dette link er ugyldigt eller ikke længere aktivt. Kontakt din træner for at få et
+              nyt link.
+            </p>
+          </div>
+        </div>
+      );
+    }
+    return (
+      <PlayerSelfEvalApp
+        player={selfData.player}
+        config={selfData.config}
+        periods={sortedPeriods(selfData.periods)}
+        coachEvaluations={selfData.evaluations}
+        goals={selfData.goals}
+        onSetGoalProgress={setSelfGoalProgress}
+      />
+    );
+  }
+
+  if (!data) return null;
+
+  const addPlayer = () =>
+    runMutation(async () => {
+      if (!newName.trim() || !newSkillGroupId) return;
+      const created = await api.createPlayer({
+        name: newName.trim(),
+        positions: newPositions,
+        number: newNumber.trim(),
+        email: newEmail.trim(),
+        teamId: newTeamId || null,
+        skillGroupId: newSkillGroupId,
+      });
+      setData({ ...data, players: [...data.players, created] });
+      setNewName("");
+      setNewPositions([]);
+      setNewNumber("");
+      setNewEmail("");
+      setNewTeamId("");
+      setNewSkillGroupId("");
+      setAddingPlayer(false);
+    });
+
+  const deletePlayer = (id) =>
+    runMutation(async () => {
+      await api.deletePlayer(id);
+      const players = data.players.filter((p) => p.id !== id);
+      const evaluations = { ...data.evaluations };
+      delete evaluations[id];
+      const goals = { ...data.goals };
+      delete goals[id];
+      setData({ ...data, players, evaluations, goals });
+      setConfirmDelete(null);
+      if (selectedId === id) {
+        setView("roster");
+        setSelectedId(null);
+      }
+    });
+
+  const updatePlayerPositions = (playerId, positions) =>
+    runMutation(async () => {
+      await api.updatePlayer(playerId, { positions });
+      const players = data.players.map((p) => (p.id === playerId ? { ...p, positions } : p));
+      setData({ ...data, players });
+    });
+
+  const updatePlayerTeam = (playerId, teamId) =>
+    runMutation(async () => {
+      await api.updatePlayer(playerId, { teamId: teamId || null });
+      const players = data.players.map((p) =>
+        p.id === playerId ? { ...p, teamId: teamId || null } : p
+      );
+      setData({ ...data, players });
+    });
+
+  const updatePlayerEmail = (playerId, email) =>
+    runMutation(async () => {
+      await api.updatePlayer(playerId, { email });
+      const players = data.players.map((p) => (p.id === playerId ? { ...p, email } : p));
+      setData({ ...data, players });
+    });
+
+  const updatePlayerNumber = (playerId, number) =>
+    runMutation(async () => {
+      await api.updatePlayer(playerId, { number });
+      const players = data.players.map((p) => (p.id === playerId ? { ...p, number } : p));
+      setData({ ...data, players });
+    });
+
+  const updatePlayerParticipationLevel = (playerId, participationLevelId) =>
+    runMutation(async () => {
+      await api.updatePlayer(playerId, { participationLevelId: participationLevelId || null });
+      const players = data.players.map((p) =>
+        p.id === playerId ? { ...p, participationLevelId: participationLevelId || null } : p
+      );
+      setData({ ...data, players });
+    });
+
+  const updatePlayerGoalHorizons = (playerId, patch) =>
+    runMutation(async () => {
+      await api.updatePlayer(playerId, patch);
+      const players = data.players.map((p) => (p.id === playerId ? { ...p, ...patch } : p));
+      setData({ ...data, players });
+    });
+
+  const createParticipationLevel = (name, numericValue) =>
+    runMutation(async () => {
+      const created = await api.createParticipationLevel({ name, numericValue, expectations: "" });
+      const config = { ...data.config };
+      config.participationLevels = [...(config.participationLevels || []), created];
+      setData({ ...data, config });
+    });
+
+  const updateParticipationLevel = (id, patch) =>
+    runMutation(async () => {
+      const updated = await api.updateParticipationLevel(id, patch);
+      const config = { ...data.config };
+      config.participationLevels = config.participationLevels.map((l) =>
+        l.id === id ? updated : l
+      );
+      setData({ ...data, config });
+    });
+
+  const deleteParticipationLevel = (id) =>
+    runMutation(async () => {
+      await api.deleteParticipationLevel(id);
+      const config = { ...data.config };
+      config.participationLevels = config.participationLevels.filter((l) => l.id !== id);
+      const players = data.players.map((p) =>
+        p.participationLevelId === id ? { ...p, participationLevelId: null } : p
+      );
+      setData({ ...data, config, players });
+    });
+
+  const createTeam = async (name) => {
+    let created = null;
+    await runMutation(async () => {
+      created = await api.createTeam(name || "Nyt hold");
+      setData({ ...data, teams: [...data.teams, created] });
+    });
+    return created ? created.id : null;
+  };
+
+  const renameTeam = (teamId, name) =>
+    runMutation(async () => {
+      await api.renameTeam(teamId, name);
+      const teams = data.teams.map((t) => (t.id === teamId ? { ...t, name } : t));
+      setData({ ...data, teams });
+    });
+
+  const deleteTeam = (teamId) =>
+    runMutation(async () => {
+      await api.deleteTeam(teamId);
+      const teams = data.teams.filter((t) => t.id !== teamId);
+      const players = data.players.map((p) => (p.teamId === teamId ? { ...p, teamId: null } : p));
+      setData({ ...data, teams, players });
+    });
+
+  const createPeriod = async (label, date) => {
+    let created = null;
+    await runMutation(async () => {
+      created = await api.createPeriod(label || "Ny periode", date || todayStr());
+      setData({ ...data, periods: [...data.periods, created] });
+    });
+    return created ? created.id : null;
+  };
+
+  const renamePeriod = (periodId, label, date) =>
+    runMutation(async () => {
+      await api.renamePeriod(periodId, label, date);
+      const periods = data.periods.map((p) => (p.id === periodId ? { ...p, label, date } : p));
+      setData({ ...data, periods });
+    });
+
+  const deletePeriod = (periodId) =>
+    runMutation(async () => {
+      await api.deletePeriod(periodId);
+      const periods = data.periods.filter((p) => p.id !== periodId);
+      const evaluations = {};
+      Object.keys(data.evaluations).forEach((playerId) => {
+        const playerEvals = { ...data.evaluations[playerId] };
+        delete playerEvals[periodId];
+        evaluations[playerId] = playerEvals;
+      });
+      setData({ ...data, periods, evaluations });
+    });
+
+  const setScore = (playerId, periodId, subskillId, value) =>
+    runMutation(async () => {
+      const playerEvals = { ...(data.evaluations[playerId] || {}) };
+      const current = playerEvals[periodId]?.scores || {};
+      const scores = { ...current };
+      scores[subskillId] = scores[subskillId] === value ? undefined : value;
+      if (scores[subskillId] === undefined) delete scores[subskillId];
+      playerEvals[periodId] = { scores };
+      const evaluations = { ...data.evaluations, [playerId]: playerEvals };
+      await api.setScore(playerId, periodId, subskillId, scores[subskillId]);
+      setData({ ...data, evaluations });
+    });
+
+  const setGoal = (playerId, periodId, subskillId, target, note, focusAreas) =>
+    runMutation(async () => {
+      const updated = await api.setGoal(playerId, periodId, subskillId, target, note, focusAreas);
+      const existingPlayer = data.goals[playerId] || {};
+      const existingPeriod = existingPlayer[periodId] || {};
+      const goals = {
+        ...data.goals,
+        [playerId]: {
+          ...existingPlayer,
+          [periodId]: { ...existingPeriod, [subskillId]: updated },
+        },
+      };
+      setData({ ...data, goals });
+    });
+
+  const removeGoal = (playerId, periodId, subskillId) =>
+    runMutation(async () => {
+      await api.removeGoal(playerId, periodId, subskillId);
+      const existingPlayer = { ...(data.goals[playerId] || {}) };
+      const existingPeriod = { ...(existingPlayer[periodId] || {}) };
+      delete existingPeriod[subskillId];
+      existingPlayer[periodId] = existingPeriod;
+      const goals = { ...data.goals, [playerId]: existingPlayer };
+      setData({ ...data, goals });
+    });
+
+  const renameSkill = (catKey, skillId, name) =>
+    runMutation(async () => {
+      await api.renameSkill(skillId, name);
+      const config = { ...data.config };
+      config[catKey] = config[catKey].map((s) => (s.id === skillId ? { ...s, name } : s));
+      setData({ ...data, config });
+    });
+
+  const toggleSkill = (catKey, skillId) =>
+    runMutation(async () => {
+      const current = data.config[catKey].find((s) => s.id === skillId);
+      await api.toggleSkill(skillId, !current.enabled);
+      const config = { ...data.config };
+      config[catKey] = config[catKey].map((s) =>
+        s.id === skillId ? { ...s, enabled: !s.enabled } : s
+      );
+      setData({ ...data, config });
+    });
+
+  const createSkill = (catKey, groupId, name) =>
+    runMutation(async () => {
+      const created = await api.createSkill({ categoryKey: catKey, groupId, name });
+      const config = { ...data.config };
+      config[catKey] = [...config[catKey], created];
+      setData({ ...data, config });
+    });
+
+  const addSkillToGroup = (catKey, skillId, groupId) =>
+    runMutation(async () => {
+      await api.addSkillToGroup(groupId, skillId);
+      const config = { ...data.config };
+      config[catKey] = config[catKey].map((s) =>
+        s.id === skillId ? { ...s, groupIds: [...s.groupIds, groupId] } : s
+      );
+      setData({ ...data, config });
+    });
+
+  const removeSkillFromGroup = (catKey, skillId, groupId) =>
+    runMutation(async () => {
+      await api.removeSkillFromGroup(groupId, skillId);
+      const config = { ...data.config };
+      config[catKey] = config[catKey].map((s) =>
+        s.id === skillId ? { ...s, groupIds: s.groupIds.filter((id) => id !== groupId) } : s
+      );
+      setData({ ...data, config });
+    });
+
+  const createSkillGroup = (name) =>
+    runMutation(async () => {
+      const created = await api.createSkillGroup(name);
+      const config = { ...data.config };
+      config.groups = [...config.groups, created];
+      setData({ ...data, config });
+    });
+
+  const renameSkillGroup = (groupId, name) =>
+    runMutation(async () => {
+      await api.renameSkillGroup(groupId, name);
+      const config = { ...data.config };
+      config.groups = config.groups.map((g) => (g.id === groupId ? { ...g, name } : g));
+      setData({ ...data, config });
+    });
+
+  const deleteSkillGroup = (groupId) =>
+    runMutation(async () => {
+      await api.deleteSkillGroup(groupId);
+      const config = { ...data.config };
+      config.groups = config.groups.filter((g) => g.id !== groupId);
+      CATEGORY_META.forEach((cat) => {
+        config[cat.key] = config[cat.key].map((s) => ({
+          ...s,
+          groupIds: s.groupIds.filter((id) => id !== groupId),
+        }));
+      });
+      setData({ ...data, config });
+    });
+
+  const updatePlayerSkillGroup = (playerId, skillGroupId) =>
+    runMutation(async () => {
+      await api.updatePlayer(playerId, { skillGroupId });
+      const players = data.players.map((p) => (p.id === playerId ? { ...p, skillGroupId } : p));
+      setData({ ...data, players });
+    });
+
+  const createCoach = async (name, email, teamId) => {
+    let created = null;
+    await runMutation(async () => {
+      created = await api.createCoach({ name, email, teamId });
+      setData({ ...data, coaches: [...(data.coaches || []), created] });
+    });
+    return created ? created.id : null;
+  };
+
+  const updateCoach = (coachId, patch) =>
+    runMutation(async () => {
+      const updated = await api.updateCoach(coachId, patch);
+      const coaches = (data.coaches || []).map((c) => (c.id === coachId ? updated : c));
+      setData({ ...data, coaches });
+    });
+
+  const deleteCoach = (coachId) =>
+    runMutation(async () => {
+      await api.deleteCoach(coachId);
+      const coaches = (data.coaches || []).filter((c) => c.id !== coachId);
+      const followups = {};
+      Object.keys(data.followups || {}).forEach((playerId) => {
+        followups[playerId] = data.followups[playerId].map((f) =>
+          f.coachId === coachId ? { ...f, coachId: null } : f
+        );
+      });
+      setData({ ...data, coaches, followups });
+    });
+
+  const addFollowup = (playerId, coachId, note) =>
+    runMutation(async () => {
+      const created = await api.createFollowup(playerId, coachId, note);
+      const followups = {
+        ...data.followups,
+        [playerId]: [...(data.followups?.[playerId] || []), created],
+      };
+      setData({ ...data, followups });
+    });
+
+  const removeFollowup = (playerId, followupId) =>
+    runMutation(async () => {
+      await api.deleteFollowup(playerId, followupId);
+      const followups = {
+        ...data.followups,
+        [playerId]: (data.followups?.[playerId] || []).filter((f) => f.id !== followupId),
+      };
+      setData({ ...data, followups });
+    });
+
+  const selectedPlayer = data.players.find((p) => p.id === selectedId);
+  const periods = sortedPeriods(data.periods);
+
+  return (
+    <div style={styles.app}>
+      <PrintStyles />
+      <ClubHeader view={view} setView={setView} setSelectedId={setSelectedId} />
+
+      <main style={styles.main}>
+        {saveError && (
+          <div style={styles.errorBanner}>
+            Kunne ikke gemme ændringer — tjek din forbindelse og prøv igen.
+          </div>
+        )}
+
+        {SETTINGS_VIEWS.includes(view) && <SettingsSubNav view={view} setView={setView} />}
+
+        {view === "settings" && (
+          <SettingsView
+            config={data.config}
+            onRename={renameSkill}
+            onToggle={toggleSkill}
+            onCreateSkill={createSkill}
+            onAddSkillToGroup={addSkillToGroup}
+            onRemoveSkillFromGroup={removeSkillFromGroup}
+            onCreateGroup={createSkillGroup}
+            onRenameGroup={renameSkillGroup}
+            onDeleteGroup={deleteSkillGroup}
+          />
+        )}
+
+        {view === "levels" && (
+          <ParticipationLevelsView
+            levels={data.config.participationLevels || []}
+            onCreate={createParticipationLevel}
+            onUpdate={updateParticipationLevel}
+            onDelete={deleteParticipationLevel}
+          />
+        )}
+
+        {view === "coaches" && (
+          <CoachesOverviewView
+            data={data}
+            onSetGoalProgress={setGoalProgress}
+            onOpenPlayer={(id) => {
+              setSelectedId(id);
+              setView("player");
+            }}
+            onAddFollowup={addFollowup}
+            onRemoveFollowup={removeFollowup}
+          />
+        )}
+
+        {view === "coachProfiles" && (
+          <CoachesView
+            coaches={data.coaches || []}
+            teams={data.teams}
+            onCreate={createCoach}
+            onUpdate={updateCoach}
+            onDelete={deleteCoach}
+          />
+        )}
+
+        {view === "followupsLog" && (
+          <FollowupsLogView data={data} onRemoveFollowup={removeFollowup} />
+        )}
+
+        {view === "matchPlans" && <KampplanView players={data.players} />}
+
+        {view === "kampScore" && <KampPerformanceView players={data.players} />}
+
+        {view === "positionOverview" && <PositionOverviewView data={data} />}
+
+        {view === "teams" && (
+          <TeamsView
+            teams={data.teams}
+            players={data.players}
+            onCreate={createTeam}
+            onRename={renameTeam}
+            onDelete={deleteTeam}
+          />
+        )}
+
+        {view === "periods" && (
+          <PeriodsView
+            periods={periods}
+            onCreate={createPeriod}
+            onRename={renamePeriod}
+            onDelete={deletePeriod}
+          />
+        )}
+
+        {view === "roster" && (
+          <RosterView
+            data={data}
+            periods={periods}
+            onOpen={(id) => {
+              setSelectedId(id);
+              setView("player");
+            }}
+            addingPlayer={addingPlayer}
+            setAddingPlayer={setAddingPlayer}
+            newName={newName}
+            setNewName={setNewName}
+            newPositions={newPositions}
+            setNewPositions={setNewPositions}
+            newNumber={newNumber}
+            setNewNumber={setNewNumber}
+            newEmail={newEmail}
+            setNewEmail={setNewEmail}
+            newTeamId={newTeamId}
+            setNewTeamId={setNewTeamId}
+            newSkillGroupId={newSkillGroupId}
+            setNewSkillGroupId={setNewSkillGroupId}
+            onAdd={addPlayer}
+          />
+        )}
+
+        {view === "player" && selectedPlayer && (
+          <PlayerView
+            player={selectedPlayer}
+            config={data.config}
+            periods={periods}
+            teams={data.teams}
+            evaluations={data.evaluations[selectedPlayer.id] || {}}
+            goals={data.goals[selectedPlayer.id] || {}}
+            onBack={() => {
+              setView("roster");
+              setSelectedId(null);
+            }}
+            onScore={(periodId, subskillId, value) =>
+              setScore(selectedPlayer.id, periodId, subskillId, value)
+            }
+            onDelete={() => setConfirmDelete(selectedPlayer.id)}
+            onUpdatePositions={(positions) => updatePlayerPositions(selectedPlayer.id, positions)}
+            onUpdateTeam={(teamId) => updatePlayerTeam(selectedPlayer.id, teamId)}
+            onUpdateEmail={(email) => updatePlayerEmail(selectedPlayer.id, email)}
+            onUpdateNumber={(number) => updatePlayerNumber(selectedPlayer.id, number)}
+            onSetGoal={(periodId, subskillId, target, note, focusAreas) =>
+              setGoal(selectedPlayer.id, periodId, subskillId, target, note, focusAreas)
+            }
+            onSetGoalProgress={(periodId, subskillId, progress) =>
+              setGoalProgress(selectedPlayer.id, periodId, subskillId, progress)
+            }
+            onRemoveGoal={(periodId, subskillId) => removeGoal(selectedPlayer.id, periodId, subskillId)}
+            onSetSkillGroup={(groupId) => updatePlayerSkillGroup(selectedPlayer.id, groupId)}
+            onUpdateParticipationLevel={(levelId) =>
+              updatePlayerParticipationLevel(selectedPlayer.id, levelId)
+            }
+            onUpdateGoalHorizons={(patch) => updatePlayerGoalHorizons(selectedPlayer.id, patch)}
+            onGoToPeriods={() => setView("periods")}
+          />
+        )}
+      </main>
+
+      {confirmDelete && (
+        <div style={styles.modalOverlay}>
+          <div style={styles.modalCard}>
+            <div style={styles.modalTitle}>Fjern spiller?</div>
+            <div style={styles.modalBody}>
+              Dette sletter alle registrerede evalueringer for spilleren. Kan ikke fortrydes.
+            </div>
+            <div style={styles.modalActions}>
+              <button style={styles.ghostBtn} onClick={() => setConfirmDelete(null)}>
+                Annuller
+              </button>
+              <button style={styles.dangerBtn} onClick={() => deletePlayer(confirmDelete)}>
+                Fjern
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ---------- Player self-evaluation (accessed only via a private link) ---------- */
+function PlayerSelfEvalApp({ player, config, periods, coachEvaluations, goals, onSetGoalProgress }) {
+  const [selectedPeriodId, setSelectedPeriodId] = useState(
+    periods.length ? periods[periods.length - 1].id : null
+  );
+  const [drilldownCat, setDrilldownCat] = useState(null);
+  const [printPanelOpen, setPrintPanelOpen] = useState(false);
+  const [printColBMode, setPrintColBMode] = useState("goal");
+  const [printColBPeriodId, setPrintColBPeriodId] = useState(null);
+
+  useEffect(() => {
+    if (!selectedPeriodId && periods.length) {
+      setSelectedPeriodId(periods[periods.length - 1].id);
+    }
+  }, [periods.length, selectedPeriodId]);
+
+  const selectedPeriod = periods.find((p) => p.id === selectedPeriodId) || null;
+  const scores = selectedPeriod ? coachEvaluations[selectedPeriod.id]?.scores || {} : {};
+  const periodGoals = (selectedPeriod && goals[selectedPeriod.id]) || {};
+
+  const radarData = CATEGORY_META.map((c) => ({
+    subject: c.short,
+    value: categoryAverage(config, scores, c.key, player) || 0,
+    goal: categoryGoalAverage(config, periodGoals, c.key, player) || 0,
+  }));
+
+  const hasGoals = Object.keys(periodGoals).length > 0;
+  const goalEntries = Object.keys(periodGoals)
+    .map((skillId) => {
+      const meta = findSkillMeta(config, skillId);
+      if (!meta) return null;
+      return { skillId, goal: periodGoals[skillId], ...meta };
+    })
+    .filter(Boolean)
+    .sort(
+      (a, b) =>
+        a.category.label.localeCompare(b.category.label) || a.skill.name.localeCompare(b.skill.name)
+    );
+
+  return (
+    <div style={styles.app}>
+      <PrintStyles />
+      <div style={styles.headerTopBar}>
+        <div style={styles.headerTopRow}>
+          <div style={styles.brand}>
+            <span style={styles.brandText}>VB PIGE AKADEMI</span>
+            <span style={styles.brandSub}>Min udvikling</span>
+          </div>
+          <img src={LOGO_SRC} alt="Klublogo" style={styles.logoImg} />
+        </div>
+      </div>
+      <div style={styles.headerStripes} />
+
+      <main style={styles.main}>
+        <div style={styles.playerHeadRow}>
+          <div style={styles.numberBadgeLg}>{player.number || "—"}</div>
+          <div>
+            <h1 style={styles.h1}>{player.name}</h1>
+            <p style={styles.subtext}>
+              {player.positions && player.positions.length > 0
+                ? player.positions.join(" · ")
+                : "Position ikke angivet"}
+            </p>
+          </div>
+        </div>
+
+        <div style={styles.infoBanner}>
+          Her kan du se din træners vurdering og opdatere din egen indsats på dine udviklingsmål.
+          Du kan ikke ændre selve scoren — det gør din træner.
+        </div>
+
+        {hasGoals && (
+          <div style={styles.goalsOverviewCard}>
+            <div style={styles.goalsOverviewHead}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <Target size={16} color="#1A1A1A" />
+                <span style={styles.categoryLabel}>Dine udviklingsmål</span>
+              </div>
+            </div>
+            {goalEntries.map(({ skillId, goal, skill, category }) => {
+              const currentVal = scores[skillId];
+              const achieved = typeof currentVal === "number" && currentVal >= goal.target;
+              return (
+                <div key={skillId} style={styles.goalOverviewRow}>
+                  <div style={styles.goalOverviewTop}>
+                    <div>
+                      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                        <div style={{ ...styles.dot, background: category.accent }} />
+                        <span style={styles.skillName}>{skill.name}</span>
+                        <span style={styles.goalOverviewCat}>{category.label}</span>
+                      </div>
+                      {(goal.note || goal.focusAreas) && (
+                        <div style={styles.goalNote}>
+                          {goal.note && (
+                            <div>
+                              <strong>Målsætning:</strong> {goal.note}
+                            </div>
+                          )}
+                          {goal.focusAreas && (
+                            <div>
+                              <strong>Fokusområder:</strong> {goal.focusAreas}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                    <span
+                      style={{
+                        ...styles.goalChip,
+                        ...(achieved ? styles.goalChipMet : styles.goalChipPending),
+                      }}
+                    >
+                      <Target size={11} /> Mål {goal.target}
+                      {achieved ? " ✓" : ""}
+                    </span>
+                  </div>
+                  <ProgressTracker
+                    value={goal.progress}
+                    onChange={(v) => selectedPeriod && onSetGoalProgress(selectedPeriod.id, skillId, v)}
+                  />
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {!hasGoals && (
+          <div style={styles.emptyState}>
+            <Target size={28} color="#B9B2A0" />
+            <div style={{ marginTop: 10, fontWeight: 600 }}>Ingen udviklingsmål endnu</div>
+            <div style={{ color: "#6B6B6B", fontSize: 14 }}>
+              Din træner har ikke sat nogen mål for dig endnu.
+            </div>
+          </div>
+        )}
+
+        {periods.length > 0 && (
+          <>
+            <div style={styles.evalBar}>
+              <div style={styles.evalTabs}>
+                {periods.map((p) => (
+                  <button
+                    key={p.id}
+                    onClick={() => {
+                      setSelectedPeriodId(p.id);
+                      setDrilldownCat(null);
+                    }}
+                    style={{
+                      ...styles.evalTab,
+                      ...(selectedPeriodId === p.id ? styles.evalTabActive : {}),
+                    }}
+                  >
+                    <div style={{ fontWeight: 700 }}>{p.label}</div>
+                    <div style={styles.evalTabDate}>{formatDate(p.date)}</div>
+                  </button>
+                ))}
+              </div>
+              <button
+                style={{
+                  ...styles.compareBtn,
+                  ...(printPanelOpen ? styles.compareBtnActive : {}),
+                }}
+                onClick={() => setPrintPanelOpen((v) => !v)}
+              >
+                <Printer size={14} /> Udskriv rapport
+              </button>
+            </div>
+
+            {printPanelOpen && (
+              <div style={styles.addCardCol}>
+                <div style={styles.fieldLabel}>Anden kolonne skal vise</div>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  <button
+                    style={{
+                      ...styles.teamFilterChip,
+                      ...(printColBMode === "goal" ? styles.teamFilterChipActive : {}),
+                    }}
+                    onClick={() => setPrintColBMode("goal")}
+                  >
+                    Mål
+                  </button>
+                  <button
+                    style={{
+                      ...styles.teamFilterChip,
+                      ...(printColBMode === "period" ? styles.teamFilterChipActive : {}),
+                    }}
+                    onClick={() => {
+                      setPrintColBMode("period");
+                      if (!printColBPeriodId) {
+                        const alt = periods.find((p) => p.id !== selectedPeriodId);
+                        setPrintColBPeriodId(alt ? alt.id : periods[0].id);
+                      }
+                    }}
+                  >
+                    Anden periode
+                  </button>
+                </div>
+                {printColBMode === "period" && periods.length >= 2 && (
+                  <div>
+                    <div style={styles.fieldLabel}>Vælg periode til sammenligning</div>
+                    <select
+                      style={styles.select}
+                      value={printColBPeriodId || ""}
+                      onChange={(e) => setPrintColBPeriodId(e.target.value)}
+                    >
+                      {periods.map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.label} · {formatDate(p.date)}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+                <button style={styles.primaryBtn} onClick={() => window.print()}>
+                  <Printer size={16} /> Udskriv nu
+                </button>
+              </div>
+            )}
+
+            {selectedPeriod &&
+              createPortal(
+                <PrintableReport
+                  player={player}
+                  config={config}
+                  goals={periodGoals}
+                  colA={{
+                    label: `${selectedPeriod.label} (${formatDate(selectedPeriod.date)})`,
+                    scores,
+                  }}
+                  colB={
+                    printColBMode === "goal"
+                      ? {
+                          label: "Mål",
+                          scores: Object.fromEntries(
+                            Object.keys(periodGoals).map((id) => [id, periodGoals[id].target])
+                          ),
+                        }
+                      : {
+                          label: (() => {
+                            const p = periods.find((pp) => pp.id === printColBPeriodId);
+                            return p ? `${p.label} (${formatDate(p.date)})` : "Anden periode";
+                          })(),
+                          scores: printColBPeriodId
+                            ? coachEvaluations[printColBPeriodId]?.scores || {}
+                            : {},
+                        }
+                  }
+                />,
+                document.body
+              )}
+
+            {selectedPeriod && (
+              <>
+                <div style={styles.radarCard}>
+                  <p style={styles.radarHint}>Tryk på en kategori for at se de enkelte kriterier</p>
+                  <ResponsiveContainer width="100%" height={250}>
+                    <RadarChart data={radarData} outerRadius="65%">
+                      <PolarGrid stroke="#D9D4C7" />
+                      <PolarAngleAxis
+                        dataKey="subject"
+                        tick={(props) => (
+                          <CategoryAxisTick {...props} onSelect={setDrilldownCat} />
+                        )}
+                      />
+                      <PolarRadiusAxis domain={[0, 5]} tick={false} axisLine={false} />
+                      <Radar
+                        name="Trænervurdering"
+                        dataKey="value"
+                        stroke="#E2231A"
+                        fill="#E2231A"
+                        fillOpacity={0.3}
+                        strokeWidth={2}
+                        isAnimationActive={false}
+                      />
+                      {hasGoals && (
+                        <Radar
+                          name="Mål"
+                          dataKey="goal"
+                          stroke={GOAL_COLOR}
+                          fill="transparent"
+                          strokeWidth={2}
+                          strokeDasharray="5 4"
+                          isAnimationActive={false}
+                        />
+                      )}
+                      <Legend wrapperStyle={{ fontSize: 12, fontFamily: "'Inter', sans-serif" }} />
+                    </RadarChart>
+                  </ResponsiveContainer>
+                </div>
+
+                {drilldownCat && (
+                  <SkillDrilldownRadar
+                    config={config}
+                    catKey={drilldownCat}
+                    player={player}
+                    scores={scores}
+                    goals={periodGoals}
+                    onClose={() => setDrilldownCat(null)}
+                  />
+                )}
+
+                <div style={styles.evalMetaRow}>
+                  <span style={styles.subtext}>
+                    Viser <strong>{selectedPeriod.label}</strong> · {formatDate(selectedPeriod.date)}
+                    {" · "}
+                    <Lock size={11} style={{ verticalAlign: "-1px" }} /> Kun din træner kan ændre
+                    scoren
+                  </span>
+                </div>
+
+                {CATEGORY_META.map((cat) => {
+                  const skills = categorySkillsForPlayer(config, player, cat.key);
+                  const avg = categoryAverage(config, scores, cat.key, player);
+                  return (
+                    <div key={cat.key} style={styles.categoryBlock}>
+                      <div style={styles.categoryHeadRow}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                          <div style={{ ...styles.dot, background: cat.accent }} />
+                          <span style={styles.categoryLabel}>{cat.label}</span>
+                        </div>
+                        <span style={{ ...styles.categoryAvg, color: cat.accent }}>
+                          {avg ? avg.toFixed(1) : "—"}
+                        </span>
+                      </div>
+                      {skills.length === 0 ? (
+                        <div style={styles.noSkills}>Ingen aktive kriterier i denne kategori.</div>
+                      ) : (
+                        skills.map((skill) => {
+                          const val = scores[skill.id];
+                          return (
+                            <div key={skill.id} style={styles.skillRow}>
+                              <span style={styles.skillName}>{skill.name}</span>
+                              <span
+                                style={{
+                                  ...styles.readOnlyScorePill,
+                                  background: scoreColor(val),
+                                }}
+                              >
+                                {val ?? "—"}
+                              </span>
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
+                  );
+                })}
+              </>
+            )}
+          </>
+        )}
+      </main>
+    </div>
+  );
+}
+
+/* ---------- Player self-evaluation link card (shown to coaches on the player profile) ---------- */
+function SelfEvalLinkCard({ token }) {
+  const [copied, setCopied] = useState(false);
+
+  const link = (() => {
+    try {
+      const url = new URL(window.location.href);
+      url.search = "";
+      url.hash = "";
+      return `${url.toString()}${url.toString().includes("?") ? "&" : "?"}player=${token}`;
+    } catch (e) {
+      return `?player=${token}`;
+    }
+  })();
+
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(link);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (e) {
+      /* clipboard not available */
+    }
+  };
+
+  return (
+    <div style={styles.linkCard}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+        <Link2 size={15} color="#1A1A1A" />
+        <span style={styles.categoryLabel}>Spillerens selvevalueringslink</span>
+      </div>
+      <p style={styles.subtext}>
+        Del dette link med spilleren. Alle med linket kan kun evaluere denne ene spiller — ingen
+        andre spillere eller trænerfunktioner er tilgængelige.
+      </p>
+      <div style={styles.linkRow}>
+        <input style={styles.linkInput} value={link} readOnly onFocus={(e) => e.target.select()} />
+        <button style={styles.primaryBtnSm} onClick={copy}>
+          {copied ? <Check size={14} /> : <Copy size={14} />} {copied ? "Kopieret" : "Kopiér"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+const GOAL_HORIZON_FIELDS = [
+  { key: "goal2to3y", label: "Mål (2-3 år)" },
+  { key: "goal1to2y", label: "Mål (1-2 år)" },
+  { key: "goalUnder1y", label: "Mål (under 1 år)" },
+];
+
+function LongTermGoalsCard({ player, onSave }) {
+  const [editing, setEditing] = useState(false);
+  const [drafts, setDrafts] = useState({});
+
+  const startEdit = () => {
+    setDrafts({
+      goal2to3y: player.goal2to3y || "",
+      goal1to2y: player.goal1to2y || "",
+      goalUnder1y: player.goalUnder1y || "",
+    });
+    setEditing(true);
+  };
+
+  const save = () => {
+    onSave({
+      goal2to3y: drafts.goal2to3y.trim(),
+      goal1to2y: drafts.goal1to2y.trim(),
+      goalUnder1y: drafts.goalUnder1y.trim(),
+    });
+    setEditing(false);
+  };
+
+  const hasAny = GOAL_HORIZON_FIELDS.some((f) => player[f.key]);
+
+  return (
+    <div style={styles.categoryBlock}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <Target size={15} color="#1A1A1A" />
+          <span style={styles.categoryLabel}>Langsigtede udviklingsmål</span>
+        </div>
+        {!editing && (
+          <button style={styles.linkBtn} onClick={startEdit}>
+            <Pencil size={12} /> Rediger
+          </button>
+        )}
+      </div>
+
+      {!editing && !hasAny && (
+        <p style={styles.subtext}>Ingen langsigtede mål angivet endnu.</p>
+      )}
+
+      {!editing &&
+        hasAny &&
+        GOAL_HORIZON_FIELDS.filter((f) => player[f.key]).map((f) => (
+          <div key={f.key} style={{ marginBottom: 8 }}>
+            <div style={styles.fieldLabel}>{f.label}</div>
+            <p style={{ margin: 0, fontSize: 14 }}>{player[f.key]}</p>
+          </div>
+        ))}
+
+      {editing && (
+        <div>
+          {GOAL_HORIZON_FIELDS.map((f) => (
+            <div key={f.key} style={{ marginBottom: 10 }}>
+              <div style={styles.fieldLabel}>{f.label}</div>
+              <textarea
+                style={{ ...styles.textarea, minHeight: 48 }}
+                value={drafts[f.key]}
+                onChange={(e) => setDrafts({ ...drafts, [f.key]: e.target.value })}
+              />
+            </div>
+          ))}
+          <div style={{ display: "flex", gap: 8 }}>
+            <button style={styles.primaryBtnSm} onClick={save}>
+              Gem
+            </button>
+            <button style={styles.ghostBtn} onClick={() => setEditing(false)}>
+              Annuller
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PeriodsView({ periods, onCreate, onRename, onDelete }) {
+  const [creating, setCreating] = useState(false);
+  const [label, setLabel] = useState("");
+  const [date, setDate] = useState(todayStr());
+  const [editingId, setEditingId] = useState(null);
+  const [editLabel, setEditLabel] = useState("");
+  const [editDate, setEditDate] = useState("");
+  const [confirmDeleteId, setConfirmDeleteId] = useState(null);
+
+  const startCreate = () => {
+    setLabel("");
+    setDate(todayStr());
+    setCreating(true);
+  };
+
+  const submitCreate = async () => {
+    if (!label.trim()) return;
+    await onCreate(label.trim(), date);
+    setCreating(false);
+  };
+
+  const startEdit = (p) => {
+    setEditingId(p.id);
+    setEditLabel(p.label);
+    setEditDate(p.date);
+  };
+
+  const submitEdit = async () => {
+    if (!editLabel.trim()) return;
+    await onRename(editingId, editLabel.trim(), editDate);
+    setEditingId(null);
+  };
+
+  return (
+    <div>
+      <div style={styles.sectionHeadRow}>
+        <div>
+          <h1 style={styles.h1}>Evalueringsperioder</h1>
+          <p style={styles.subtext}>
+            Oprettes én gang og deles af alle spillere — fx "Forsæson" og "Midtsæson". Alle
+            trænere vurderer hver spiller ud fra de samme perioder.
+          </p>
+        </div>
+        <button style={styles.primaryBtn} onClick={startCreate}>
+          <Plus size={16} /> Ny periode
+        </button>
+      </div>
+
+      {creating && (
+        <div style={styles.addCardCol}>
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+            <input
+              style={styles.input}
+              placeholder="Periodenavn (fx Forsæson)"
+              value={label}
+              onChange={(e) => setLabel(e.target.value)}
+              autoFocus
+            />
+            <input
+              type="date"
+              style={{ ...styles.input, maxWidth: 170 }}
+              value={date}
+              onChange={(e) => setDate(e.target.value)}
+            />
+          </div>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button style={styles.primaryBtn} onClick={submitCreate}>
+              Opret
+            </button>
+            <button style={styles.ghostBtn} onClick={() => setCreating(false)}>
+              Annuller
+            </button>
+          </div>
+        </div>
+      )}
+
+      {periods.length === 0 && !creating && (
+        <div style={styles.emptyState}>
+          <CalendarRange size={28} color="#B9B2A0" />
+          <div style={{ marginTop: 10, fontWeight: 600 }}>Ingen evalueringsperioder endnu</div>
+          <div style={{ color: "#6B6B6B", fontSize: 14 }}>
+            Opret én (fx "Forsæson"), så trænere kan begynde at vurdere spillere ud fra den.
+          </div>
+        </div>
+      )}
+
+      {periods.map((p) => (
+        <div key={p.id} style={styles.periodRow}>
+          {editingId === p.id ? (
+            <div style={{ display: "flex", gap: 10, flexWrap: "wrap", flex: 1 }}>
+              <input
+                style={styles.input}
+                value={editLabel}
+                onChange={(e) => setEditLabel(e.target.value)}
+                autoFocus
+              />
+              <input
+                type="date"
+                style={{ ...styles.input, maxWidth: 170 }}
+                value={editDate}
+                onChange={(e) => setEditDate(e.target.value)}
+              />
+              <button style={styles.primaryBtnSm} onClick={submitEdit}>
+                Gem
+              </button>
+              <button style={styles.ghostBtn} onClick={() => setEditingId(null)}>
+                Annuller
+              </button>
+            </div>
+          ) : (
+            <>
+              <div>
+                <div style={{ fontWeight: 700 }}>{p.label}</div>
+                <div style={styles.subtext}>{formatDate(p.date)}</div>
+              </div>
+              <div style={{ display: "flex", gap: 6 }}>
+                <button style={styles.iconBtn} onClick={() => startEdit(p)} title="Rediger">
+                  <Pencil size={14} />
+                </button>
+                <button
+                  style={{ ...styles.iconBtn, color: "#E2231A" }}
+                  onClick={() => setConfirmDeleteId(p.id)}
+                  title="Slet"
+                >
+                  <Trash2 size={14} />
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      ))}
+
+      {confirmDeleteId && (
+        <div style={styles.modalOverlay}>
+          <div style={styles.modalCard}>
+            <div style={styles.modalTitle}>Slet denne periode?</div>
+            <div style={styles.modalBody}>
+              Dette fjerner den for alle spillere, inklusive allerede indtastede scores på tværs
+              af hele truppen. Kan ikke fortrydes.
+            </div>
+            <div style={styles.modalActions}>
+              <button style={styles.ghostBtn} onClick={() => setConfirmDeleteId(null)}>
+                Annuller
+              </button>
+              <button
+                style={styles.dangerBtn}
+                onClick={() => {
+                  onDelete(confirmDeleteId);
+                  setConfirmDeleteId(null);
+                }}
+              >
+                Slet
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ParticipationLevelsView({ levels, onCreate, onUpdate, onDelete }) {
+  const [creating, setCreating] = useState(false);
+  const [name, setName] = useState("");
+  const [numericValue, setNumericValue] = useState(0);
+  const [editingName, setEditingName] = useState(null);
+
+  const sortedLevels = [...levels].sort((a, b) => a.sortOrder - b.sortOrder);
+
+  const submitCreate = async () => {
+    if (!name.trim()) return;
+    await onCreate(name.trim(), Number(numericValue) || 0);
+    setName("");
+    setNumericValue(0);
+    setCreating(false);
+  };
+
+  return (
+    <div>
+      <div style={styles.sectionHeadRow}>
+        <div>
+          <h1 style={styles.h1}>Deltagelsesniveauer</h1>
+          <p style={styles.subtext}>
+            Definér hvilke niveauer spillere kan deltage i udviklingsprogrammet på. Den numeriske
+            værdi bruges til at sortere spillere efter niveau. Forventninger vises på spillerens
+            rapport.
+          </p>
+        </div>
+        <button style={styles.primaryBtn} onClick={() => setCreating(true)}>
+          <Plus size={16} /> Nyt niveau
+        </button>
+      </div>
+
+      {creating && (
+        <div style={styles.addCardCol}>
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+            <input
+              style={styles.input}
+              placeholder="Niveaunavn (fx Udvidet)"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              autoFocus
+            />
+            <input
+              type="number"
+              style={{ ...styles.input, maxWidth: 100 }}
+              placeholder="Værdi"
+              value={numericValue}
+              onChange={(e) => setNumericValue(e.target.value)}
+            />
+          </div>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button style={styles.primaryBtn} onClick={submitCreate}>
+              Opret
+            </button>
+            <button style={styles.ghostBtn} onClick={() => setCreating(false)}>
+              Annuller
+            </button>
+          </div>
+        </div>
+      )}
+
+      {sortedLevels.length === 0 && !creating && (
+        <div style={styles.emptyState}>
+          <BarChart3 size={28} color="#B9B2A0" />
+          <div style={{ marginTop: 10, fontWeight: 600 }}>Ingen niveauer endnu</div>
+          <div style={{ color: "#6B6B6B", fontSize: 14 }}>
+            Opret ét (fx "Standard"), så spillere kan tildeles det.
+          </div>
+        </div>
+      )}
+
+      {sortedLevels.map((l) => (
+        <div key={l.id} style={styles.categoryBlock}>
+          <div style={styles.settingsRow}>
+            {editingName === l.id ? (
+              <div style={{ display: "flex", gap: 8, flex: 1 }}>
+                <input
+                  style={styles.editInput}
+                  defaultValue={l.name}
+                  autoFocus
+                  onBlur={(e) => {
+                    onUpdate(l.id, { name: e.target.value.trim() || l.name });
+                    setEditingName(null);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") e.target.blur();
+                    if (e.key === "Escape") setEditingName(null);
+                  }}
+                />
+                <input
+                  type="number"
+                  style={{ ...styles.input, maxWidth: 90 }}
+                  defaultValue={l.numericValue}
+                  onBlur={(e) => onUpdate(l.id, { numericValue: Number(e.target.value) || 0 })}
+                />
+              </div>
+            ) : (
+              <div>
+                <span style={{ fontWeight: 700 }}>{l.name}</span>
+                <span style={styles.subtext}> · værdi {l.numericValue}</span>
+              </div>
+            )}
+            <div style={{ display: "flex", gap: 6 }}>
+              <button style={styles.iconBtn} onClick={() => setEditingName(l.id)} title="Omdøb / rediger værdi">
+                <Pencil size={14} />
+              </button>
+              <button
+                style={{ ...styles.iconBtn, color: "#E2231A" }}
+                onClick={() => onDelete(l.id)}
+                title="Slet"
+              >
+                <Trash2 size={14} />
+              </button>
+            </div>
+          </div>
+          <div style={{ marginTop: 8 }}>
+            <div style={styles.fieldLabel}>Forventninger (vises på rapporten)</div>
+            <textarea
+              style={styles.textarea}
+              defaultValue={l.expectations}
+              placeholder="Fx: Deltager i 2 træninger om ugen og forventes til alle kampe."
+              onBlur={(e) => {
+                if (e.target.value !== l.expectations) {
+                  onUpdate(l.id, { expectations: e.target.value });
+                }
+              }}
+            />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function ProgressTracker({ value, onChange, compact }) {
+  return (
+    <div style={styles.progressRow}>
+      <span style={styles.progressLabel}>Fremskridt</span>
+      <div style={styles.progressButtons}>
+        {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((v) => {
+          const filled = typeof value === "number" && v <= value;
+          return (
+            <button
+              key={v}
+              onClick={() => onChange(value === v ? null : v)}
+              style={{
+                ...(compact ? styles.progressBtnCompact : styles.progressBtn),
+                background: filled ? "#1A1A1A" : "#FFFFFF",
+                color: filled ? "#FFFFFF" : "#1A1A1A",
+                borderColor: filled ? "#1A1A1A" : "#D9D4C7",
+              }}
+              title={`Sæt fremskridt til ${v}`}
+            >
+              {v}
+            </button>
+          );
+        })}
+      </div>
+      <span style={styles.progressValue}>{typeof value === "number" ? `${value}/10` : "—"}</span>
+    </div>
+  );
+}
+
+function getLatestFollowup(data, playerId) {
+  const list = data.followups?.[playerId];
+  if (!list || list.length === 0) return null;
+  return list[list.length - 1];
+}
+
+function CoachesOverviewView({ data, onSetGoalProgress, onOpenPlayer, onAddFollowup, onRemoveFollowup }) {
+  const periods = sortedPeriods(data.periods);
+  const [selectedPeriodId, setSelectedPeriodId] = useState(
+    periods.length ? periods[periods.length - 1].id : null
+  );
+  const [sortMode, setSortMode] = useState("alpha");
+  const [followupPlayerId, setFollowupPlayerId] = useState(null);
+  const [followupNote, setFollowupNote] = useState("");
+  const [followupCoachId, setFollowupCoachId] = useState("");
+
+  useEffect(() => {
+    if (!selectedPeriodId && periods.length) {
+      setSelectedPeriodId(periods[periods.length - 1].id);
+    }
+    if (selectedPeriodId && !periods.find((p) => p.id === selectedPeriodId)) {
+      setSelectedPeriodId(periods.length ? periods[periods.length - 1].id : null);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [periods.length]);
+
+  const openFollowupForm = (playerId) => {
+    setFollowupPlayerId(playerId);
+    setFollowupNote("");
+    setFollowupCoachId("");
+  };
+
+  const saveFollowup = (playerId) => {
+    onAddFollowup(playerId, followupCoachId || null, followupNote.trim());
+    setFollowupPlayerId(null);
+  };
+
+  const levelById = {};
+  (data.config.participationLevels || []).forEach((l) => {
+    levelById[l.id] = l;
+  });
+
+  const sortedPlayers =
+    sortMode === "followup"
+      ? [...data.players].sort((a, b) => {
+          const la = getLatestFollowup(data, a.id);
+          const lb = getLatestFollowup(data, b.id);
+          const ta = la ? new Date(la.createdAt).getTime() : -Infinity;
+          const tb = lb ? new Date(lb.createdAt).getTime() : -Infinity;
+          return ta - tb;
+        })
+      : sortMode === "level"
+      ? [...data.players].sort((a, b) => {
+          const va = levelById[a.participationLevelId]?.numericValue ?? -Infinity;
+          const vb = levelById[b.participationLevelId]?.numericValue ?? -Infinity;
+          return vb - va;
+        })
+      : data.players;
+
+  return (
+    <div>
+      <div style={styles.sectionHeadRow}>
+        <div>
+          <h1 style={styles.h1}>Træneroverblik</h1>
+          <p style={styles.subtext}>
+            Alle spilleres udviklingsmål, målsætninger og opfølgninger samlet ét sted.
+          </p>
+        </div>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <button
+            style={{ ...styles.teamFilterChip, ...(sortMode === "followup" ? styles.teamFilterChipActive : {}) }}
+            onClick={() => setSortMode((v) => (v === "followup" ? "alpha" : "followup"))}
+          >
+            <ArrowUpDown size={14} />{" "}
+            {sortMode === "followup" ? "Sortér alfabetisk" : "Sortér efter seneste opfølgning"}
+          </button>
+          <button
+            style={{ ...styles.teamFilterChip, ...(sortMode === "level" ? styles.teamFilterChipActive : {}) }}
+            onClick={() => setSortMode((v) => (v === "level" ? "alpha" : "level"))}
+          >
+            <BarChart3 size={14} /> {sortMode === "level" ? "Sortér alfabetisk" : "Sortér efter niveau"}
+          </button>
+        </div>
+      </div>
+
+      {periods.length > 0 && (
+        <div style={{ marginBottom: 16 }}>
+          <div style={styles.fieldLabel}>Evalueringsperiode</div>
+          <select
+            style={styles.select}
+            value={selectedPeriodId || ""}
+            onChange={(e) => setSelectedPeriodId(e.target.value)}
+          >
+            {periods.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.label} · {formatDate(p.date)}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+
+      {periods.length === 0 && (
+        <div style={styles.emptyState}>
+          <CalendarRange size={28} color="#B9B2A0" />
+          <div style={{ marginTop: 10, fontWeight: 600 }}>Ingen evalueringsperioder endnu</div>
+          <div style={{ color: "#6B6B6B", fontSize: 14 }}>
+            Opret en periode under Perioder, så kan du vælge den her.
+          </div>
+        </div>
+      )}
+
+      {periods.length > 0 && data.players.length === 0 && (
+        <div style={styles.emptyState}>
+          <ClipboardList size={28} color="#B9B2A0" />
+          <div style={{ marginTop: 10, fontWeight: 600 }}>Ingen spillere endnu</div>
+          <div style={{ color: "#6B6B6B", fontSize: 14 }}>
+            Tilføj spillere i Spillertrup, så vises de her.
+          </div>
+        </div>
+      )}
+
+      {periods.length > 0 && sortedPlayers.map((player) => {
+        const goals = data.goals[player.id]?.[selectedPeriodId] || {};
+        const goalIds = Object.keys(goals);
+        const scores = selectedPeriodId ? getPlayerScores(data, player.id, selectedPeriodId) : {};
+        const entries = goalIds
+          .map((skillId) => {
+            const meta = findSkillMeta(data.config, skillId);
+            if (!meta) return null;
+            return { skillId, goal: goals[skillId], ...meta };
+          })
+          .filter(Boolean)
+          .sort(
+            (a, b) =>
+              a.category.label.localeCompare(b.category.label) ||
+              a.skill.name.localeCompare(b.skill.name)
+          );
+
+        const latestFollowup = getLatestFollowup(data, player.id);
+        const followupCoachName = latestFollowup?.coachId
+          ? (data.coaches || []).find((c) => c.id === latestFollowup.coachId)?.name
+          : null;
+        const isRegistering = followupPlayerId === player.id;
+
+        return (
+          <div key={player.id} style={styles.coachPlayerCard}>
+            <div style={styles.coachPlayerHead} onClick={() => onOpenPlayer(player.id)}>
+              <div style={styles.numberBadge}>{player.number || "—"}</div>
+              <div style={{ flex: 1 }}>
+                <div style={styles.playerName}>{player.name}</div>
+                <div style={styles.subtext}>
+                  {player.positions && player.positions.length > 0
+                    ? player.positions.join(" · ")
+                    : "Position ikke angivet"}
+                </div>
+                {levelById[player.participationLevelId] && (
+                  <div style={styles.teamBadge}>
+                    <BarChart3 size={10} /> {levelById[player.participationLevelId].name}
+                  </div>
+                )}
+              </div>
+              <ChevronRight size={18} color="#B9B2A0" />
+            </div>
+
+            <div style={styles.goalOverviewRow}>
+              <div style={styles.goalOverviewTop}>
+                <div>
+                  <div style={styles.subtext}>
+                    {latestFollowup
+                      ? `Seneste opfølgning: ${formatDate(latestFollowup.createdAt.slice(0, 10))}${
+                          followupCoachName ? ` · ${followupCoachName}` : ""
+                        }`
+                      : "Ingen opfølgning endnu"}
+                  </div>
+                  {latestFollowup && latestFollowup.note && (
+                    <div style={styles.goalNote}>{latestFollowup.note}</div>
+                  )}
+                </div>
+                {!isRegistering && (
+                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    {latestFollowup && (
+                      <button
+                        style={styles.iconBtnGhost}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onRemoveFollowup(player.id, latestFollowup.id);
+                        }}
+                        title="Fjern seneste opfølgning"
+                      >
+                        <X size={12} />
+                      </button>
+                    )}
+                    <button
+                      style={styles.linkBtn}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        openFollowupForm(player.id);
+                      }}
+                    >
+                      <MessageSquarePlus size={12} /> Registrer opfølgning
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {isRegistering && (
+                <div style={styles.goalEditRow}>
+                  <div style={styles.fieldLabel}>Note</div>
+                  <input
+                    style={styles.input}
+                    placeholder="fx aftalt fokus til næste træning"
+                    value={followupNote}
+                    maxLength={500}
+                    onChange={(e) => setFollowupNote(e.target.value)}
+                    autoFocus
+                  />
+                  <div style={styles.charCount}>{followupNote.length}/500</div>
+                  <div style={styles.fieldLabel}>Træner</div>
+                  <select
+                    style={styles.select}
+                    value={followupCoachId}
+                    onChange={(e) => setFollowupCoachId(e.target.value)}
+                  >
+                    <option value="">Ingen valgt</option>
+                    {(data.coaches || []).map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name}
+                      </option>
+                    ))}
+                  </select>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <button style={styles.primaryBtnSm} onClick={() => saveFollowup(player.id)}>
+                      Gem
+                    </button>
+                    <button style={styles.ghostBtn} onClick={() => setFollowupPlayerId(null)}>
+                      Annuller
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {entries.map(({ skillId, goal, skill, category }) => {
+              const currentVal = scores[skillId];
+              const achieved = typeof currentVal === "number" && currentVal >= goal.target;
+              return (
+                <div key={skillId} style={styles.goalOverviewRow}>
+                  <div style={styles.goalOverviewTop}>
+                    <div>
+                      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                        <div style={{ ...styles.dot, background: category.accent }} />
+                        <span style={styles.skillName}>{skill.name}</span>
+                        <span style={styles.goalOverviewCat}>{category.label}</span>
+                      </div>
+                      {(goal.note || goal.focusAreas) && (
+                        <div style={styles.goalNote}>
+                          {goal.note && (
+                            <div>
+                              <strong>Målsætning:</strong> {goal.note}
+                            </div>
+                          )}
+                          {goal.focusAreas && (
+                            <div>
+                              <strong>Fokusområder:</strong> {goal.focusAreas}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                    <span
+                      style={{
+                        ...styles.goalChip,
+                        ...(achieved ? styles.goalChipMet : styles.goalChipPending),
+                      }}
+                    >
+                      <Target size={11} /> Mål {goal.target}
+                      {achieved ? " ✓" : ""}
+                    </span>
+                  </div>
+                  <ProgressTracker
+                    value={goal.progress}
+                    onChange={(v) => onSetGoalProgress(player.id, selectedPeriodId, skillId, v)}
+                  />
+                </div>
+              );
+            })}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function CoachesView({ coaches, teams, onCreate, onUpdate, onDelete }) {
+  const [creating, setCreating] = useState(false);
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [teamId, setTeamId] = useState("");
+  const [editingId, setEditingId] = useState(null);
+  const [editName, setEditName] = useState("");
+  const [editEmail, setEditEmail] = useState("");
+  const [editTeamId, setEditTeamId] = useState("");
+  const [confirmDeleteId, setConfirmDeleteId] = useState(null);
+
+  const submitCreate = async () => {
+    if (!name.trim()) return;
+    await onCreate(name.trim(), email.trim(), teamId || null);
+    setName("");
+    setEmail("");
+    setTeamId("");
+    setCreating(false);
+  };
+
+  const startEdit = (coach) => {
+    setEditingId(coach.id);
+    setEditName(coach.name);
+    setEditEmail(coach.email || "");
+    setEditTeamId(coach.teamId || "");
+  };
+
+  const submitEdit = async () => {
+    if (!editName.trim()) return;
+    await onUpdate(editingId, {
+      name: editName.trim(),
+      email: editEmail.trim(),
+      teamId: editTeamId || null,
+    });
+    setEditingId(null);
+  };
+
+  const teamName = (id) => teams.find((t) => t.id === id)?.name || null;
+
+  return (
+    <div>
+      <div style={styles.sectionHeadRow}>
+        <div>
+          <h1 style={styles.h1}>Trænere</h1>
+          <p style={styles.subtext}>
+            Opret trænerprofiler, så de kan knyttes til opfølgninger og hold.
+          </p>
+        </div>
+        <button style={styles.primaryBtn} onClick={() => setCreating(true)}>
+          <Plus size={16} /> Ny træner
+        </button>
+      </div>
+
+      {creating && (
+        <div style={styles.addCardCol}>
+          <input
+            style={styles.input}
+            placeholder="Navn"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            autoFocus
+          />
+          <input
+            style={styles.input}
+            type="email"
+            placeholder="E-mail"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+          />
+          {teams.length > 0 && (
+            <div>
+              <div style={styles.fieldLabel}>Hold</div>
+              <select style={styles.select} value={teamId} onChange={(e) => setTeamId(e.target.value)}>
+                <option value="">Intet hold</option>
+                {teams.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+          <div style={{ display: "flex", gap: 8 }}>
+            <button style={styles.primaryBtn} onClick={submitCreate}>
+              Opret
+            </button>
+            <button style={styles.ghostBtn} onClick={() => setCreating(false)}>
+              Annuller
+            </button>
+          </div>
+        </div>
+      )}
+
+      {coaches.length === 0 && !creating && (
+        <div style={styles.emptyState}>
+          <UserCog size={28} color="#B9B2A0" />
+          <div style={{ marginTop: 10, fontWeight: 600 }}>Ingen trænere endnu</div>
+          <div style={{ color: "#6B6B6B", fontSize: 14 }}>
+            Opret en træner, så du kan knytte dem til opfølgninger.
+          </div>
+        </div>
+      )}
+
+      {coaches.map((c) => (
+        <div key={c.id} style={styles.periodRow}>
+          {editingId === c.id ? (
+            <div style={{ display: "flex", gap: 10, flexWrap: "wrap", flex: 1 }}>
+              <input
+                style={styles.input}
+                value={editName}
+                onChange={(e) => setEditName(e.target.value)}
+                autoFocus
+              />
+              <input
+                style={styles.input}
+                type="email"
+                value={editEmail}
+                onChange={(e) => setEditEmail(e.target.value)}
+              />
+              {teams.length > 0 && (
+                <select
+                  style={styles.select}
+                  value={editTeamId}
+                  onChange={(e) => setEditTeamId(e.target.value)}
+                >
+                  <option value="">Intet hold</option>
+                  {teams.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.name}
+                    </option>
+                  ))}
+                </select>
+              )}
+              <button style={styles.primaryBtnSm} onClick={submitEdit}>
+                Gem
+              </button>
+              <button style={styles.ghostBtn} onClick={() => setEditingId(null)}>
+                Annuller
+              </button>
+            </div>
+          ) : (
+            <>
+              <div>
+                <div style={{ fontWeight: 700 }}>{c.name}</div>
+                <div style={styles.subtext}>
+                  {c.email || "Ingen e-mail"}
+                  {teamName(c.teamId) ? ` · ${teamName(c.teamId)}` : ""}
+                </div>
+              </div>
+              <div style={{ display: "flex", gap: 6 }}>
+                <button style={styles.iconBtn} onClick={() => startEdit(c)} title="Rediger">
+                  <Pencil size={14} />
+                </button>
+                <button
+                  style={{ ...styles.iconBtn, color: "#E2231A" }}
+                  onClick={() => setConfirmDeleteId(c.id)}
+                  title="Slet"
+                >
+                  <Trash2 size={14} />
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      ))}
+
+      {confirmDeleteId && (
+        <div style={styles.modalOverlay}>
+          <div style={styles.modalCard}>
+            <div style={styles.modalTitle}>Slet denne træner?</div>
+            <div style={styles.modalBody}>
+              Tidligere registrerede opfølgninger bevares, men vises ikke længere med trænerens
+              navn.
+            </div>
+            <div style={styles.modalActions}>
+              <button style={styles.ghostBtn} onClick={() => setConfirmDeleteId(null)}>
+                Annuller
+              </button>
+              <button
+                style={styles.dangerBtn}
+                onClick={() => {
+                  onDelete(confirmDeleteId);
+                  setConfirmDeleteId(null);
+                }}
+              >
+                Slet
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function FollowupsLogView({ data, onRemoveFollowup }) {
+  const [playerFilter, setPlayerFilter] = useState("all");
+  const [coachFilter, setCoachFilter] = useState("all");
+  const [monthFilter, setMonthFilter] = useState("all");
+
+  const allFollowups = [];
+  Object.keys(data.followups || {}).forEach((playerId) => {
+    const player = data.players.find((p) => p.id === playerId);
+    (data.followups[playerId] || []).forEach((f) => {
+      allFollowups.push({
+        ...f,
+        playerId,
+        playerName: player ? player.name : "Ukendt spiller",
+      });
+    });
+  });
+  allFollowups.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+  const monthKey = (iso) => iso.slice(0, 7);
+  const monthLabel = (key) => {
+    const dt = new Date(`${key}-01T00:00:00`);
+    const label = dt.toLocaleDateString("da-DK", { month: "long", year: "numeric" });
+    return label.charAt(0).toUpperCase() + label.slice(1);
+  };
+
+  const availableMonths = Array.from(new Set(allFollowups.map((f) => monthKey(f.createdAt)))).sort(
+    (a, b) => b.localeCompare(a)
+  );
+
+  const filtered = allFollowups.filter((f) => {
+    if (playerFilter !== "all" && f.playerId !== playerFilter) return false;
+    if (coachFilter === "none" && f.coachId) return false;
+    if (coachFilter !== "all" && coachFilter !== "none" && f.coachId !== coachFilter) return false;
+    if (monthFilter !== "all" && monthKey(f.createdAt) !== monthFilter) return false;
+    return true;
+  });
+
+  const coachName = (coachId) => (data.coaches || []).find((c) => c.id === coachId)?.name || null;
+
+  return (
+    <div>
+      <h1 style={styles.h1}>Opfølgninger</h1>
+      <p style={styles.subtext}>Alle registrerede opfølgninger på tværs af spillere.</p>
+
+      <div style={{ display: "flex", gap: 10, flexWrap: "wrap", margin: "16px 0" }}>
+        <div>
+          <div style={styles.fieldLabel}>Spiller</div>
+          <select
+            style={styles.select}
+            value={playerFilter}
+            onChange={(e) => setPlayerFilter(e.target.value)}
+          >
+            <option value="all">Alle spillere</option>
+            {data.players.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <div style={styles.fieldLabel}>Træner</div>
+          <select
+            style={styles.select}
+            value={coachFilter}
+            onChange={(e) => setCoachFilter(e.target.value)}
+          >
+            <option value="all">Alle trænere</option>
+            <option value="none">Ingen valgt</option>
+            {(data.coaches || []).map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <div style={styles.fieldLabel}>Periode</div>
+          <select
+            style={styles.select}
+            value={monthFilter}
+            onChange={(e) => setMonthFilter(e.target.value)}
+          >
+            <option value="all">Alle perioder</option>
+            {availableMonths.map((m) => (
+              <option key={m} value={m}>
+                {monthLabel(m)}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      {filtered.length === 0 && (
+        <div style={styles.emptyState}>
+          <History size={28} color="#B9B2A0" />
+          <div style={{ marginTop: 10, fontWeight: 600 }}>
+            {allFollowups.length === 0
+              ? "Ingen opfølgninger registreret endnu"
+              : "Ingen opfølgninger matcher filtrene"}
+          </div>
+          <div style={{ color: "#6B6B6B", fontSize: 14 }}>
+            {allFollowups.length === 0
+              ? "Registrér en opfølgning på en spiller fra Træneroverblik."
+              : "Prøv at nulstille filtrene."}
+          </div>
+        </div>
+      )}
+
+      {filtered.map((f) => (
+        <div key={f.id} style={styles.periodRow}>
+          <div>
+            <div style={{ fontWeight: 700 }}>{f.playerName}</div>
+            <div style={styles.subtext}>
+              {formatDate(f.createdAt.slice(0, 10))}
+              {coachName(f.coachId) ? ` · ${coachName(f.coachId)}` : " · Ingen træner valgt"}
+            </div>
+            {f.note && <div style={styles.goalNote}>{f.note}</div>}
+          </div>
+          <button
+            style={{ ...styles.iconBtn, color: "#E2231A" }}
+            onClick={() => onRemoveFollowup(f.playerId, f.id)}
+            title="Slet opfølgning"
+          >
+            <Trash2 size={14} />
+          </button>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function TeamsView({ teams, players, onCreate, onRename, onDelete }) {
+  const [creating, setCreating] = useState(false);
+  const [name, setName] = useState("");
+  const [editingId, setEditingId] = useState(null);
+  const [editName, setEditName] = useState("");
+  const [confirmDeleteId, setConfirmDeleteId] = useState(null);
+
+  const submitCreate = async () => {
+    if (!name.trim()) return;
+    await onCreate(name.trim());
+    setName("");
+    setCreating(false);
+  };
+
+  const submitEdit = async () => {
+    if (!editName.trim()) return;
+    await onRename(editingId, editName.trim());
+    setEditingId(null);
+  };
+
+  const countFor = (teamId) => players.filter((p) => p.teamId === teamId).length;
+
+  return (
+    <div>
+      <div style={styles.sectionHeadRow}>
+        <div>
+          <h1 style={styles.h1}>Hold</h1>
+          <p style={styles.subtext}>
+            Oprettes én gang — knyt en spiller til et hold fra spillerens profil eller når du
+            opretter spilleren.
+          </p>
+        </div>
+        <button style={styles.primaryBtn} onClick={() => setCreating(true)}>
+          <Plus size={16} /> Nyt hold
+        </button>
+      </div>
+
+      {creating && (
+        <div style={styles.addCardCol}>
+          <input
+            style={styles.input}
+            placeholder="Holdnavn (fx U14 Drenge)"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            autoFocus
+          />
+          <div style={{ display: "flex", gap: 8 }}>
+            <button style={styles.primaryBtn} onClick={submitCreate}>
+              Opret
+            </button>
+            <button style={styles.ghostBtn} onClick={() => setCreating(false)}>
+              Annuller
+            </button>
+          </div>
+        </div>
+      )}
+
+      {teams.length === 0 && !creating && (
+        <div style={styles.emptyState}>
+          <Layers size={28} color="#B9B2A0" />
+          <div style={{ marginTop: 10, fontWeight: 600 }}>Ingen hold endnu</div>
+          <div style={{ color: "#6B6B6B", fontSize: 14 }}>
+            Opret ét (fx "U14 Drenge"), så spillere kan knyttes til det.
+          </div>
+        </div>
+      )}
+
+      {teams.map((t) => (
+        <div key={t.id} style={styles.periodRow}>
+          {editingId === t.id ? (
+            <div style={{ display: "flex", gap: 10, flexWrap: "wrap", flex: 1 }}>
+              <input
+                style={styles.input}
+                value={editName}
+                onChange={(e) => setEditName(e.target.value)}
+                autoFocus
+              />
+              <button style={styles.primaryBtnSm} onClick={submitEdit}>
+                Gem
+              </button>
+              <button style={styles.ghostBtn} onClick={() => setEditingId(null)}>
+                Annuller
+              </button>
+            </div>
+          ) : (
+            <>
+              <div>
+                <div style={{ fontWeight: 700 }}>{t.name}</div>
+                <div style={styles.subtext}>
+                  {countFor(t.id)} spiller{countFor(t.id) !== 1 ? "e" : ""}
+                </div>
+              </div>
+              <div style={{ display: "flex", gap: 6 }}>
+                <button
+                  style={styles.iconBtn}
+                  onClick={() => {
+                    setEditingId(t.id);
+                    setEditName(t.name);
+                  }}
+                  title="Omdøb"
+                >
+                  <Pencil size={14} />
+                </button>
+                <button
+                  style={{ ...styles.iconBtn, color: "#E2231A" }}
+                  onClick={() => setConfirmDeleteId(t.id)}
+                  title="Slet"
+                >
+                  <Trash2 size={14} />
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      ))}
+
+      {confirmDeleteId && (
+        <div style={styles.modalOverlay}>
+          <div style={styles.modalCard}>
+            <div style={styles.modalTitle}>Slet dette hold?</div>
+            <div style={styles.modalBody}>
+              Spillere knyttet til det bliver frigjort — deres scores og mål bevares.
+            </div>
+            <div style={styles.modalActions}>
+              <button style={styles.ghostBtn} onClick={() => setConfirmDeleteId(null)}>
+                Annuller
+              </button>
+              <button
+                style={styles.dangerBtn}
+                onClick={() => {
+                  onDelete(confirmDeleteId);
+                  setConfirmDeleteId(null);
+                }}
+              >
+                Slet
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function RosterView({
+  data,
+  periods,
+  onOpen,
+  addingPlayer,
+  setAddingPlayer,
+  newName,
+  setNewName,
+  newPositions,
+  setNewPositions,
+  newNumber,
+  setNewNumber,
+  newEmail,
+  setNewEmail,
+  newTeamId,
+  setNewTeamId,
+  newSkillGroupId,
+  setNewSkillGroupId,
+  onAdd,
+}) {
+  const [teamFilter, setTeamFilter] = useState("all");
+  const [sortMode, setSortMode] = useState("alpha");
+  const [selectMode, setSelectMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState([]);
+  const [sending, setSending] = useState(false);
+  const [sendResult, setSendResult] = useState(null);
+  const [emailsCopied, setEmailsCopied] = useState(false);
+  const teams = data.teams || [];
+
+  const toggleSelectMode = () => {
+    setSelectMode((v) => !v);
+    setSelectedIds([]);
+    setSendResult(null);
+    setEmailsCopied(false);
+  };
+
+  const toggleSelected = (playerId) => {
+    setSelectedIds((prev) =>
+      prev.includes(playerId) ? prev.filter((id) => id !== playerId) : [...prev, playerId]
+    );
+  };
+
+  const selectAllWithEmail = () => {
+    setSelectedIds(visiblePlayers.filter((p) => p.email).map((p) => p.id));
+  };
+
+  const copySelectedEmails = async () => {
+    const emails = data.players
+      .filter((p) => selectedIds.includes(p.id) && p.email)
+      .map((p) => p.email);
+    if (emails.length === 0) return;
+    try {
+      await navigator.clipboard.writeText(emails.join(", "));
+      setEmailsCopied(true);
+      setTimeout(() => setEmailsCopied(false), 2000);
+    } catch (e) {
+      /* clipboard not available */
+    }
+  };
+
+  const sendNotifications = async () => {
+    if (selectedIds.length === 0) return;
+    setSending(true);
+    setSendResult(null);
+    try {
+      const { results } = await api.sendSelfEvalNotifications(selectedIds);
+      const okCount = results.filter((r) => r.ok).length;
+      const failCount = results.length - okCount;
+      setSendResult({
+        ok: failCount === 0,
+        message:
+          failCount === 0
+            ? `Selvevaluering sendt til ${okCount} spiller${okCount !== 1 ? "e" : ""}.`
+            : `Sendt til ${okCount} spiller${okCount !== 1 ? "e" : ""}. ${failCount} kunne ikke modtage e-mail (mangler adresse eller afsendelsen fejlede).`,
+      });
+      setSelectMode(false);
+      setSelectedIds([]);
+    } catch (e) {
+      setSendResult({
+        ok: false,
+        message:
+          e.message === "E-mailafsendelse er ikke konfigureret endnu"
+            ? e.message
+            : "Kunne ikke sende e-mails — tjek din forbindelse og prøv igen.",
+      });
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const togglePosition = (pos) => {
+    setNewPositions((prev) =>
+      prev.includes(pos) ? prev.filter((p) => p !== pos) : [...prev, pos]
+    );
+  };
+
+  const teamName = (teamId) => teams.find((t) => t.id === teamId)?.name || null;
+
+  const visiblePlayers =
+    teamFilter === "all"
+      ? data.players
+      : teamFilter === "none"
+      ? data.players.filter((p) => !p.teamId)
+      : data.players.filter((p) => p.teamId === teamFilter);
+
+  const levelById = {};
+  (data.config.participationLevels || []).forEach((l) => {
+    levelById[l.id] = l;
+  });
+
+  const playersWithStats = visiblePlayers.map((p) => {
+    const latestPeriod = getLatestScoredPeriod(data, p.id);
+    const scores = latestPeriod ? getPlayerScores(data, p.id, latestPeriod.id) : {};
+    const overall = overallAverage(data.config, scores, p);
+    const goals = (latestPeriod && data.goals[p.id]?.[latestPeriod.id]) || {};
+    const goalIds = Object.keys(goals);
+    const goalsMet = goalIds.filter(
+      (id) => typeof scores[id] === "number" && scores[id] >= goals[id].target
+    ).length;
+    const level = levelById[p.participationLevelId] || null;
+    return { player: p, scores, overall, goals, goalIds, goalsMet, latestPeriod, level };
+  });
+
+  // Best score (or highest participation level) on top; players with no
+  // value at all sort to the bottom.
+  const sortedPlayers =
+    sortMode === "score"
+      ? [...playersWithStats].sort((a, b) => (b.overall ?? -Infinity) - (a.overall ?? -Infinity))
+      : sortMode === "level"
+      ? [...playersWithStats].sort(
+          (a, b) => (b.level?.numericValue ?? -Infinity) - (a.level?.numericValue ?? -Infinity)
+        )
+      : playersWithStats;
+
+  return (
+    <div>
+      <div style={styles.sectionHeadRow}>
+        <div>
+          <h1 style={styles.h1}>Spillertrup</h1>
+          <p style={styles.subtext}>
+            {visiblePlayers.length} af {data.players.length} spiller
+            {data.players.length !== 1 ? "e" : ""} · delt med alle trænere
+          </p>
+        </div>
+        <button style={styles.primaryBtn} onClick={() => setAddingPlayer(true)}>
+          <Plus size={16} /> Tilføj spiller
+        </button>
+      </div>
+
+      {sendResult && (
+        <div style={sendResult.ok ? styles.successBanner : styles.errorBannerRow}>
+          {sendResult.message}
+          <button style={styles.iconBtnGhost} onClick={() => setSendResult(null)}>
+            <X size={14} />
+          </button>
+        </div>
+      )}
+
+      <div style={{ marginBottom: 12, display: "flex", gap: 8, flexWrap: "wrap" }}>
+        <button
+          style={{ ...styles.teamFilterChip, ...(sortMode === "score" ? styles.teamFilterChipActive : {}) }}
+          onClick={() => setSortMode((v) => (v === "score" ? "alpha" : "score"))}
+        >
+          <ArrowUpDown size={14} /> {sortMode === "score" ? "Sortér alfabetisk" : "Sortér efter score"}
+        </button>
+        <button
+          style={{ ...styles.teamFilterChip, ...(sortMode === "level" ? styles.teamFilterChipActive : {}) }}
+          onClick={() => setSortMode((v) => (v === "level" ? "alpha" : "level"))}
+        >
+          <BarChart3 size={14} /> {sortMode === "level" ? "Sortér alfabetisk" : "Sortér efter niveau"}
+        </button>
+        <button
+          style={{ ...styles.teamFilterChip, ...(selectMode ? styles.teamFilterChipActive : {}) }}
+          onClick={toggleSelectMode}
+        >
+          <Mail size={14} /> {selectMode ? "Annuller" : "Send selvevaluering"}
+        </button>
+      </div>
+
+      {selectMode && (
+        <div style={styles.selectActionBar}>
+          <span>
+            {selectedIds.length} spiller{selectedIds.length !== 1 ? "e" : ""} valgt
+          </span>
+          <button style={styles.ghostBtn} onClick={selectAllWithEmail}>
+            Vælg alle med e-mail
+          </button>
+          <button
+            style={styles.ghostBtn}
+            onClick={copySelectedEmails}
+            disabled={selectedIds.length === 0}
+          >
+            {emailsCopied ? <Check size={14} /> : <Copy size={14} />}{" "}
+            {emailsCopied ? "Kopieret" : `Kopiér e-mails (${selectedIds.length})`}
+          </button>
+          <button
+            style={styles.primaryBtn}
+            onClick={sendNotifications}
+            disabled={selectedIds.length === 0 || sending}
+          >
+            {sending ? "Sender…" : `Send (${selectedIds.length})`}
+          </button>
+        </div>
+      )}
+
+      {teams.length > 0 && (
+        <div style={styles.teamFilterRow}>
+          <button
+            style={{
+              ...styles.teamFilterChip,
+              ...(teamFilter === "all" ? styles.teamFilterChipActive : {}),
+            }}
+            onClick={() => setTeamFilter("all")}
+          >
+            Alle
+          </button>
+          {teams.map((t) => (
+            <button
+              key={t.id}
+              style={{
+                ...styles.teamFilterChip,
+                ...(teamFilter === t.id ? styles.teamFilterChipActive : {}),
+              }}
+              onClick={() => setTeamFilter(t.id)}
+            >
+              {t.name}
+            </button>
+          ))}
+          <button
+            style={{
+              ...styles.teamFilterChip,
+              ...(teamFilter === "none" ? styles.teamFilterChipActive : {}),
+            }}
+            onClick={() => setTeamFilter("none")}
+          >
+            Intet hold
+          </button>
+        </div>
+      )}
+
+      {addingPlayer && (
+        <div style={styles.addCardCol}>
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+            <input
+              style={styles.input}
+              placeholder="Spillernavn"
+              value={newName}
+              onChange={(e) => setNewName(e.target.value)}
+              autoFocus
+            />
+            <input
+              style={{ ...styles.input, maxWidth: 90 }}
+              placeholder="Nr."
+              value={newNumber}
+              onChange={(e) => setNewNumber(e.target.value.replace(/\D/g, "").slice(0, 2))}
+            />
+            <input
+              style={styles.input}
+              type="email"
+              placeholder="E-mail"
+              value={newEmail}
+              onChange={(e) => setNewEmail(e.target.value)}
+            />
+          </div>
+          {teams.length > 0 && (
+            <div>
+              <div style={styles.fieldLabel}>Hold</div>
+              <select
+                style={styles.select}
+                value={newTeamId}
+                onChange={(e) => setNewTeamId(e.target.value)}
+              >
+                <option value="">Intet hold</option>
+                {teams.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+          <div>
+            <div style={styles.fieldLabel}>Kriteriegruppe</div>
+            <select
+              style={styles.select}
+              value={newSkillGroupId}
+              onChange={(e) => setNewSkillGroupId(e.target.value)}
+            >
+              {(data.config.groups || []).map((g) => (
+                <option key={g.id} value={g.id}>
+                  {g.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <div style={styles.fieldLabel}>Position(er)</div>
+            <PositionPicker selected={newPositions} onToggle={togglePosition} />
+          </div>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button style={styles.primaryBtn} onClick={onAdd}>
+              Gem
+            </button>
+            <button style={styles.ghostBtn} onClick={() => setAddingPlayer(false)}>
+              Annuller
+            </button>
+          </div>
+        </div>
+      )}
+
+      {data.players.length === 0 && !addingPlayer && (
+        <div style={styles.emptyState}>
+          <Shield size={32} color="#B9B2A0" />
+          <div style={{ marginTop: 10, fontWeight: 600 }}>Ingen spillere endnu</div>
+          <div style={{ color: "#6B6B6B", fontSize: 14 }}>
+            Tilføj din første spiller for at begynde udviklingen.
+          </div>
+        </div>
+      )}
+
+      {data.players.length > 0 && visiblePlayers.length === 0 && (
+        <div style={styles.emptyState}>
+          <div style={{ fontWeight: 600 }}>Ingen spillere på dette hold</div>
+        </div>
+      )}
+
+      <div style={styles.grid}>
+        {sortedPlayers.map(({ player: p, scores, overall, goals, goalIds, goalsMet, latestPeriod, level }) => {
+          const isSelected = selectedIds.includes(p.id);
+          const selectableDisabled = selectMode && !p.email;
+          return (
+            <div
+              key={p.id}
+              style={{
+                ...styles.playerCard,
+                ...(selectMode && isSelected ? styles.playerCardSelected : {}),
+                ...(selectableDisabled ? styles.playerCardDisabled : {}),
+              }}
+              onClick={() => {
+                if (selectMode) {
+                  if (!selectableDisabled) toggleSelected(p.id);
+                } else {
+                  onOpen(p.id);
+                }
+              }}
+            >
+              <div style={styles.playerCardTop}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  {selectMode && (
+                    <input
+                      type="checkbox"
+                      checked={isSelected}
+                      disabled={selectableDisabled}
+                      onClick={(e) => e.stopPropagation()}
+                      onChange={() => toggleSelected(p.id)}
+                      title={p.email ? "" : "Spilleren mangler en e-mailadresse"}
+                    />
+                  )}
+                  <div style={styles.numberBadge}>{p.number || "—"}</div>
+                </div>
+                <div
+                  style={{
+                    ...styles.overallPill,
+                    background: scoreColor(overall ? Math.round(overall) : null),
+                  }}
+                >
+                  {overall ? overall.toFixed(1) : "—"}
+                </div>
+              </div>
+              <div style={styles.playerName}>{p.name}</div>
+              <div style={styles.playerPos}>
+                {p.positions && p.positions.length > 0
+                  ? p.positions.join(" · ")
+                  : "Position ikke angivet"}
+              </div>
+              {teamName(p.teamId) && (
+                <div style={styles.teamBadge}>
+                  <Layers size={10} /> {teamName(p.teamId)}
+                </div>
+              )}
+              {level && (
+                <div style={styles.teamBadge}>
+                  <BarChart3 size={10} /> {level.name}
+                </div>
+              )}
+              <div style={styles.miniBars}>
+                {CATEGORY_META.map((c) => {
+                  const avg = categoryAverage(data.config, scores, c.key, p);
+                  return (
+                    <div key={c.key} style={styles.miniBarTrack} title={`${c.label}: ${avg ? avg.toFixed(1) : "—"}`}>
+                      <div
+                        style={{
+                          ...styles.miniBarFill,
+                          width: avg ? `${(avg / 5) * 100}%` : "0%",
+                          background: c.accent,
+                        }}
+                      />
+                    </div>
+                  );
+                })}
+              </div>
+              {goalIds.length > 0 && (
+                <div
+                  style={{
+                    ...styles.goalChip,
+                    ...(goalsMet === goalIds.length ? styles.goalChipMet : styles.goalChipPending),
+                    marginTop: 10,
+                  }}
+                >
+                  <Target size={11} /> {goalsMet} af {goalIds.length} mål nået
+                </div>
+              )}
+              <div style={styles.evalCountTag}>
+                {periods.length === 0
+                  ? "Ingen perioder oprettet endnu"
+                  : latestPeriod
+                  ? `Seneste vurdering: ${latestPeriod.label} · ${formatDate(latestPeriod.date)}`
+                  : "Ikke vurderet endnu"}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function PlayerView({
+  player,
+  config,
+  periods,
+  teams,
+  evaluations,
+  goals,
+  onBack,
+  onScore,
+  onDelete,
+  onUpdatePositions,
+  onUpdateTeam,
+  onUpdateEmail,
+  onUpdateNumber,
+  onSetGoal,
+  onSetGoalProgress,
+  onRemoveGoal,
+  onSetSkillGroup,
+  onUpdateParticipationLevel,
+  onUpdateGoalHorizons,
+  onGoToPeriods,
+}) {
+  const [editingPositions, setEditingPositions] = useState(false);
+  const [editingTeam, setEditingTeam] = useState(false);
+  const [editingLevel, setEditingLevel] = useState(false);
+  const [editingSkillGroup, setEditingSkillGroup] = useState(false);
+  const [editingEmail, setEditingEmail] = useState(false);
+  const [emailDraft, setEmailDraft] = useState(player.email || "");
+  const [editingNumber, setEditingNumber] = useState(false);
+  const [numberDraft, setNumberDraft] = useState(player.number || "");
+  const [selectedPeriodId, setSelectedPeriodId] = useState(
+    periods.length ? periods[periods.length - 1].id : null
+  );
+  const [compareMode, setCompareMode] = useState(false);
+  const [goalEditingId, setGoalEditingId] = useState(null);
+  const [goalTargetDraft, setGoalTargetDraft] = useState(4);
+  const [goalNoteDraft, setGoalNoteDraft] = useState("");
+  const [goalFocusAreasDraft, setGoalFocusAreasDraft] = useState("");
+  const [drilldownCat, setDrilldownCat] = useState(null);
+  const [printPanelOpen, setPrintPanelOpen] = useState(false);
+  const [printColBMode, setPrintColBMode] = useState("goal");
+  const [printColBPeriodId, setPrintColBPeriodId] = useState(null);
+
+  const positions = player.positions || [];
+
+  useEffect(() => {
+    if (!selectedPeriodId && periods.length) {
+      setSelectedPeriodId(periods[periods.length - 1].id);
+    }
+    if (selectedPeriodId && !periods.find((p) => p.id === selectedPeriodId)) {
+      setSelectedPeriodId(periods.length ? periods[periods.length - 1].id : null);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [periods.length]);
+
+  const togglePosition = (pos) => {
+    const next = positions.includes(pos)
+      ? positions.filter((p) => p !== pos)
+      : [...positions, pos];
+    onUpdatePositions(next);
+  };
+
+  const selectedPeriod = periods.find((p) => p.id === selectedPeriodId) || null;
+  const scores = selectedPeriod ? evaluations[selectedPeriod.id]?.scores || {} : {};
+  // Goals are scoped per evaluation period — always the one currently
+  // selected via the period tabs, same as scores.
+  const periodGoals = (selectedPeriod && goals[selectedPeriod.id]) || {};
+
+  const openGoalEditor = (skillId) => {
+    const existing = periodGoals[skillId];
+    setGoalEditingId(skillId);
+    setGoalTargetDraft(existing ? existing.target : 4);
+    setGoalNoteDraft(existing ? existing.note : "");
+    setGoalFocusAreasDraft(existing ? existing.focusAreas : "");
+  };
+
+  const saveGoal = (skillId) => {
+    if (!selectedPeriod) return;
+    onSetGoal(selectedPeriod.id, skillId, goalTargetDraft, goalNoteDraft.trim(), goalFocusAreasDraft.trim());
+    setGoalEditingId(null);
+  };
+
+  const hasGoals = Object.keys(periodGoals).length > 0;
+
+  const radarData = CATEGORY_META.map((c) => ({
+    subject: c.short,
+    value: categoryAverage(config, scores, c.key, player) || 0,
+    goal: categoryGoalAverage(config, periodGoals, c.key, player) || 0,
+  }));
+
+  return (
+    <div>
+      <button style={styles.backBtn} onClick={onBack}>
+        <ChevronLeft size={16} /> Spillertrup
+      </button>
+
+      <div style={styles.playerHeadRow}>
+        <div style={styles.numberBadgeLg}>{player.number || "—"}</div>
+        <div style={{ flex: 1 }}>
+          <h1 style={styles.h1}>{player.name}</h1>
+          {!editingPositions && (
+            <div style={styles.positionRow}>
+              <span style={styles.subtext}>
+                {positions.length > 0 ? positions.join(" · ") : "Position ikke angivet"}
+              </span>
+              <button style={styles.linkBtn} onClick={() => setEditingPositions(true)}>
+                <Pencil size={12} /> Rediger
+              </button>
+            </div>
+          )}
+        </div>
+        <button style={styles.iconDangerBtn} onClick={onDelete} title="Fjern spiller">
+          <Trash2 size={16} />
+        </button>
+      </div>
+
+      {editingPositions && (
+        <div style={styles.positionEditCard}>
+          <div style={styles.fieldLabel}>Position(er)</div>
+          <PositionPicker selected={positions} onToggle={togglePosition} />
+          <button style={styles.ghostBtn} onClick={() => setEditingPositions(false)}>
+            Færdig
+          </button>
+        </div>
+      )}
+
+      <div style={styles.teamRow}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <Hash size={14} color="#6B6B6B" />
+          {!editingNumber && (
+            <span style={styles.subtext}>{player.number || "Intet nummer angivet"}</span>
+          )}
+          {editingNumber && (
+            <input
+              style={{ ...styles.input, maxWidth: 100 }}
+              type="text"
+              inputMode="numeric"
+              value={numberDraft}
+              onChange={(e) => setNumberDraft(e.target.value)}
+              autoFocus
+            />
+          )}
+        </div>
+        {!editingNumber && (
+          <button
+            style={styles.linkBtn}
+            onClick={() => {
+              setNumberDraft(player.number || "");
+              setEditingNumber(true);
+            }}
+          >
+            <Pencil size={12} /> Rediger
+          </button>
+        )}
+        {editingNumber && (
+          <div style={{ display: "flex", gap: 8 }}>
+            <button
+              style={styles.linkBtn}
+              onClick={() => {
+                onUpdateNumber(numberDraft.trim());
+                setEditingNumber(false);
+              }}
+            >
+              Gem
+            </button>
+            <button style={styles.linkBtn} onClick={() => setEditingNumber(false)}>
+              Annuller
+            </button>
+          </div>
+        )}
+      </div>
+
+      {teams.length > 0 && (
+        <div style={styles.teamRow}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <Layers size={14} color="#6B6B6B" />
+            {!editingTeam && (
+              <span style={styles.subtext}>
+                {teams.find((t) => t.id === player.teamId)?.name || "Intet hold tilknyttet"}
+              </span>
+            )}
+            {editingTeam && (
+              <select
+                style={{ ...styles.select, maxWidth: 220 }}
+                value={player.teamId || ""}
+                onChange={(e) => onUpdateTeam(e.target.value || null)}
+                autoFocus
+              >
+                <option value="">Intet hold</option>
+                {teams.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.name}
+                  </option>
+                ))}
+              </select>
+            )}
+          </div>
+          <button style={styles.linkBtn} onClick={() => setEditingTeam((v) => !v)}>
+            <Pencil size={12} /> {editingTeam ? "Færdig" : "Rediger"}
+          </button>
+        </div>
+      )}
+
+      {(config.participationLevels || []).length > 0 && (
+        <div style={styles.teamRow}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <BarChart3 size={14} color="#6B6B6B" />
+            {!editingLevel && (
+              <span style={styles.subtext}>
+                {config.participationLevels.find((l) => l.id === player.participationLevelId)
+                  ?.name || "Intet niveau valgt"}
+              </span>
+            )}
+            {editingLevel && (
+              <select
+                style={{ ...styles.select, maxWidth: 220 }}
+                value={player.participationLevelId || ""}
+                onChange={(e) => onUpdateParticipationLevel(e.target.value || null)}
+                autoFocus
+              >
+                <option value="">Intet niveau valgt</option>
+                {[...config.participationLevels]
+                  .sort((a, b) => a.sortOrder - b.sortOrder)
+                  .map((l) => (
+                    <option key={l.id} value={l.id}>
+                      {l.name}
+                    </option>
+                  ))}
+              </select>
+            )}
+          </div>
+          <button style={styles.linkBtn} onClick={() => setEditingLevel((v) => !v)}>
+            <Pencil size={12} /> {editingLevel ? "Færdig" : "Rediger"}
+          </button>
+        </div>
+      )}
+
+      <div style={styles.teamRow}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <Mail size={14} color="#6B6B6B" />
+          {!editingEmail && (
+            <span style={styles.subtext}>{player.email || "Ingen e-mail angivet"}</span>
+          )}
+          {editingEmail && (
+            <input
+              style={{ ...styles.input, maxWidth: 260 }}
+              type="email"
+              value={emailDraft}
+              onChange={(e) => setEmailDraft(e.target.value)}
+              autoFocus
+            />
+          )}
+        </div>
+        {!editingEmail && (
+          <button
+            style={styles.linkBtn}
+            onClick={() => {
+              setEmailDraft(player.email || "");
+              setEditingEmail(true);
+            }}
+          >
+            <Pencil size={12} /> Rediger
+          </button>
+        )}
+        {editingEmail && (
+          <div style={{ display: "flex", gap: 8 }}>
+            <button
+              style={styles.linkBtn}
+              onClick={() => {
+                onUpdateEmail(emailDraft.trim());
+                setEditingEmail(false);
+              }}
+            >
+              Gem
+            </button>
+            <button style={styles.linkBtn} onClick={() => setEditingEmail(false)}>
+              Annuller
+            </button>
+          </div>
+        )}
+      </div>
+
+      <div style={styles.teamRow}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <SlidersHorizontal size={14} color="#6B6B6B" />
+          {!editingSkillGroup && (
+            <span style={styles.subtext}>
+              {(config.groups || []).find((g) => g.id === player.skillGroupId)?.name ||
+                "Ingen gruppe valgt"}
+            </span>
+          )}
+          {editingSkillGroup && (
+            <select
+              style={{ ...styles.select, maxWidth: 220 }}
+              value={player.skillGroupId}
+              onChange={(e) => onSetSkillGroup(e.target.value)}
+              autoFocus
+            >
+              {(config.groups || []).map((g) => (
+                <option key={g.id} value={g.id}>
+                  {g.name}
+                </option>
+              ))}
+            </select>
+          )}
+        </div>
+        <button style={styles.linkBtn} onClick={() => setEditingSkillGroup((v) => !v)}>
+          <Pencil size={12} /> {editingSkillGroup ? "Færdig" : "Rediger"}
+        </button>
+      </div>
+
+      <LongTermGoalsCard player={player} onSave={onUpdateGoalHorizons} />
+
+      <GoalsOverview
+        config={config}
+        goals={periodGoals}
+        scores={scores}
+        periodLabel={selectedPeriod ? selectedPeriod.label : null}
+        goalEditingId={goalEditingId}
+        goalTargetDraft={goalTargetDraft}
+        goalNoteDraft={goalNoteDraft}
+        goalFocusAreasDraft={goalFocusAreasDraft}
+        setGoalTargetDraft={setGoalTargetDraft}
+        setGoalNoteDraft={setGoalNoteDraft}
+        setGoalFocusAreasDraft={setGoalFocusAreasDraft}
+        onOpenEditor={openGoalEditor}
+        onCloseEditor={() => setGoalEditingId(null)}
+        onSave={saveGoal}
+        onRemove={(skillId) => selectedPeriod && onRemoveGoal(selectedPeriod.id, skillId)}
+        onSetProgress={(skillId, progress) =>
+          selectedPeriod && onSetGoalProgress(selectedPeriod.id, skillId, progress)
+        }
+      />
+
+      {periods.length === 0 ? (
+        <div style={styles.emptyState}>
+          <CalendarRange size={28} color="#B9B2A0" />
+          <div style={{ marginTop: 10, fontWeight: 600 }}>Ingen evalueringsperioder endnu</div>
+          <div style={{ color: "#6B6B6B", fontSize: 14, marginBottom: 12 }}>
+            Perioder oprettes én gang og deles af alle spillere.
+          </div>
+          <button style={styles.primaryBtnSm} onClick={onGoToPeriods}>
+            <Plus size={14} /> Opret periode
+          </button>
+        </div>
+      ) : (
+        <>
+          <div style={styles.evalBar}>
+            <div style={styles.evalTabs}>
+              {periods.map((p) => (
+                <button
+                  key={p.id}
+                  onClick={() => {
+                    setSelectedPeriodId(p.id);
+                    setCompareMode(false);
+                    setGoalEditingId(null);
+                    setDrilldownCat(null);
+                  }}
+                  style={{
+                    ...styles.evalTab,
+                    ...(selectedPeriodId === p.id && !compareMode ? styles.evalTabActive : {}),
+                  }}
+                >
+                  <div style={{ fontWeight: 700 }}>{p.label}</div>
+                  <div style={styles.evalTabDate}>{formatDate(p.date)}</div>
+                </button>
+              ))}
+            </div>
+            {periods.length >= 2 && (
+              <button
+                style={{
+                  ...styles.compareBtn,
+                  ...(compareMode ? styles.compareBtnActive : {}),
+                }}
+                onClick={() => {
+                  setCompareMode((v) => !v);
+                  setDrilldownCat(null);
+                }}
+              >
+                <GitCompare size={14} /> Sammenlign
+              </button>
+            )}
+            {periods.length >= 1 && (
+              <button
+                style={{
+                  ...styles.compareBtn,
+                  ...(printPanelOpen ? styles.compareBtnActive : {}),
+                }}
+                onClick={() => setPrintPanelOpen((v) => !v)}
+              >
+                <Printer size={14} /> Udskriv rapport
+              </button>
+            )}
+          </div>
+
+          {printPanelOpen && (
+            <div style={styles.addCardCol}>
+              <div style={styles.fieldLabel}>Anden kolonne skal vise</div>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                <button
+                  style={{
+                    ...styles.teamFilterChip,
+                    ...(printColBMode === "goal" ? styles.teamFilterChipActive : {}),
+                  }}
+                  onClick={() => setPrintColBMode("goal")}
+                >
+                  Mål
+                </button>
+                <button
+                  style={{
+                    ...styles.teamFilterChip,
+                    ...(printColBMode === "period" ? styles.teamFilterChipActive : {}),
+                  }}
+                  onClick={() => {
+                    setPrintColBMode("period");
+                    if (!printColBPeriodId) {
+                      const alt = periods.find((p) => p.id !== selectedPeriodId);
+                      setPrintColBPeriodId(alt ? alt.id : periods[0].id);
+                    }
+                  }}
+                >
+                  Anden periode
+                </button>
+              </div>
+              {printColBMode === "period" && periods.length >= 2 && (
+                <div>
+                  <div style={styles.fieldLabel}>Vælg periode til sammenligning</div>
+                  <select
+                    style={styles.select}
+                    value={printColBPeriodId || ""}
+                    onChange={(e) => setPrintColBPeriodId(e.target.value)}
+                  >
+                    {periods.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.label} · {formatDate(p.date)}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+              <p style={styles.subtext}>
+                Rapporten viser {selectedPeriod ? selectedPeriod.label : "den valgte periode"} i
+                første kolonne, samt {printColBMode === "goal" ? "målene" : "den valgte periode"}{" "}
+                i anden kolonne — på én side, klar til udskrift eller "Gem som PDF".
+              </p>
+              <button
+                style={styles.primaryBtn}
+                onClick={() => window.print()}
+              >
+                <Printer size={16} /> Udskriv nu
+              </button>
+            </div>
+          )}
+
+          {selectedPeriod &&
+            createPortal(
+              <PrintableReport
+                player={player}
+                teamName={teams.find((t) => t.id === player.teamId)?.name}
+                config={config}
+                goals={periodGoals}
+                colA={{
+                  label: `${selectedPeriod.label} (${formatDate(selectedPeriod.date)})`,
+                  scores,
+                }}
+                colB={
+                  printColBMode === "goal"
+                    ? {
+                        label: "Mål",
+                        scores: Object.fromEntries(
+                          Object.keys(periodGoals).map((id) => [id, periodGoals[id].target])
+                        ),
+                      }
+                    : {
+                        label: (() => {
+                          const p = periods.find((pp) => pp.id === printColBPeriodId);
+                          return p ? `${p.label} (${formatDate(p.date)})` : "Anden periode";
+                        })(),
+                        scores: printColBPeriodId
+                          ? evaluations[printColBPeriodId]?.scores || {}
+                          : {},
+                      }
+                }
+              />,
+              document.body
+            )}
+
+          {compareMode && periods.length >= 2 ? (
+            <CompareView config={config} periods={periods} evaluations={evaluations} player={player} />
+          ) : (
+            selectedPeriod && (
+              <>
+                <div style={styles.radarCard}>
+                  <p style={styles.radarHint}>Tryk på en kategori for at se de enkelte kriterier</p>
+                  <ResponsiveContainer width="100%" height={250}>
+                    <RadarChart data={radarData} outerRadius="65%">
+                      <PolarGrid stroke="#D9D4C7" />
+                      <PolarAngleAxis
+                        dataKey="subject"
+                        tick={(props) => (
+                          <CategoryAxisTick {...props} onSelect={setDrilldownCat} />
+                        )}
+                      />
+                      <PolarRadiusAxis domain={[0, 5]} tick={false} axisLine={false} />
+                      <Radar
+                        name="Træner"
+                        dataKey="value"
+                        stroke="#E2231A"
+                        fill="#E2231A"
+                        fillOpacity={0.3}
+                        strokeWidth={2}
+                        isAnimationActive={false}
+                      />
+                      {hasGoals && (
+                        <Radar
+                          name="Mål"
+                          dataKey="goal"
+                          stroke={GOAL_COLOR}
+                          fill="transparent"
+                          strokeWidth={2}
+                          strokeDasharray="5 4"
+                          isAnimationActive={false}
+                        />
+                      )}
+                      {hasGoals && (
+                        <Legend wrapperStyle={{ fontSize: 12, fontFamily: "'Inter', sans-serif" }} />
+                      )}
+                    </RadarChart>
+                  </ResponsiveContainer>
+                </div>
+
+                {drilldownCat && (
+                  <SkillDrilldownRadar
+                    config={config}
+                    catKey={drilldownCat}
+                    player={player}
+                    scores={scores}
+                    goals={periodGoals}
+                    onClose={() => setDrilldownCat(null)}
+                  />
+                )}
+
+                <div style={styles.evalMetaRow}>
+                  <span style={styles.subtext}>
+                    Redigerer <strong>{selectedPeriod.label}</strong> · {formatDate(selectedPeriod.date)}
+                  </span>
+                </div>
+
+                {CATEGORY_META.map((cat) => {
+                  const skills = categorySkillsForPlayer(config, player, cat.key);
+                  const avg = categoryAverage(config, scores, cat.key, player);
+                  return (
+                    <div key={cat.key} style={styles.categoryBlock}>
+                      <div style={styles.categoryHeadRow}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                          <div style={{ ...styles.dot, background: cat.accent }} />
+                          <span style={styles.categoryLabel}>{cat.label}</span>
+                        </div>
+                        <span style={{ ...styles.categoryAvg, color: cat.accent }}>
+                          {avg ? avg.toFixed(1) : "—"}
+                        </span>
+                      </div>
+                      {skills.length === 0 ? (
+                        <div style={styles.noSkills}>Ingen aktive kriterier i denne kategori.</div>
+                      ) : (
+                        skills.map((skill) => {
+                          const goal = periodGoals[skill.id];
+                          const currentVal = scores[skill.id];
+                          const achieved =
+                            goal && typeof currentVal === "number" && currentVal >= goal.target;
+                          const isEditingGoal = goalEditingId === skill.id;
+                          return (
+                            <div key={skill.id} style={styles.skillBlock}>
+                              <div style={styles.skillTopRow}>
+                                <span style={styles.skillName}>{skill.name}</span>
+                                {goal && !isEditingGoal && (
+                                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                                    <span
+                                      style={{
+                                        ...styles.goalChip,
+                                        ...(achieved ? styles.goalChipMet : styles.goalChipPending),
+                                      }}
+                                    >
+                                      <Target size={11} /> Mål {goal.target}
+                                      {achieved ? " ✓" : ""}
+                                    </span>
+                                    <button
+                                      style={styles.iconBtnGhost}
+                                      onClick={() => openGoalEditor(skill.id)}
+                                      title="Rediger mål"
+                                    >
+                                      <Pencil size={11} />
+                                    </button>
+                                    <button
+                                      style={styles.iconBtnGhost}
+                                      onClick={() => onRemoveGoal(selectedPeriod.id, skill.id)}
+                                      title="Fjern mål"
+                                    >
+                                      <X size={11} />
+                                    </button>
+                                  </div>
+                                )}
+                                {!goal && !isEditingGoal && (
+                                  <button style={styles.linkBtn} onClick={() => openGoalEditor(skill.id)}>
+                                    <Target size={11} /> Sæt mål
+                                  </button>
+                                )}
+                              </div>
+
+                              {goal && (goal.note || goal.focusAreas) && !isEditingGoal && (
+                                <div style={styles.goalNote}>
+                                  {goal.note && (
+                                    <div>
+                                      <strong>Målsætning:</strong> {goal.note}
+                                    </div>
+                                  )}
+                                  {goal.focusAreas && (
+                                    <div>
+                                      <strong>Fokusområder:</strong> {goal.focusAreas}
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+
+                              {isEditingGoal && (
+                                <div style={styles.goalEditRow}>
+                                  <div style={styles.fieldLabel}>Målscore</div>
+                                  <div style={styles.scoreButtons}>
+                                    {[1, 2, 3, 4, 5].map((v) => (
+                                      <button
+                                        key={v}
+                                        onClick={() => setGoalTargetDraft(v)}
+                                        style={{
+                                          ...styles.scoreBtn,
+                                          background: goalTargetDraft === v ? "#5C6B73" : "#FFFFFF",
+                                          color: goalTargetDraft === v ? "#FFFFFF" : "#1A1A1A",
+                                          borderColor: goalTargetDraft === v ? "#5C6B73" : "#D9D4C7",
+                                        }}
+                                      >
+                                        {v}
+                                      </button>
+                                    ))}
+                                  </div>
+                                  <div style={styles.fieldLabel}>Målsætning (valgfrit)</div>
+                                  <input
+                                    style={styles.input}
+                                    placeholder="fx forbedre boldkontrol under pres"
+                                    value={goalNoteDraft}
+                                    maxLength={120}
+                                    onChange={(e) => setGoalNoteDraft(e.target.value)}
+                                  />
+                                  <div style={styles.charCount}>{goalNoteDraft.length}/120</div>
+                                  <div style={styles.fieldLabel}>Fokusområder (valgfrit)</div>
+                                  <input
+                                    style={styles.input}
+                                    placeholder="fx afleveringer, pres, positionering"
+                                    value={goalFocusAreasDraft}
+                                    maxLength={200}
+                                    onChange={(e) => setGoalFocusAreasDraft(e.target.value)}
+                                  />
+                                  <div style={styles.charCount}>{goalFocusAreasDraft.length}/200</div>
+                                  <div style={{ display: "flex", gap: 8 }}>
+                                    <button
+                                      style={styles.primaryBtnSm}
+                                      onClick={() => saveGoal(skill.id)}
+                                    >
+                                      Gem mål
+                                    </button>
+                                    <button
+                                      style={styles.ghostBtn}
+                                      onClick={() => setGoalEditingId(null)}
+                                    >
+                                      Annuller
+                                    </button>
+                                  </div>
+                                </div>
+                              )}
+
+                              <div style={styles.scoreButtons}>
+                                {[1, 2, 3, 4, 5].map((v) => {
+                                  const active = scores[skill.id] === v;
+                                  return (
+                                    <button
+                                      key={v}
+                                      onClick={() => onScore(selectedPeriod.id, skill.id, v)}
+                                      style={{
+                                        ...styles.scoreBtn,
+                                        background: active ? scoreColor(v) : "#FFFFFF",
+                                        color: active ? "#FFFFFF" : "#1A1A1A",
+                                        borderColor: active ? scoreColor(v) : "#D9D4C7",
+                                      }}
+                                    >
+                                      {v}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
+                  );
+                })}
+              </>
+            )
+          )}
+        </>
+      )}
+
+      <SelfEvalLinkCard token={player.selfToken} />
+    </div>
+  );
+}
+
+function GoalsOverview({
+  config,
+  goals,
+  scores,
+  periodLabel,
+  goalEditingId,
+  goalTargetDraft,
+  goalNoteDraft,
+  goalFocusAreasDraft,
+  setGoalTargetDraft,
+  setGoalNoteDraft,
+  setGoalFocusAreasDraft,
+  onOpenEditor,
+  onCloseEditor,
+  onSave,
+  onRemove,
+  onSetProgress,
+}) {
+  const entries = Object.keys(goals)
+    .map((skillId) => {
+      const meta = findSkillMeta(config, skillId);
+      if (!meta) return null;
+      return { skillId, goal: goals[skillId], ...meta };
+    })
+    .filter(Boolean)
+    .sort((a, b) => a.category.label.localeCompare(b.category.label) || a.skill.name.localeCompare(b.skill.name));
+
+  if (entries.length === 0) return null;
+
+  const metCount = entries.filter(
+    (e) => typeof scores[e.skillId] === "number" && scores[e.skillId] >= e.goal.target
+  ).length;
+
+  return (
+    <div style={styles.goalsOverviewCard}>
+      <div style={styles.goalsOverviewHead}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <Target size={16} color="#1A1A1A" />
+          <span style={styles.categoryLabel}>Udviklingsmål</span>
+        </div>
+        <span style={styles.subtext}>
+          {metCount} af {entries.length} nået{periodLabel ? ` · ${periodLabel}` : ""}
+        </span>
+      </div>
+
+      {entries.map(({ skillId, goal, skill, category }) => {
+        const currentVal = scores[skillId];
+        const achieved = typeof currentVal === "number" && currentVal >= goal.target;
+        const isEditing = goalEditingId === skillId;
+        return (
+          <div key={skillId} style={styles.goalOverviewRow}>
+            <div style={styles.goalOverviewTop}>
+              <div>
+                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  <div style={{ ...styles.dot, background: category.accent }} />
+                  <span style={styles.skillName}>{skill.name}</span>
+                  <span style={styles.goalOverviewCat}>{category.label}</span>
+                </div>
+                {(goal.note || goal.focusAreas) && !isEditing && (
+                  <div style={styles.goalNote}>
+                    {goal.note && (
+                      <div>
+                        <strong>Målsætning:</strong> {goal.note}
+                      </div>
+                    )}
+                    {goal.focusAreas && (
+                      <div>
+                        <strong>Fokusområder:</strong> {goal.focusAreas}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+              {!isEditing && (
+                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  <span
+                    style={{
+                      ...styles.goalChip,
+                      ...(achieved ? styles.goalChipMet : styles.goalChipPending),
+                    }}
+                  >
+                    <Target size={11} /> Mål {goal.target}
+                    {achieved ? " ✓" : ""}
+                  </span>
+                  <button
+                    style={styles.iconBtnGhost}
+                    onClick={() => onOpenEditor(skillId)}
+                    title="Rediger mål"
+                  >
+                    <Pencil size={12} />
+                  </button>
+                  <button
+                    style={styles.iconBtnGhost}
+                    onClick={() => onRemove(skillId)}
+                    title="Fjern mål"
+                  >
+                    <X size={12} />
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {isEditing && (
+              <div style={styles.goalEditRow}>
+                <div style={styles.fieldLabel}>Målscore</div>
+                <div style={styles.scoreButtons}>
+                  {[1, 2, 3, 4, 5].map((v) => (
+                    <button
+                      key={v}
+                      onClick={() => setGoalTargetDraft(v)}
+                      style={{
+                        ...styles.scoreBtn,
+                        background: goalTargetDraft === v ? "#5C6B73" : "#FFFFFF",
+                        color: goalTargetDraft === v ? "#FFFFFF" : "#1A1A1A",
+                        borderColor: goalTargetDraft === v ? "#5C6B73" : "#D9D4C7",
+                      }}
+                    >
+                      {v}
+                    </button>
+                  ))}
+                </div>
+                <div style={styles.fieldLabel}>Målsætning (valgfrit)</div>
+                <input
+                  style={styles.input}
+                  placeholder="fx forbedre boldkontrol under pres"
+                  value={goalNoteDraft}
+                  maxLength={120}
+                  onChange={(e) => setGoalNoteDraft(e.target.value)}
+                />
+                <div style={styles.charCount}>{goalNoteDraft.length}/120</div>
+                <div style={styles.fieldLabel}>Fokusområder (valgfrit)</div>
+                <input
+                  style={styles.input}
+                  placeholder="fx afleveringer, pres, positionering"
+                  value={goalFocusAreasDraft}
+                  maxLength={200}
+                  onChange={(e) => setGoalFocusAreasDraft(e.target.value)}
+                />
+                <div style={styles.charCount}>{goalFocusAreasDraft.length}/200</div>
+                <div style={{ display: "flex", gap: 8 }}>
+                  <button style={styles.primaryBtnSm} onClick={() => onSave(skillId)}>
+                    Gem mål
+                  </button>
+                  <button style={styles.ghostBtn} onClick={onCloseEditor}>
+                    Annuller
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {!isEditing && (
+              <ProgressTracker
+                value={goal.progress}
+                onChange={(v) => onSetProgress(skillId, v)}
+                compact
+              />
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function PrintStyles() {
+  // The report is rendered into a portal directly under <body>, outside the
+  // app's own DOM tree (see PrintableReport's call sites). That means print
+  // mode can simply hide the whole app (#root) rather than trying to hide
+  // "everything except the report" within it — the old approach used
+  // `visibility: hidden` on the app, which keeps its full (often very tall)
+  // layout height, and browsers paginate print output based on that full
+  // invisible height, producing a run of blank pages after the report.
+  return (
+    <style>{`
+      @media print {
+        #root { display: none !important; }
+        @page { size: A4 landscape; margin: 10mm; }
+      }
+      @media screen {
+        .print-report { display: none; }
+      }
+    `}</style>
+  );
+}
+
+function buildPositionGroups(data) {
+  return POSITIONS.filter((pos) => /^\d+$/.test(pos)).map((pos) => {
+    const rows = data.players
+      .filter((p) => (p.positions || []).includes(pos))
+      .map((p) => {
+        const latestPeriod = getLatestScoredPeriod(data, p.id);
+        const scores = latestPeriod ? getPlayerScores(data, p.id, latestPeriod.id) : {};
+        const overall = overallAverage(data.config, scores, p);
+        return { player: p, overall };
+      })
+      .sort((a, b) => (b.overall ?? -Infinity) - (a.overall ?? -Infinity));
+    return { pos, rows };
+  });
+}
+
+function PositionOverviewPrint({ data }) {
+  const positionGroups = buildPositionGroups(data);
+
+  return (
+    <div className="print-report" style={pstyles.page}>
+      <div style={pstyles.headRow}>
+        <img src={LOGO_SRC} alt="Klublogo" style={pstyles.logo} />
+        <div>
+          <div style={pstyles.title}>Positionsoversigt</div>
+          <div style={pstyles.subtitle}>
+            Spillere rangeret efter seneste samlede score pr. position
+          </div>
+        </div>
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8 }}>
+        {positionGroups.map(({ pos, rows }) => (
+          <div key={pos} style={pstyles.categoryCell}>
+            <div style={{ ...pstyles.categoryHead, background: "#1A1A1A" }}>Position {pos}</div>
+            <div style={{ padding: "4px 6px" }}>
+              {rows.length === 0 ? (
+                <div style={{ fontSize: "7.5pt", color: "#6B6B6B", fontStyle: "italic" }}>
+                  Ingen spillere
+                </div>
+              ) : (
+                <ol style={{ margin: 0, paddingLeft: 14 }}>
+                  {rows.map(({ player, overall }) => (
+                    <li key={player.id} style={{ fontSize: "7.5pt", marginBottom: 2 }}>
+                      <span
+                        style={(player.positions || []).length <= 1 ? { fontWeight: 700 } : undefined}
+                      >
+                        {player.name}
+                      </span>{" "}
+                      <span style={{ color: "#6B6B6B" }}>
+                        ({overall != null ? overall.toFixed(1) : "—"})
+                      </span>
+                    </li>
+                  ))}
+                </ol>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function PositionOverviewView({ data }) {
+  const positionGroups = buildPositionGroups(data);
+
+  return (
+    <div>
+      <div style={styles.sectionHeadRow}>
+        <div>
+          <h1 style={styles.h1}>Positionsoversigt</h1>
+          <p style={styles.subtext}>
+            Hver spiller vist under de(n) position(er), de er registreret på — rangeret efter
+            seneste samlede score. Spillere med flere positioner optræder flere gange. Spillere
+            der kun spiller én position er vist med <strong>fed skrift</strong>.
+          </p>
+        </div>
+        <button style={styles.primaryBtn} onClick={() => window.print()}>
+          <Printer size={16} /> Generér PDF
+        </button>
+      </div>
+
+      <div style={styles.grid}>
+        {positionGroups.map(({ pos, rows }) => (
+          <div key={pos} style={styles.categoryBlock}>
+            <div style={styles.categoryLabel}>Position {pos}</div>
+            {rows.length === 0 ? (
+              <p style={{ ...styles.subtext, fontStyle: "italic", marginTop: 8 }}>
+                Ingen spillere
+              </p>
+            ) : (
+              <ol style={{ margin: "10px 0 0", paddingLeft: 18 }}>
+                {rows.map(({ player, overall }) => (
+                  <li key={player.id} style={{ fontSize: 14, marginBottom: 6 }}>
+                    <span
+                      style={(player.positions || []).length <= 1 ? { fontWeight: 700 } : undefined}
+                    >
+                      {player.name}
+                    </span>{" "}
+                    <span style={{ color: "#8A8A8A" }}>
+                      ({overall != null ? overall.toFixed(1) : "—"})
+                    </span>
+                  </li>
+                ))}
+              </ol>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {createPortal(<PositionOverviewPrint data={data} />, document.body)}
+    </div>
+  );
+}
+
+function PrintableReport({ player, teamName, config, goals, colA, colB }) {
+  const level = (config.participationLevels || []).find(
+    (l) => l.id === player.participationLevelId
+  );
+
+  return (
+    <div className="print-report" style={pstyles.page}>
+      <div style={pstyles.headRow}>
+        <img src={LOGO_SRC} alt="Klublogo" style={pstyles.logo} />
+        <div>
+          <div style={pstyles.title}>
+            Spillerprofil {player.name}
+            {player.positions && player.positions.length > 0 ? ` — ${player.positions.join(", ")}` : ""}
+          </div>
+          {teamName && <div style={pstyles.subtitle}>{teamName}</div>}
+          {level && (
+            <div style={pstyles.subtitle}>
+              Niveau: {level.name}
+              {level.expectations ? ` — ${level.expectations}` : ""}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {GOAL_HORIZON_FIELDS.some((f) => player[f.key]) && (
+        <div style={pstyles.horizonRow}>
+          {GOAL_HORIZON_FIELDS.filter((f) => player[f.key]).map((f) => (
+            <div key={f.key} style={pstyles.horizonCell}>
+              <div style={pstyles.horizonLabel}>{f.label}</div>
+              <div>{player[f.key]}</div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div style={pstyles.grid}>
+        {CATEGORY_META.map((cat) => {
+          const skills = categorySkillsForPlayer(config, player, cat.key);
+          const totA = categoryTotal(config, colA.scores, cat.key, player);
+          const totB = categoryTotal(config, colB.scores, cat.key, player);
+          const catRadarData = skills.map((s) => ({
+            subject: s.name,
+            colA: colA.scores[s.id] ?? 0,
+            colB: colB.scores[s.id] ?? 0,
+          }));
+          return (
+            <div key={cat.key} style={pstyles.categoryCell}>
+              <div style={{ ...pstyles.categoryHead, background: cat.accent }}>{cat.label}</div>
+              <div style={pstyles.categoryBody}>
+                {skills.length > 0 && (
+                  <RadarChart width={92} height={92} data={catRadarData} outerRadius="65%">
+                    <PolarGrid stroke="#D9D4C7" />
+                    <PolarAngleAxis dataKey="subject" tick={{ fontSize: 5, fill: "#111111" }} />
+                    <PolarRadiusAxis domain={[0, 5]} tick={false} axisLine={false} />
+                    <Radar
+                      dataKey="colA"
+                      stroke={cat.accent}
+                      fill={cat.accent}
+                      fillOpacity={0.35}
+                      strokeWidth={1}
+                      isAnimationActive={false}
+                    />
+                    <Radar
+                      dataKey="colB"
+                      stroke="#1A1A1A"
+                      fill="transparent"
+                      strokeWidth={1}
+                      strokeDasharray="3 2"
+                      isAnimationActive={false}
+                    />
+                  </RadarChart>
+                )}
+                <table style={pstyles.table}>
+                  <thead>
+                    <tr>
+                      <th style={{ ...pstyles.th, ...pstyles.thName }}></th>
+                      <th style={pstyles.th}>{colA.label}</th>
+                      <th style={pstyles.th}>{colB.label}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {skills.map((s) => (
+                      <tr key={s.id}>
+                        <td style={pstyles.tdName}>{s.name}</td>
+                        <td style={pstyles.td}>{colA.scores[s.id] ?? ""}</td>
+                        <td style={pstyles.td}>{colB.scores[s.id] ?? ""}</td>
+                      </tr>
+                    ))}
+                    <tr>
+                      <td style={{ ...pstyles.tdName, fontWeight: 700 }}>Total</td>
+                      <td style={{ ...pstyles.td, fontWeight: 700 }}>{totA.total}</td>
+                      <td style={{ ...pstyles.td, fontWeight: 700 }}>{totB.total}</td>
+                    </tr>
+                    <tr>
+                      <td style={{ ...pstyles.tdName, fontWeight: 700 }}>Gennemsnit</td>
+                      <td style={{ ...pstyles.td, fontWeight: 700 }}>{totA.avg.toFixed(2)}</td>
+                      <td style={{ ...pstyles.td, fontWeight: 700 }}>{totB.avg.toFixed(2)}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      <div style={pstyles.footerRow}>
+        <table style={pstyles.legendTable}>
+          <thead>
+            <tr>
+              <th colSpan={3} style={pstyles.legendHead}>
+                Scoreinddeling — ud af 10 aktioner
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td style={pstyles.legendTd}>Fremragende</td>
+              <td style={pstyles.legendTd}>5</td>
+              <td style={pstyles.legendTd}>9/10 vellykkede aktioner</td>
+            </tr>
+            <tr>
+              <td style={pstyles.legendTd}>Over middel</td>
+              <td style={pstyles.legendTd}>4</td>
+              <td style={pstyles.legendTd}>7/8 vellykkede aktioner</td>
+            </tr>
+            <tr>
+              <td style={pstyles.legendTd}>Middel</td>
+              <td style={pstyles.legendTd}>3</td>
+              <td style={pstyles.legendTd}>5/6 vellykkede aktioner</td>
+            </tr>
+            <tr>
+              <td style={pstyles.legendTd}>Kunne være bedre</td>
+              <td style={pstyles.legendTd}>2</td>
+              <td style={pstyles.legendTd}>3/4 vellykkede aktioner</td>
+            </tr>
+            <tr>
+              <td style={pstyles.legendTd}>Udviklingsområde</td>
+              <td style={pstyles.legendTd}>1</td>
+              <td style={pstyles.legendTd}>1/2 vellykkede aktioner</td>
+            </tr>
+          </tbody>
+        </table>
+
+        {Object.keys(goals).length > 0 && (
+          <div style={pstyles.goalsBox}>
+            <div style={pstyles.goalsTitle}>Udviklingsmål</div>
+            {Object.keys(goals).map((skillId) => {
+              const meta = findSkillMeta(config, skillId);
+              if (!meta) return null;
+              const goal = goals[skillId];
+              return (
+                <div key={skillId} style={pstyles.goalLine}>
+                  <strong>{meta.skill.name}</strong> — Mål: {goal.target}
+                  {typeof goal.progress === "number" ? ` — Fremskridt: ${goal.progress}/10` : ""}
+                  {goal.note ? ` — Målsætning: ${goal.note}` : ""}
+                  {goal.focusAreas ? ` — Fokusområder: ${goal.focusAreas}` : ""}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+const pstyles = {
+  page: {
+    width: "277mm",
+    fontFamily: "Arial, sans-serif",
+    color: "#111111",
+    fontSize: "8pt",
+  },
+  headRow: {
+    display: "flex",
+    alignItems: "center",
+    gap: 10,
+    marginBottom: 8,
+    borderBottom: "2px solid #111111",
+    paddingBottom: 5,
+  },
+  logo: { width: 30, height: 30, objectFit: "contain" },
+  title: { fontSize: "12pt", fontWeight: 700 },
+  subtitle: { fontSize: "8.5pt", color: "#4A4A4A" },
+  horizonRow: {
+    display: "flex",
+    gap: 8,
+    marginBottom: 8,
+  },
+  horizonCell: {
+    flex: 1,
+    border: "1px solid #B0B0B0",
+    padding: "4px 6px",
+    fontSize: "7.5pt",
+  },
+  horizonLabel: {
+    fontWeight: 700,
+    fontSize: "7pt",
+    textTransform: "uppercase",
+    marginBottom: 2,
+  },
+  grid: {
+    display: "grid",
+    gridTemplateColumns: "1fr 1fr",
+    gap: 8,
+    marginBottom: 8,
+  },
+  categoryCell: {
+    border: "1px solid #111111",
+  },
+  categoryHead: {
+    padding: "3px 6px",
+    color: "#FFFFFF",
+    fontWeight: 700,
+    fontSize: "8pt",
+    WebkitPrintColorAdjust: "exact",
+    printColorAdjust: "exact",
+  },
+  categoryBody: {
+    display: "flex",
+    alignItems: "center",
+    gap: 4,
+    padding: "3px 4px",
+  },
+  table: {
+    flex: 1,
+    borderCollapse: "collapse",
+  },
+  th: {
+    border: "1px solid #111111",
+    padding: "2px 4px",
+    color: "#FFFFFF",
+    background: "#1A1A1A",
+    fontSize: "7pt",
+    textAlign: "center",
+    WebkitPrintColorAdjust: "exact",
+    printColorAdjust: "exact",
+  },
+  thName: { textAlign: "left" },
+  td: {
+    border: "1px solid #B0B0B0",
+    padding: "2px 4px",
+    textAlign: "center",
+    fontSize: "7.5pt",
+  },
+  tdName: {
+    border: "1px solid #B0B0B0",
+    padding: "2px 4px",
+    textAlign: "left",
+    fontSize: "7.5pt",
+  },
+  footerRow: {
+    display: "grid",
+    gridTemplateColumns: "1fr 1fr",
+    gap: 10,
+    alignItems: "start",
+  },
+  legendTable: {
+    width: "100%",
+    borderCollapse: "collapse",
+    border: "1px solid #111111",
+    fontSize: "7.5pt",
+  },
+  legendHead: {
+    border: "1px solid #111111",
+    background: "#111111",
+    color: "#FFFFFF",
+    padding: "3px 5px",
+    textAlign: "left",
+    WebkitPrintColorAdjust: "exact",
+    printColorAdjust: "exact",
+  },
+  legendTd: {
+    border: "1px solid #B0B0B0",
+    padding: "2px 5px",
+  },
+  goalsBox: {
+    border: "1px solid #111111",
+    padding: "6px 8px",
+    fontSize: "7.5pt",
+  },
+  goalsTitle: { fontWeight: 700, fontSize: "8.5pt", marginBottom: 4 },
+  goalLine: { marginBottom: 3, lineHeight: 1.35 },
+};
+
+function CompareView({ config, periods, evaluations, player }) {
+  const [fromId, setFromId] = useState(periods[0].id);
+  const [toId, setToId] = useState(periods[periods.length - 1].id);
+
+  const fromScores = evaluations[fromId]?.scores || {};
+  const toScores = evaluations[toId]?.scores || {};
+  const fromPeriod = periods.find((p) => p.id === fromId);
+  const toPeriod = periods.find((p) => p.id === toId);
+
+  const radarData = CATEGORY_META.map((c) => ({
+    subject: c.short,
+    from: categoryAverage(config, fromScores, c.key, player) || 0,
+    to: categoryAverage(config, toScores, c.key, player) || 0,
+  }));
+
+  const overallFrom = overallAverage(config, fromScores, player);
+  const overallTo = overallAverage(config, toScores, player);
+  const overallDelta =
+    overallFrom != null && overallTo != null ? overallTo - overallFrom : null;
+
+  return (
+    <div>
+      <div style={styles.compareSelectRow}>
+        <div style={{ flex: 1 }}>
+          <div style={styles.fieldLabel}>Fra</div>
+          <select style={styles.select} value={fromId} onChange={(e) => setFromId(e.target.value)}>
+            {periods.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.label} · {formatDate(p.date)}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div style={{ flex: 1 }}>
+          <div style={styles.fieldLabel}>Til</div>
+          <select style={styles.select} value={toId} onChange={(e) => setToId(e.target.value)}>
+            {periods.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.label} · {formatDate(p.date)}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      <div style={styles.radarCard}>
+        <ResponsiveContainer width="100%" height={260}>
+          <RadarChart data={radarData} outerRadius="65%">
+            <PolarGrid stroke="#D9D4C7" />
+            <PolarAngleAxis
+              dataKey="subject"
+              tick={{ fill: "#1A1A1A", fontSize: 12, fontFamily: "'Oswald', sans-serif" }}
+            />
+            <PolarRadiusAxis domain={[0, 5]} tick={false} axisLine={false} />
+            <Radar
+              name={fromPeriod ? fromPeriod.label : "Fra"}
+              dataKey="from"
+              stroke={EVAL_COLORS[0]}
+              fill={EVAL_COLORS[0]}
+              fillOpacity={0.15}
+              strokeWidth={2}
+              isAnimationActive={false}
+            />
+            <Radar
+              name={toPeriod ? toPeriod.label : "Til"}
+              dataKey="to"
+              stroke={EVAL_COLORS[1]}
+              fill={EVAL_COLORS[1]}
+              fillOpacity={0.3}
+              strokeWidth={2}
+              isAnimationActive={false}
+            />
+            <Legend wrapperStyle={{ fontSize: 12, fontFamily: "'Inter', sans-serif" }} />
+          </RadarChart>
+        </ResponsiveContainer>
+      </div>
+
+      <div style={styles.overallCompareCard}>
+        <div>
+          <div style={styles.fieldLabel}>Samlet</div>
+          <div style={styles.overallCompareNums}>
+            <span>{overallFrom != null ? overallFrom.toFixed(1) : "—"}</span>
+            <span style={{ color: "#B9B2A0" }}>→</span>
+            <span>{overallTo != null ? overallTo.toFixed(1) : "—"}</span>
+          </div>
+        </div>
+        <DeltaBadge value={overallDelta} />
+      </div>
+
+      {CATEGORY_META.map((cat) => {
+        const fromAvg = categoryAverage(config, fromScores, cat.key, player);
+        const toAvg = categoryAverage(config, toScores, cat.key, player);
+        const delta = fromAvg != null && toAvg != null ? toAvg - fromAvg : null;
+        const skills = categorySkillsForPlayer(config, player, cat.key);
+        return (
+          <div key={cat.key} style={styles.categoryBlock}>
+            <div style={styles.categoryHeadRow}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <div style={{ ...styles.dot, background: cat.accent }} />
+                <span style={styles.categoryLabel}>{cat.label}</span>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <span style={styles.compareNums}>
+                  {fromAvg != null ? fromAvg.toFixed(1) : "—"} → {toAvg != null ? toAvg.toFixed(1) : "—"}
+                </span>
+                <DeltaBadge value={delta} compact />
+              </div>
+            </div>
+            {skills.map((skill) => {
+              const fv = fromScores[skill.id];
+              const tv = toScores[skill.id];
+              const d = typeof fv === "number" && typeof tv === "number" ? tv - fv : null;
+              return (
+                <div key={skill.id} style={styles.skillRow}>
+                  <span style={styles.skillName}>{skill.name}</span>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <span style={styles.compareNums}>
+                      {fv ?? "—"} → {tv ?? "—"}
+                    </span>
+                    <DeltaBadge value={d} compact />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function DeltaBadge({ value, compact }) {
+  if (value == null) {
+    return <span style={{ ...styles.deltaBadge, ...styles.deltaNeutral }}>—</span>;
+  }
+  const rounded = Math.round(value * 10) / 10;
+  if (rounded === 0) {
+    return (
+      <span style={{ ...styles.deltaBadge, ...styles.deltaNeutral }}>
+        <Minus size={compact ? 10 : 12} /> 0
+      </span>
+    );
+  }
+  const up = rounded > 0;
+  return (
+    <span style={{ ...styles.deltaBadge, ...(up ? styles.deltaUp : styles.deltaDown) }}>
+      {up ? <ArrowUp size={compact ? 10 : 12} /> : <ArrowDown size={compact ? 10 : 12} />}
+      {up ? "+" : ""}
+      {rounded}
+    </span>
+  );
+}
+
+function SettingsView({
+  config,
+  onRename,
+  onToggle,
+  onCreateSkill,
+  onAddSkillToGroup,
+  onRemoveSkillFromGroup,
+  onCreateGroup,
+  onRenameGroup,
+  onDeleteGroup,
+}) {
+  const [editing, setEditing] = useState(null);
+  const [editingGroup, setEditingGroup] = useState(null);
+  const [addingGroup, setAddingGroup] = useState(false);
+  const [newGroupName, setNewGroupName] = useState("");
+  const [addingSkillFor, setAddingSkillFor] = useState(null);
+  const [newSkillName, setNewSkillName] = useState("");
+
+  const groups = [...(config.groups || [])].sort((a, b) => a.sortOrder - b.sortOrder);
+
+  const submitNewGroup = async () => {
+    if (!newGroupName.trim()) return;
+    await onCreateGroup(newGroupName.trim());
+    setNewGroupName("");
+    setAddingGroup(false);
+  };
+
+  const submitNewSkill = async (catKey) => {
+    if (!newSkillName.trim()) return;
+    await onCreateSkill(catKey, null, newSkillName.trim());
+    setNewSkillName("");
+    setAddingSkillFor(null);
+  };
+
+  const toggleMembership = (catKey, skill, groupId) => {
+    if (skill.groupIds.includes(groupId)) {
+      onRemoveSkillFromGroup(catKey, skill.id, groupId);
+    } else {
+      onAddSkillToGroup(catKey, skill.id, groupId);
+    }
+  };
+
+  return (
+    <div>
+      <h1 style={styles.h1}>Vurderingskriterier</h1>
+      <p style={styles.subtext}>
+        Omdøb kriterier, eller deaktivér dem, jeres klub ikke bruger. Deaktiverede kriterier
+        udgår af alle spilleres kategori-gennemsnit.
+      </p>
+
+      <div style={styles.categoryBlock}>
+        <div style={styles.categoryHeadRow}>
+          <span style={styles.categoryLabel}>Kriteriegrupper</span>
+          <button
+            style={styles.iconBtn}
+            title="Ny gruppe"
+            onClick={() => {
+              setAddingGroup(true);
+              setNewGroupName("");
+            }}
+          >
+            <Plus size={14} />
+          </button>
+        </div>
+        <p style={styles.subtext}>
+          Hver spiller tilhører præcis én gruppe. Et kriterie kan indgå i flere grupper — fx kan
+          Fysisk-kriterier gælde for både Standard og Målmand, mens kun Målmand har
+          målmandsspecifikke Teknik-kriterier.
+        </p>
+
+        {addingGroup && (
+          <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+            <input
+              style={styles.input}
+              placeholder="Gruppenavn (fx Målmand)"
+              value={newGroupName}
+              onChange={(e) => setNewGroupName(e.target.value)}
+              autoFocus
+            />
+            <button style={styles.primaryBtnSm} onClick={submitNewGroup}>
+              Opret
+            </button>
+            <button style={styles.ghostBtn} onClick={() => setAddingGroup(false)}>
+              Annuller
+            </button>
+          </div>
+        )}
+
+        {groups.length === 0 && !addingGroup && (
+          <div style={styles.noSkills}>Ingen grupper endnu — opret mindst én.</div>
+        )}
+
+        {groups.map((group) => (
+          <div key={group.id} style={styles.settingsRow}>
+            {editingGroup === group.id ? (
+              <input
+                style={styles.editInput}
+                defaultValue={group.name}
+                autoFocus
+                onBlur={(e) => {
+                  onRenameGroup(group.id, e.target.value.trim() || group.name);
+                  setEditingGroup(null);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") e.target.blur();
+                  if (e.key === "Escape") setEditingGroup(null);
+                }}
+              />
+            ) : (
+              <span style={styles.skillName}>{group.name}</span>
+            )}
+            <div style={{ display: "flex", gap: 6 }}>
+              <button style={styles.iconBtn} onClick={() => setEditingGroup(group.id)} title="Omdøb">
+                <Pencil size={14} />
+              </button>
+              <button
+                style={{ ...styles.iconBtn, color: "#E2231A" }}
+                onClick={() => onDeleteGroup(group.id)}
+                title="Slet gruppe"
+              >
+                <Trash2 size={14} />
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {CATEGORY_META.map((cat) => (
+        <div key={cat.key} style={styles.categoryBlock}>
+          <div style={styles.categoryHeadRow}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <div style={{ ...styles.dot, background: cat.accent }} />
+              <span style={styles.categoryLabel}>{cat.label}</span>
+            </div>
+            <button
+              style={styles.iconBtn}
+              title="Nyt kriterium"
+              onClick={() => {
+                setAddingSkillFor(cat.key);
+                setNewSkillName("");
+              }}
+            >
+              <Plus size={14} />
+            </button>
+          </div>
+
+          {addingSkillFor === cat.key && (
+            <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
+              <input
+                style={styles.input}
+                placeholder="Kriterienavn"
+                value={newSkillName}
+                onChange={(e) => setNewSkillName(e.target.value)}
+                autoFocus
+              />
+              <button style={styles.primaryBtnSm} onClick={() => submitNewSkill(cat.key)}>
+                Opret
+              </button>
+              <button style={styles.ghostBtn} onClick={() => setAddingSkillFor(null)}>
+                Annuller
+              </button>
+            </div>
+          )}
+
+          {config[cat.key].map((skill) => (
+            <div key={skill.id} style={styles.settingsRow}>
+              {editing === skill.id ? (
+                <input
+                  style={styles.editInput}
+                  defaultValue={skill.name}
+                  autoFocus
+                  onBlur={(e) => {
+                    onRename(cat.key, skill.id, e.target.value.trim() || skill.name);
+                    setEditing(null);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") e.target.blur();
+                    if (e.key === "Escape") setEditing(null);
+                  }}
+                />
+              ) : (
+                <span
+                  style={{
+                    ...styles.skillName,
+                    opacity: skill.enabled ? 1 : 0.4,
+                    textDecoration: skill.enabled ? "none" : "line-through",
+                  }}
+                >
+                  {skill.name}
+                </span>
+              )}
+              <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+                {groups.map((g) => (
+                  <button
+                    key={g.id}
+                    style={{
+                      ...styles.groupChip,
+                      ...(skill.groupIds.includes(g.id) ? styles.groupChipActive : {}),
+                    }}
+                    onClick={() => toggleMembership(cat.key, skill, g.id)}
+                    title={
+                      skill.groupIds.includes(g.id) ? `Fjern fra ${g.name}` : `Tilføj til ${g.name}`
+                    }
+                  >
+                    {g.name}
+                  </button>
+                ))}
+                <button style={styles.iconBtn} onClick={() => setEditing(skill.id)} title="Omdøb">
+                  <Pencil size={14} />
+                </button>
+                <button
+                  style={styles.iconBtn}
+                  onClick={() => onToggle(cat.key, skill.id)}
+                  title={skill.enabled ? "Deaktiver" : "Aktiver"}
+                >
+                  {skill.enabled ? <Eye size={14} /> : <EyeOff size={14} />}
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/* ============================================================
+   Kampplan (match plan) — a self-contained tactical planning tool,
+   ported from a standalone prototype. Kept visually distinct (dark
+   pitch theme) from the rest of the app on purpose, scoped under
+   .kampplan-app so it can't leak into the rest of the UI, which is
+   styled entirely with inline styles.
+   ============================================================ */
+
+const KP_DEFENSE_CATEGORIES = [
+  "Forsvar feltet",
+  "Organiseret forsvarsspil",
+  "Genopret balance",
+  "Reoganisering efter boldtab",
+];
+const KP_CONQUEST_CATEGORIES = ["Genpres", "Højt pres", "Pres fra organiseret forsvarsspil"];
+const KP_BUILDUP_CATEGORIES = [
+  "Fastholde bolden efter erobring",
+  "Mod højt pres",
+  "Mod organiseret forsvarsspil",
+];
+const KP_FINISHING_CATEGORIES = ["Kontrangreb", "Forbi højt pres", "Gennembrud", "Afslutning af angreb"];
+const KP_EXTRAS_CATEGORIES = ["Preshøjde", "Hjørnespark højre", "Hjørnespark venstre", "Frispark"];
+
+function kpEmptyPlan() {
+  return {
+    id: null,
+    opponent: "",
+    date: todayStr(),
+    teamGoals: [""],
+    defense: [],
+    conquest: [],
+    buildUp: [],
+    finishing: [],
+    extras: [],
+    generalNotes: "",
+    playerGoals: {},
+    positions: [],
+    formation: "",
+    positions2: [],
+    formation2: "",
+    reserves: [],
+    performanceScores: {},
+  };
+}
+
+function kpFmtDate(iso) {
+  if (!iso) return "";
+  const [y, m, d] = iso.split("-");
+  return `${d}/${m}/${y}`;
+}
+
+function kpEscapeHtml(str) {
+  return String(str).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+}
+
+// Renders free-text notes as safe HTML: escapes everything, then turns any
+// URL-looking substrings into real clickable links. Never accepts arbitrary
+// HTML from the user — only <a> and <br> are ever produced.
+function kpLinkify(text) {
+  const escaped = kpEscapeHtml(text || "");
+  const withLinks = escaped.replace(/((https?:\/\/|www\.)[^\s<]+)/gi, (match) => {
+    const href = match.toLowerCase().startsWith("http") ? match : `https://${match}`;
+    return `<a href="${href}" target="_blank" rel="noopener noreferrer">${match}</a>`;
+  });
+  return withLinks.replace(/\n/g, "<br/>");
+}
+
+const KP_PRINT_CSS = `
+.pp-page{ font-family:var(--font-body);color:#111;font-size:13.5px;line-height:1.4; }
+.pp-head{
+  font-family:var(--font-display);font-weight:600;font-size:22px;border-bottom:2px solid #111;
+  padding-bottom:6px;margin-bottom:9px;display:flex;justify-content:space-between;align-items:baseline;
+}
+.pp-head span.small{font-family:var(--font-body);font-weight:600;font-size:16px;}
+.pp-grid{
+  display:grid;
+  grid-template-columns:1fr 1fr 1fr;
+  grid-template-areas:
+    "goalhead goalhead goalhead"
+    "goalA goalB goalC"
+    "colA colB colExtra";
+  gap:0 16px;
+}
+.pp-grid2{
+  display:grid;
+  grid-template-columns:2fr 1fr 1fr;
+  grid-template-areas:
+    "goals lineup1 lineup2";
+  gap:0 16px;
+}
+.pp-page2{ page-break-before:always; break-before:page; }
+.pp-colA{grid-area:colA;border-right:1px solid #ccc;padding-right:14px;}
+.pp-colB{grid-area:colB;border-right:1px solid #ccc;padding-right:14px;}
+.pp-colExtra{grid-area:colExtra;}
+.pp-goals{grid-area:goals;border-right:1px solid #ccc;padding-right:14px;border-top:1px solid #ccc;margin-top:8px;padding-top:6px;}
+.pp-lineup1{grid-area:lineup1;border-right:1px solid #ccc;padding-right:14px;border-top:1px solid #ccc;margin-top:8px;padding-top:6px;}
+.pp-lineup2{grid-area:lineup2;border-top:1px solid #ccc;margin-top:8px;padding-top:6px;}
+.pp-goalhead{grid-area:goalhead;}
+.pp-goalhead h4{
+  font-family:var(--font-display);font-size:14px;text-transform:uppercase;letter-spacing:.03em;
+  margin:0 0 3px;padding-bottom:0;border:none;
+}
+.pp-goalA{grid-area:goalA;border-right:1px solid #ccc;padding-right:14px;border-bottom:1px solid #ccc;padding-bottom:6px;margin-bottom:16px;}
+.pp-goalB{grid-area:goalB;border-right:1px solid #ccc;padding-right:14px;border-bottom:1px solid #ccc;padding-bottom:6px;margin-bottom:16px;}
+.pp-goalC{grid-area:goalC;border-bottom:1px solid #ccc;padding-bottom:6px;margin-bottom:16px;}
+.pp-goal-list{margin:0;padding:0;list-style:none;}
+.pp-goal-list li{margin:0 0 2px;}
+.pp-block{margin-bottom:6px;}
+.pp-block h4{
+  font-family:var(--font-display);font-size:14px;text-transform:uppercase;letter-spacing:.03em;
+  margin:0 0 3px;border-bottom:1px solid #999;padding-bottom:2px;
+}
+.pp-phase-header{
+  font-family:var(--font-display);font-weight:700;font-size:14px;text-transform:uppercase;letter-spacing:.05em;
+  background:#eee;border:1px solid #bbb;border-radius:3px;padding:3px 7px;margin-bottom:5px;
+}
+.pp-block p, .pp-goalA p, .pp-goalB p, .pp-goalC p{margin:0 0 2px;white-space:pre-line;}
+.pp-block p b{font-weight:700;}
+.pp-notes-text{white-space:pre-line;margin:0;}
+.pp-table{width:100%;border-collapse:collapse;margin-bottom:5px;}
+.pp-table th, .pp-table td{border:1px solid #bbb;padding:2px 6px;text-align:left;font-size:14px;line-height:1.3;}
+.pp-table th{background:#eee;font-weight:700;}
+`;
+
+function kpPline(label, value) {
+  if (!value) return `<p><b>${label}:</b></p>`;
+  return `<p><b>${label}:</b> ${kpEscapeHtml(value)}</p>`;
+}
+
+function kpPrintPlan(p) {
+  const printWindow = window.open("", "_blank");
+  if (!printWindow) {
+    return false;
+  }
+
+  const rosterSorted = [...p.positions]
+    .filter((r) => r.name && r.name.trim())
+    .sort((a, b) => Number(a.position) - Number(b.position));
+  const rosterNamesUnique = [...new Set(rosterSorted.map((r) => r.name.trim()))];
+  const goalsRows =
+    rosterNamesUnique
+      .map((name) => {
+        const posForName = rosterSorted.find((r) => r.name.trim() === name);
+        return `<tr><td>${kpEscapeHtml(posForName ? posForName.position : "")}</td><td>${kpEscapeHtml(
+          name
+        )}</td><td>${kpEscapeHtml(p.playerGoals[name] || "")}</td></tr>`;
+      })
+      .join("") || '<tr><td colspan="3">–</td></tr>';
+  const posRows =
+    [...p.positions]
+      .sort((a, b) => Number(a.position) - Number(b.position))
+      .map((r) => `<tr><td>${kpEscapeHtml(r.position)}</td><td>${kpEscapeHtml(r.name)}</td></tr>`)
+      .join("") || '<tr><td colspan="2">–</td></tr>';
+  const posRows2 =
+    [...p.positions2]
+      .sort((a, b) => Number(a.position) - Number(b.position))
+      .map((r) => `<tr><td>${kpEscapeHtml(r.position)}</td><td>${kpEscapeHtml(r.name)}</td></tr>`)
+      .join("") || '<tr><td colspan="2">–</td></tr>';
+  const reserveRows =
+    (p.reserves || [])
+      .map((r) => (typeof r === "string" ? r : r.name))
+      .filter(Boolean)
+      .map((name) => `<tr><td>${kpEscapeHtml(name)}</td></tr>`)
+      .join("") || '<tr><td>–</td></tr>';
+  const filledGoals = p.teamGoals.filter(Boolean);
+  const goalCols = [[], [], []];
+  filledGoals.forEach((g, i) => goalCols[i % 3].push(g));
+  const renderGoalCol = (list) =>
+    list.length
+      ? `<ul class="pp-goal-list">${list.map((g) => `<li>${kpEscapeHtml(g)}</li>`).join("")}</ul>`
+      : "";
+
+  const markup = `
+    <div class="pp-page">
+      <div class="pp-head">
+        <span>${kpEscapeHtml(p.opponent || "–")}</span>
+        <span class="small">${kpFmtDate(p.date)}</span>
+      </div>
+
+      <div class="pp-grid">
+        <div class="pp-goalhead">
+          <h4>Målsætning for holdet</h4>
+          ${filledGoals.length ? "" : "<p>–</p>"}
+        </div>
+
+        ${
+          filledGoals.length
+            ? `
+        <div class="pp-goalA">${renderGoalCol(goalCols[0])}</div>
+        <div class="pp-goalB">${renderGoalCol(goalCols[1])}</div>
+        <div class="pp-goalC">${renderGoalCol(goalCols[2])}</div>
+        `
+            : ""
+        }
+
+        <div class="pp-colA">
+          <div class="pp-phase-header">Vi har bolden</div>
+          <div class="pp-block">
+            <h4>Opbygningsspil</h4>
+            ${
+              p.buildUp.filter((b) => b.text).length
+                ? p.buildUp.filter((b) => b.text).map((b) => kpPline(b.category, b.text)).join("")
+                : "<p>–</p>"
+            }
+          </div>
+          <div class="pp-block">
+            <h4>Afslutningsspil</h4>
+            ${
+              p.finishing.filter((f) => f.text).length
+                ? p.finishing.filter((f) => f.text).map((f) => kpPline(f.category, f.text)).join("")
+                : "<p>–</p>"
+            }
+          </div>
+        </div>
+
+        <div class="pp-colB">
+          <div class="pp-phase-header">Når de har bolden</div>
+          <div class="pp-block">
+            <h4>Forsvarsspil</h4>
+            ${
+              p.defense.filter((d) => d.text).length
+                ? p.defense.filter((d) => d.text).map((d) => kpPline(d.category, d.text)).join("")
+                : "<p>–</p>"
+            }
+          </div>
+          <div class="pp-block">
+            <h4>Erobringsspil</h4>
+            ${
+              p.conquest.filter((c) => c.text).length
+                ? p.conquest.filter((c) => c.text).map((c) => kpPline(c.category, c.text)).join("")
+                : "<p>–</p>"
+            }
+          </div>
+        </div>
+
+        <div class="pp-colExtra">
+          <div class="pp-block">
+            <h4>Yderligere aftaler</h4>
+            ${
+              p.extras.filter((x) => x.text).length
+                ? p.extras.filter((x) => x.text).map((x) => kpPline(x.category, x.text)).join("")
+                : "<p>–</p>"
+            }
+          </div>
+          <div class="pp-block">
+            <h4>Noter generelt før kamp</h4>
+            <p class="pp-notes-text">${p.generalNotes ? kpLinkify(p.generalNotes) : "–"}</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="pp-page pp-page2">
+      <div class="pp-grid2">
+        <div class="pp-goals">
+          <div class="pp-block">
+            <h4>Individuelle mål</h4>
+            <table class="pp-table">
+              <thead><tr><th>Pos</th><th>Navn</th><th>Mål</th></tr></thead>
+              <tbody>${goalsRows}</tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="pp-lineup1">
+          <div class="pp-block">
+            <h4>Position &amp; opstilling</h4>
+            ${p.formation ? `<p><b>Formation:</b> ${kpEscapeHtml(p.formation)}</p>` : ""}
+            <table class="pp-table">
+              <thead><tr><th>Pos</th><th>Spiller</th></tr></thead>
+              <tbody>${posRows}</tbody>
+            </table>
+          </div>
+          <div class="pp-block">
+            <h4>Reserver</h4>
+            <table class="pp-table">
+              <thead><tr><th>Spiller</th></tr></thead>
+              <tbody>${reserveRows}</tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="pp-lineup2">
+          <div class="pp-block">
+            <h4>Position &amp; opstilling 2</h4>
+            ${p.formation2 ? `<p><b>Formation:</b> ${kpEscapeHtml(p.formation2)}</p>` : ""}
+            <table class="pp-table">
+              <thead><tr><th>Pos</th><th>Spiller</th></tr></thead>
+              <tbody>${posRows2}</tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+
+  const doc = `<!DOCTYPE html>
+<html lang="da">
+<head>
+<meta charset="UTF-8">
+<title>Kampplan – ${kpEscapeHtml(p.opponent || "Uden navn")}</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap');
+@page{ size:A4 landscape; margin:9mm; }
+*{box-sizing:border-box;}
+body{margin:0;padding:14px;background:#fff;}
+:root{ --font-display:'Oswald','Arial Narrow',sans-serif; --font-body:'Inter',-apple-system,sans-serif; }
+${KP_PRINT_CSS}
+.print-bar{display:flex;justify-content:flex-end;gap:8px;margin-bottom:12px;}
+.print-bar button{
+  font-family:var(--font-body);font-weight:600;font-size:13px;padding:8px 16px;border-radius:6px;
+  border:1.5px solid #1B4332;background:#1B4332;color:#fff;cursor:pointer;
+}
+@media print{ .print-bar{display:none;} body{padding:0;} }
+</style>
+</head>
+<body>
+  <div class="print-bar"><button onclick="window.print()">Print</button></div>
+  ${markup}
+</body>
+</html>`;
+
+  printWindow.document.open();
+  printWindow.document.write(doc);
+  printWindow.document.close();
+  printWindow.focus();
+  return true;
+}
+
+function kpSetAt(list, index, patch) {
+  return list.map((item, i) => (i === index ? { ...item, ...patch } : item));
+}
+function kpRemoveAt(list, index) {
+  return list.filter((_, i) => i !== index);
+}
+function kpSetStringAt(list, index, value) {
+  return list.map((v, i) => (i === index ? value : v));
+}
+
+function KpCategorySection({ title, items, categories, defaultCategory, onAdd, onUpdate, onRemove }) {
+  return (
+    <div style={styles.categoryBlock}>
+      <div style={styles.categoryHeadRow}>
+        <span style={styles.categoryLabel}>{title}</span>
+      </div>
+      {items.map((item, i) => (
+        <div key={i} style={{ border: "1px solid #E3E3E3", borderRadius: 8, padding: 12, marginBottom: 10 }}>
+          <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 8 }}>
+            <select
+              style={{ ...styles.select, flex: 1 }}
+              value={item.category}
+              onChange={(e) => onUpdate(i, { category: e.target.value })}
+            >
+              {categories.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </select>
+            <button style={styles.iconBtnGhost} onClick={() => onRemove(i)} title="Fjern">
+              <X size={14} />
+            </button>
+          </div>
+          <textarea
+            style={styles.textarea}
+            rows={4}
+            value={item.text}
+            onChange={(e) => onUpdate(i, { text: e.target.value })}
+          />
+        </div>
+      ))}
+      <button
+        style={{ ...styles.ghostBtn, borderStyle: "dashed", padding: "8px 14px", fontSize: 13 }}
+        onClick={() => onAdd(defaultCategory)}
+      >
+        <Plus size={14} /> Tilføj afsnit
+      </button>
+    </div>
+  );
+}
+
+function KpPositionTable({ title, positions, formation, onFormationChange, onUpdate, onAdd, onRemove, playerNames }) {
+  const th = {
+    textAlign: "left",
+    fontSize: 11,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+    color: "#6B6B6B",
+    padding: "0 8px 6px 0",
+    fontWeight: 700,
+  };
+  return (
+    <div style={styles.categoryBlock}>
+      <div style={styles.categoryHeadRow}>
+        <span style={styles.categoryLabel}>{title}</span>
+      </div>
+      <div style={{ maxWidth: 220, marginBottom: 14 }}>
+        <div style={styles.fieldLabel}>Formation</div>
+        <input
+          style={styles.input}
+          type="text"
+          value={formation}
+          onChange={(e) => onFormationChange(e.target.value)}
+        />
+      </div>
+      <table style={{ width: "100%", borderCollapse: "collapse" }}>
+        <thead>
+          <tr>
+            <th style={{ ...th, width: 70 }}>Position</th>
+            <th style={th}>Spillernavn</th>
+            <th style={{ ...th, width: 60, textAlign: "center" }} title="Vælg fra spillerlisten frem for at skrive navnet frit">
+              Liste
+            </th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {positions.map((r, i) => {
+            const useList = r.useList !== false;
+            return (
+              <tr key={i}>
+                <td style={{ width: 70, padding: "4px 8px 4px 0" }}>
+                  <select
+                    style={styles.select}
+                    value={r.position}
+                    onChange={(e) => onUpdate(i, { position: e.target.value })}
+                  >
+                    {Array.from({ length: 11 }, (_, n) => n + 1).map((n) => (
+                      <option key={n} value={String(n)}>
+                        {n}
+                      </option>
+                    ))}
+                  </select>
+                </td>
+                <td style={{ padding: "4px 8px 4px 0" }}>
+                  {useList ? (
+                    <select
+                      style={styles.select}
+                      value={r.name}
+                      onChange={(e) => onUpdate(i, { name: e.target.value })}
+                    >
+                      <option value="">Vælg spiller</option>
+                      {playerNames.map((n) => (
+                        <option key={n} value={n}>
+                          {n}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <input
+                      style={styles.input}
+                      value={r.name}
+                      placeholder="Spillernavn"
+                      onChange={(e) => onUpdate(i, { name: e.target.value })}
+                    />
+                  )}
+                </td>
+                <td style={{ width: 60, padding: "4px 8px 4px 0", textAlign: "center" }}>
+                  <input
+                    type="checkbox"
+                    checked={useList}
+                    onChange={(e) => onUpdate(i, { useList: e.target.checked })}
+                    title="Vælg fra spillerlisten frem for at skrive navnet frit"
+                  />
+                </td>
+                <td style={{ width: 26, padding: "4px 0" }}>
+                  <button style={styles.iconBtnGhost} onClick={() => onRemove(i)} title="Fjern">
+                    <X size={14} />
+                  </button>
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+      <button
+        style={{ ...styles.ghostBtn, borderStyle: "dashed", padding: "8px 14px", fontSize: 13, marginTop: 10 }}
+        onClick={onAdd}
+      >
+        <Plus size={14} /> Tilføj position
+      </button>
+    </div>
+  );
+}
+
+function KpReserveTable({ reserves, onUpdate, onAdd, onRemove, playerNames }) {
+  const th = {
+    textAlign: "left",
+    fontSize: 11,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+    color: "#6B6B6B",
+    padding: "0 8px 6px 0",
+    fontWeight: 700,
+  };
+  return (
+    <div style={styles.categoryBlock}>
+      <div style={styles.categoryHeadRow}>
+        <span style={styles.categoryLabel}>Reserver</span>
+      </div>
+      {reserves.length > 0 && (
+        <table style={{ width: "100%", borderCollapse: "collapse" }}>
+          <thead>
+            <tr>
+              <th style={th}>Spillernavn</th>
+              <th style={{ ...th, width: 60, textAlign: "center" }} title="Vælg fra spillerlisten frem for at skrive navnet frit">
+                Liste
+              </th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {reserves.map((r, i) => {
+              const useList = r.useList !== false;
+              return (
+                <tr key={i}>
+                  <td style={{ padding: "4px 8px 4px 0" }}>
+                    {useList ? (
+                      <select
+                        style={styles.select}
+                        value={r.name}
+                        onChange={(e) => onUpdate(i, { name: e.target.value })}
+                      >
+                        <option value="">Vælg spiller</option>
+                        {playerNames.map((n) => (
+                          <option key={n} value={n}>
+                            {n}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <input
+                        style={styles.input}
+                        value={r.name}
+                        placeholder="Spillernavn"
+                        onChange={(e) => onUpdate(i, { name: e.target.value })}
+                      />
+                    )}
+                  </td>
+                  <td style={{ width: 60, padding: "4px 8px 4px 0", textAlign: "center" }}>
+                    <input
+                      type="checkbox"
+                      checked={useList}
+                      onChange={(e) => onUpdate(i, { useList: e.target.checked })}
+                      title="Vælg fra spillerlisten frem for at skrive navnet frit"
+                    />
+                  </td>
+                  <td style={{ width: 26, padding: "4px 0" }}>
+                    <button style={styles.iconBtnGhost} onClick={() => onRemove(i)} title="Fjern">
+                      <X size={14} />
+                    </button>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      )}
+      <button
+        style={{ ...styles.ghostBtn, borderStyle: "dashed", padding: "8px 14px", fontSize: 13, marginTop: 10 }}
+        onClick={onAdd}
+      >
+        <Plus size={14} /> Tilføj reserve
+      </button>
+    </div>
+  );
+}
+
+// Coach-entered 1-5 rating of how each player performed in this specific
+// match, keyed by player name (same convention as playerGoals). Screen-only —
+// deliberately never read by kpPrintPlan — used to build a per-player
+// performance-over-time report (KampPerformanceView) to help spot who's
+// ready to progress to the next level of training.
+function KpPerformanceScores({ planId, players, scores, onSetScore }) {
+  return (
+    <div style={styles.categoryBlock}>
+      <div style={styles.categoryHeadRow}>
+        <span style={styles.categoryLabel}>Spillerbedømmelse</span>
+      </div>
+      <p style={styles.subtext}>
+        Vurdér hver spillers indsats i denne kamp på en skala fra 1-5. Vises kun her — kommer ikke
+        med på den udskrevne kampplan.
+      </p>
+      {!planId ? (
+        <p style={styles.noSkills}>
+          Gem kampplanen først — så kan du bedømme spillernes indsats bagefter.
+        </p>
+      ) : players.length === 0 ? (
+        <p style={styles.noSkills}>
+          Tilføj spillere under "Position &amp; opstilling" for at bedømme deres indsats.
+        </p>
+      ) : (
+        players.map(({ id, name }) => {
+          const value = scores[id];
+          return (
+            <div key={id} style={styles.skillRow}>
+              <span style={styles.skillName}>{name}</span>
+              <div style={styles.scoreButtons}>
+                {[1, 2, 3, 4, 5].map((v) => {
+                  const active = value === v;
+                  return (
+                    <button
+                      key={v}
+                      onClick={() => onSetScore(id, value === v ? null : v)}
+                      style={{
+                        ...styles.scoreBtn,
+                        background: active ? scoreColor(v) : "#FFFFFF",
+                        color: active ? "#FFFFFF" : "#1A1A1A",
+                        borderColor: active ? scoreColor(v) : "#D9D4C7",
+                      }}
+                    >
+                      {v}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })
+      )}
+    </div>
+  );
+}
+
+function KpNotesField({ value, onChange }) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(value || "");
+
+  const startEdit = () => {
+    setDraft(value || "");
+    setEditing(true);
+  };
+  const save = () => {
+    onChange(draft);
+    setEditing(false);
+  };
+
+  return (
+    <div style={styles.categoryBlock}>
+      <div style={styles.categoryHeadRow}>
+        <span style={styles.categoryLabel}>Noter generelt før kamp</span>
+        {!editing && (
+          <button style={styles.linkBtn} onClick={startEdit}>
+            <Pencil size={12} /> Rediger
+          </button>
+        )}
+      </div>
+      {editing ? (
+        <div>
+          <textarea
+            style={{ ...styles.textarea, minHeight: 120 }}
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            autoFocus
+          />
+          <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+            <button style={styles.primaryBtnSm} onClick={save}>
+              Gem
+            </button>
+            <button style={styles.ghostBtn} onClick={() => setEditing(false)}>
+              Annuller
+            </button>
+          </div>
+        </div>
+      ) : value ? (
+        <div
+          style={{ fontSize: 14, lineHeight: 1.6 }}
+          dangerouslySetInnerHTML={{ __html: kpLinkify(value) }}
+        />
+      ) : (
+        <p style={styles.noSkills}>Ingen noter endnu. Klik Rediger for at tilføje noter — links indsat her kan klikkes.</p>
+      )}
+    </div>
+  );
+}
+
+function KampplanEditor({ plan, setPlan, onBack, onSave, onPrint, saving, players }) {
+  const roster = [...plan.positions]
+    .filter((r) => r.name && r.name.trim())
+    .sort((a, b) => Number(a.position) - Number(b.position));
+  const rosterNames = [...new Set(roster.map((r) => r.name.trim()))];
+  const playerNames = [...new Set((players || []).map((p) => p.name).filter(Boolean))].sort((a, b) =>
+    a.localeCompare(b, "da")
+  );
+  // Older plans stored reserves as plain name strings; normalize those to
+  // the { name, useList } shape used going forward before any edit touches
+  // them, so a merge patch never spreads onto a raw string.
+  const reserves = (plan.reserves || []).map((r) =>
+    typeof r === "string" ? { name: r, useList: false } : r
+  );
+  // Performance scoring covers anyone in either lineup or the reserves list,
+  // not just the lineup 1 starters — but only names that resolve to a real
+  // player record, since a rating links to a player_id, not a free-text name.
+  const performanceRosterNames = [
+    ...new Set(
+      [...plan.positions, ...plan.positions2, ...reserves]
+        .filter((r) => r.name && r.name.trim())
+        .map((r) => r.name.trim())
+    ),
+  ]
+    .map((name) => (players || []).find((p) => p.name && p.name.trim() === name))
+    .filter(Boolean)
+    .map((p) => ({ id: p.id, name: p.name }))
+    .sort((a, b) => a.name.localeCompare(b.name, "da"));
+
+  // Performance ratings are linked to this plan's real id in their own
+  // table (see schema.sql), so — unlike the rest of the editor's fields —
+  // each rating is written immediately rather than batched into the next
+  // "Gem kampplan". KpPerformanceScores only calls this once plan.id exists.
+  const onSetPerformanceScore = async (playerId, value) => {
+    const prev = plan.performanceScores || {};
+    try {
+      await api.setMatchPerformanceScore(plan.id, playerId, value);
+      const next =
+        value == null
+          ? Object.fromEntries(Object.entries(prev).filter(([id]) => id !== playerId))
+          : { ...prev, [playerId]: value };
+      setPlan({ ...plan, performanceScores: next });
+    } catch (e) {
+      /* leave local state as-is on failure so the UI reflects what's actually saved */
+    }
+  };
+
+  return (
+    <div>
+      <button style={styles.backBtn} onClick={onBack}>
+        <ChevronLeft size={16} /> Alle kampplaner
+      </button>
+
+      <div style={{ ...styles.addCardCol, display: "grid", gridTemplateColumns: "2fr 1fr", gap: 14 }}>
+        <div>
+          <div style={styles.fieldLabel}>Modstander</div>
+          <input
+            style={styles.input}
+            type="text"
+            value={plan.opponent}
+            onChange={(e) => setPlan({ ...plan, opponent: e.target.value })}
+          />
+        </div>
+        <div>
+          <div style={styles.fieldLabel}>Kampdato</div>
+          <input
+            style={styles.input}
+            type="date"
+            value={plan.date}
+            onChange={(e) => setPlan({ ...plan, date: e.target.value })}
+          />
+        </div>
+      </div>
+
+      <div style={styles.categoryBlock}>
+        <div style={styles.categoryHeadRow}>
+          <span style={styles.categoryLabel}>Målsætning for holdet</span>
+        </div>
+        {plan.teamGoals.map((g, i) => (
+          <div key={i} style={{ display: "grid", gridTemplateColumns: "1fr 26px", gap: 8, alignItems: "start", marginBottom: 8 }}>
+            <textarea
+              style={{ ...styles.textarea, minHeight: 44 }}
+              value={g}
+              onChange={(e) => setPlan({ ...plan, teamGoals: kpSetStringAt(plan.teamGoals, i, e.target.value) })}
+            />
+            <button
+              style={{ ...styles.iconBtnGhost, marginTop: 6 }}
+              onClick={() => setPlan({ ...plan, teamGoals: kpRemoveAt(plan.teamGoals, i) })}
+              title="Fjern"
+            >
+              <X size={14} />
+            </button>
+          </div>
+        ))}
+        <button
+          style={{ ...styles.ghostBtn, borderStyle: "dashed", padding: "8px 14px", fontSize: 13 }}
+          onClick={() => setPlan({ ...plan, teamGoals: [...plan.teamGoals, ""] })}
+        >
+          <Plus size={14} /> Tilføj målsætning
+        </button>
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 16 }}>
+        <div>
+          <div style={{ ...styles.fieldLabel, fontSize: 13, marginBottom: 10 }}>Vi har bolden</div>
+          <KpCategorySection
+            title="Opbygningsspil"
+            items={plan.buildUp}
+            categories={KP_BUILDUP_CATEGORIES}
+            defaultCategory={KP_BUILDUP_CATEGORIES[0]}
+            onAdd={(cat) => setPlan({ ...plan, buildUp: [...plan.buildUp, { category: cat, text: "" }] })}
+            onUpdate={(i, patch) => setPlan({ ...plan, buildUp: kpSetAt(plan.buildUp, i, patch) })}
+            onRemove={(i) => setPlan({ ...plan, buildUp: kpRemoveAt(plan.buildUp, i) })}
+          />
+          <KpCategorySection
+            title="Afslutningsspil"
+            items={plan.finishing}
+            categories={KP_FINISHING_CATEGORIES}
+            defaultCategory={KP_FINISHING_CATEGORIES[0]}
+            onAdd={(cat) => setPlan({ ...plan, finishing: [...plan.finishing, { category: cat, text: "" }] })}
+            onUpdate={(i, patch) => setPlan({ ...plan, finishing: kpSetAt(plan.finishing, i, patch) })}
+            onRemove={(i) => setPlan({ ...plan, finishing: kpRemoveAt(plan.finishing, i) })}
+          />
+        </div>
+        <div>
+          <div style={{ ...styles.fieldLabel, fontSize: 13, marginBottom: 10 }}>Når de har bolden</div>
+          <KpCategorySection
+            title="Forsvarsspil"
+            items={plan.defense}
+            categories={KP_DEFENSE_CATEGORIES}
+            defaultCategory={KP_DEFENSE_CATEGORIES[0]}
+            onAdd={(cat) => setPlan({ ...plan, defense: [...plan.defense, { category: cat, text: "" }] })}
+            onUpdate={(i, patch) => setPlan({ ...plan, defense: kpSetAt(plan.defense, i, patch) })}
+            onRemove={(i) => setPlan({ ...plan, defense: kpRemoveAt(plan.defense, i) })}
+          />
+          <KpCategorySection
+            title="Erobringsspil"
+            items={plan.conquest}
+            categories={KP_CONQUEST_CATEGORIES}
+            defaultCategory={KP_CONQUEST_CATEGORIES[0]}
+            onAdd={(cat) => setPlan({ ...plan, conquest: [...plan.conquest, { category: cat, text: "" }] })}
+            onUpdate={(i, patch) => setPlan({ ...plan, conquest: kpSetAt(plan.conquest, i, patch) })}
+            onRemove={(i) => setPlan({ ...plan, conquest: kpRemoveAt(plan.conquest, i) })}
+          />
+        </div>
+      </div>
+
+      <KpCategorySection
+        title="Yderligere aftaler"
+        items={plan.extras}
+        categories={KP_EXTRAS_CATEGORIES}
+        defaultCategory={KP_EXTRAS_CATEGORIES[0]}
+        onAdd={(cat) => setPlan({ ...plan, extras: [...plan.extras, { category: cat, text: "" }] })}
+        onUpdate={(i, patch) => setPlan({ ...plan, extras: kpSetAt(plan.extras, i, patch) })}
+        onRemove={(i) => setPlan({ ...plan, extras: kpRemoveAt(plan.extras, i) })}
+      />
+
+      <KpNotesField
+        value={plan.generalNotes}
+        onChange={(v) => setPlan({ ...plan, generalNotes: v })}
+      />
+
+      <KpPositionTable
+        title="Position & opstilling"
+        positions={plan.positions}
+        formation={plan.formation}
+        playerNames={playerNames}
+        onFormationChange={(v) => setPlan({ ...plan, formation: v })}
+        onUpdate={(i, patch) => setPlan({ ...plan, positions: kpSetAt(plan.positions, i, patch) })}
+        onAdd={() =>
+          setPlan({ ...plan, positions: [...plan.positions, { position: "1", name: "", useList: true }] })
+        }
+        onRemove={(i) => setPlan({ ...plan, positions: kpRemoveAt(plan.positions, i) })}
+      />
+
+      <KpPositionTable
+        title="Position & opstilling 2"
+        positions={plan.positions2}
+        formation={plan.formation2}
+        playerNames={playerNames}
+        onFormationChange={(v) => setPlan({ ...plan, formation2: v })}
+        onUpdate={(i, patch) => setPlan({ ...plan, positions2: kpSetAt(plan.positions2, i, patch) })}
+        onAdd={() =>
+          setPlan({ ...plan, positions2: [...plan.positions2, { position: "1", name: "", useList: true }] })
+        }
+        onRemove={(i) => setPlan({ ...plan, positions2: kpRemoveAt(plan.positions2, i) })}
+      />
+
+      <div style={styles.categoryBlock}>
+        <div style={styles.categoryHeadRow}>
+          <span style={styles.categoryLabel}>Individuelle mål</span>
+        </div>
+        {rosterNames.length === 0 ? (
+          <p style={styles.noSkills}>
+            Tilføj spillere under "Position &amp; opstilling" for at sætte individuelle mål.
+          </p>
+        ) : (
+          <table style={{ width: "100%", borderCollapse: "collapse" }}>
+            <thead>
+              <tr>
+                <th style={{ textAlign: "left", fontSize: 11, textTransform: "uppercase", letterSpacing: 0.5, color: "#6B6B6B", padding: "0 8px 6px 0", fontWeight: 700 }}>
+                  Pos
+                </th>
+                <th style={{ textAlign: "left", fontSize: 11, textTransform: "uppercase", letterSpacing: 0.5, color: "#6B6B6B", padding: "0 8px 6px 0", fontWeight: 700 }}>
+                  Navn
+                </th>
+                <th style={{ textAlign: "left", fontSize: 11, textTransform: "uppercase", letterSpacing: 0.5, color: "#6B6B6B", padding: "0 8px 6px 0", fontWeight: 700 }}>
+                  Individuelt mål
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {rosterNames.map((name) => {
+                const posForName = roster.find((r) => r.name.trim() === name);
+                return (
+                  <tr key={name}>
+                    <td style={{ width: 60, padding: "4px 8px 4px 0" }}>{posForName ? posForName.position : ""}</td>
+                    <td style={{ width: 110, padding: "4px 8px 4px 0" }}>{name}</td>
+                    <td style={{ padding: "4px 0" }}>
+                      <textarea
+                        style={{ ...styles.textarea, minHeight: 38 }}
+                        placeholder="Individuelt mål"
+                        value={plan.playerGoals[name] || ""}
+                        onChange={(e) =>
+                          setPlan({
+                            ...plan,
+                            playerGoals: { ...plan.playerGoals, [name]: e.target.value },
+                          })
+                        }
+                      />
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        )}
+      </div>
+
+      <KpReserveTable
+        reserves={reserves}
+        playerNames={playerNames}
+        onUpdate={(i, patch) => setPlan({ ...plan, reserves: kpSetAt(reserves, i, patch) })}
+        onAdd={() => setPlan({ ...plan, reserves: [...reserves, { name: "", useList: true }] })}
+        onRemove={(i) => setPlan({ ...plan, reserves: kpRemoveAt(reserves, i) })}
+      />
+
+      <KpPerformanceScores
+        planId={plan.id}
+        players={performanceRosterNames}
+        scores={plan.performanceScores || {}}
+        onSetScore={onSetPerformanceScore}
+      />
+
+      <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 20, position: "sticky", bottom: 16 }}>
+        <div style={{ background: "#FFFFFF", border: "1px solid #E3E3E3", padding: 10, borderRadius: 10, display: "flex", gap: 10, boxShadow: "0 4px 16px rgba(0,0,0,0.1)" }}>
+          <button style={styles.ghostBtn} onClick={() => onPrint(plan)}>
+            <Printer size={14} /> Print
+          </button>
+          <button style={styles.primaryBtn} onClick={onSave} disabled={saving}>
+            {saving ? "Gemmer…" : "Gem kampplan"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function KampplanList({ planIndex, onNew, onEdit, onCopy, onDelete, onPrint }) {
+  return (
+    <div>
+      <div style={styles.sectionHeadRow}>
+        <div>
+          <h1 style={styles.h1}>Kampplaner</h1>
+          <p style={styles.subtext}>Taktiske planer pr. kamp — målsætninger, opstilling og individuelle mål.</p>
+        </div>
+        <button style={styles.primaryBtn} onClick={onNew}>
+          <Plus size={16} /> Ny kampplan
+        </button>
+      </div>
+
+      {planIndex.length === 0 ? (
+        <div style={styles.emptyState}>
+          <Swords size={28} color="#B9B2A0" />
+          <div style={{ marginTop: 10, fontWeight: 600 }}>Ingen kampplaner endnu</div>
+          <div style={{ color: "#6B6B6B", fontSize: 14 }}>
+            Opret din første kampplan, eller kopiér en fra tidligere når du har en.
+          </div>
+        </div>
+      ) : (
+        <div style={styles.grid}>
+          {planIndex.map((p) => (
+            <div key={p.id} style={styles.playerCard}>
+              <div style={styles.playerName}>{p.opponent || "Uden navn"}</div>
+              <div style={styles.subtext}>{kpFmtDate(p.date)}</div>
+              <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 10 }}>
+                <button style={{ ...styles.teamFilterChip, flex: 1, textAlign: "center" }} onClick={() => onEdit(p.id)}>
+                  Redigér
+                </button>
+                <button style={{ ...styles.teamFilterChip, flex: 1, textAlign: "center" }} onClick={() => onCopy(p.id)}>
+                  Kopiér
+                </button>
+                <button style={{ ...styles.teamFilterChip, flex: 1, textAlign: "center" }} onClick={() => onPrint(p.id)}>
+                  Print
+                </button>
+                <button
+                  style={{
+                    ...styles.teamFilterChip,
+                    flex: 1,
+                    textAlign: "center",
+                    color: "#E2231A",
+                    borderColor: "#E2231A",
+                  }}
+                  onClick={() => onDelete(p.id)}
+                >
+                  Slet
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Aggregates every match plan's per-player performance score (1-5, entered
+// on Kampplan after each game) into a per-player history over time, to help
+// spot who's ready to progress to the next level of training.
+function KampPerformanceView({ players }) {
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+  const [plans, setPlans] = useState([]);
+  const [sortMode, setSortMode] = useState("avg");
+
+  useEffect(() => {
+    (async () => {
+      setLoading(true);
+      try {
+        const list = await api.getMatchPlans();
+        setPlans(list);
+        setError(false);
+      } catch (e) {
+        setError(true);
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
+
+  const gamesByPlayer = {};
+  plans.forEach((p) => {
+    Object.entries(p.performanceScores || {}).forEach(([playerId, score]) => {
+      if (typeof score !== "number") return;
+      if (!gamesByPlayer[playerId]) gamesByPlayer[playerId] = [];
+      gamesByPlayer[playerId].push({ opponent: p.opponent || "Ukendt modstander", date: p.date, score });
+    });
+  });
+  Object.values(gamesByPlayer).forEach((games) =>
+    games.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0))
+  );
+
+  const rows = players.map((player) => {
+    const games = gamesByPlayer[player.id] || [];
+    const avg = games.length ? games.reduce((sum, g) => sum + g.score, 0) / games.length : null;
+    return { player, games, avg };
+  });
+
+  const sortedRows =
+    sortMode === "avg"
+      ? [...rows].sort((a, b) => (b.avg ?? -Infinity) - (a.avg ?? -Infinity))
+      : [...rows].sort((a, b) => a.player.name.localeCompare(b.player.name, "da"));
+
+  return (
+    <div>
+      <div style={styles.sectionHeadRow}>
+        <div>
+          <h1 style={styles.h1}>Kampscore</h1>
+          <p style={styles.subtext}>
+            Spillernes kampindsats over tid, bedømt 1-5 efter hver kamp på Kampplan. Bruges til at
+            vurdere hvem der er klar til at rykke op på næste niveau.
+          </p>
+        </div>
+      </div>
+
+      <div style={{ marginBottom: 12, display: "flex", gap: 8, flexWrap: "wrap" }}>
+        <button
+          style={{ ...styles.teamFilterChip, ...(sortMode === "avg" ? styles.teamFilterChipActive : {}) }}
+          onClick={() => setSortMode("avg")}
+        >
+          <ArrowUpDown size={14} /> Sortér efter gennemsnit
+        </button>
+        <button
+          style={{ ...styles.teamFilterChip, ...(sortMode === "alpha" ? styles.teamFilterChipActive : {}) }}
+          onClick={() => setSortMode("alpha")}
+        >
+          <ArrowUpDown size={14} /> Sortér alfabetisk
+        </button>
+      </div>
+
+      {loading && <p style={styles.subtext}>Indlæser…</p>}
+      {error && <div style={styles.errorBannerRow}>Kunne ikke hente kampplaner.</div>}
+
+      {!loading && !error && (
+        <div style={styles.grid}>
+          {sortedRows.map(({ player, games, avg }) => (
+            <div key={player.id} style={styles.categoryBlock}>
+              <div style={styles.categoryHeadRow}>
+                <span style={styles.categoryLabel}>{player.name}</span>
+                <span
+                  style={{
+                    ...styles.readOnlyScorePill,
+                    background: scoreColor(avg != null ? Math.round(avg) : null),
+                  }}
+                >
+                  {avg != null ? avg.toFixed(1) : "—"}
+                </span>
+              </div>
+              {games.length === 0 ? (
+                <p style={{ ...styles.subtext, fontStyle: "italic" }}>Ingen kampscore endnu</p>
+              ) : (
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                  {games.map((g, i) => (
+                    <span
+                      key={i}
+                      title={`${formatDate(g.date)} — ${g.opponent}`}
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: 4,
+                        padding: "3px 8px",
+                        borderRadius: 20,
+                        fontSize: 11,
+                        fontWeight: 700,
+                        color: "#FFFFFF",
+                        background: scoreColor(g.score),
+                      }}
+                    >
+                      {g.opponent} {g.score}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function KampplanView({ players }) {
+  const [subView, setSubView] = useState("list");
+  const [loading, setLoading] = useState(true);
+  const [planIndex, setPlanIndex] = useState([]);
+  const [plan, setPlan] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState(false);
+
+  const loadIndex = async () => {
+    setLoading(true);
+    try {
+      const list = await api.getMatchPlans();
+      setPlanIndex(list);
+      setError(false);
+    } catch (e) {
+      setError(true);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadIndex();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const openNew = () => {
+    setPlan(kpEmptyPlan());
+    setSubView("editor");
+  };
+
+  const openEdit = async (id) => {
+    try {
+      const full = await api.getMatchPlan(id);
+      setPlan(full);
+      setSubView("editor");
+    } catch (e) {
+      setError(true);
+    }
+  };
+
+  const openCopy = async (id) => {
+    try {
+      const full = await api.getMatchPlan(id);
+      // A copy is a new match with its own id, so it must start with no
+      // performance ratings — those belong to the match they were entered
+      // for, not to the plan's other fields. (The server won't persist
+      // performanceScores from this body either way; this just keeps the
+      // local draft honest before it's even saved.)
+      setPlan({ ...full, id: null, opponent: "", date: todayStr(), performanceScores: {} });
+      setSubView("editor");
+    } catch (e) {
+      setError(true);
+    }
+  };
+
+  const remove = async (id) => {
+    if (!window.confirm("Slet denne kampplan? Det kan ikke fortrydes.")) return;
+    try {
+      await api.deleteMatchPlan(id);
+      loadIndex();
+    } catch (e) {
+      setError(true);
+    }
+  };
+
+  const printById = async (id) => {
+    try {
+      const full = await api.getMatchPlan(id);
+      kpPrintPlan(full);
+    } catch (e) {
+      setError(true);
+    }
+  };
+
+  const save = async () => {
+    setSaving(true);
+    try {
+      if (plan.id) {
+        await api.updateMatchPlan(plan.id, plan);
+      } else {
+        await api.createMatchPlan(plan);
+      }
+      setError(false);
+      setSubView("list");
+      loadIndex();
+    } catch (e) {
+      setError(true);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div>
+      {error && (
+        <div style={styles.errorBanner}>Kunne ikke gemme/hente kampplanen — tjek din forbindelse og prøv igen.</div>
+      )}
+      {loading ? (
+        <p style={styles.subtext}>Indlæser kampplaner …</p>
+      ) : subView === "list" ? (
+        <KampplanList
+          planIndex={planIndex}
+          onNew={openNew}
+          onEdit={openEdit}
+          onCopy={openCopy}
+          onDelete={remove}
+          onPrint={printById}
+        />
+      ) : (
+        <KampplanEditor
+          plan={plan}
+          setPlan={setPlan}
+          onBack={() => setSubView("list")}
+          onSave={save}
+          onPrint={kpPrintPlan}
+          saving={saving}
+          players={players}
+        />
+      )}
+    </div>
+  );
+}
+
+const styles = {
+  app: {
+    minHeight: "100vh",
+    background: "#F7F7F5",
+    fontFamily: "'Inter', system-ui, sans-serif",
+    color: "#1A1A1A",
+    paddingBottom: 60,
+  },
+  loadingWrap: {
+    minHeight: "100vh",
+    background: "#111111",
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 12,
+  },
+  header: {
+    position: "sticky",
+    top: 0,
+    zIndex: 5,
+  },
+  headerTopBar: {
+    background: "#FFFFFF",
+    borderBottom: "1px solid #E3E3E3",
+  },
+  headerTopRow: {
+    maxWidth: 900,
+    margin: "0 auto",
+    padding: "14px 20px",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 10,
+  },
+  brand: {
+    display: "flex",
+    flexDirection: "column",
+  },
+  brandText: {
+    color: "#111111",
+    fontFamily: "'Oswald', sans-serif",
+    fontSize: 17,
+    letterSpacing: 1.5,
+    fontWeight: 700,
+  },
+  brandSub: {
+    color: "#6B6B6B",
+    fontSize: 11,
+    fontWeight: 500,
+    letterSpacing: 0.3,
+  },
+  logoImg: {
+    width: 40,
+    height: 40,
+    objectFit: "contain",
+    flexShrink: 0,
+  },
+  headerNavBar: {
+    background: "#111111",
+  },
+  headerNavBarRow: {
+    maxWidth: 900,
+    margin: "0 auto",
+    padding: "8px 20px",
+    display: "flex",
+    justifyContent: "flex-end",
+  },
+  menuTriggerBtn: {
+    display: "flex",
+    alignItems: "center",
+    gap: 8,
+    padding: "8px 12px",
+    borderRadius: 8,
+    border: "1px solid transparent",
+    background: "transparent",
+    color: "#C9C9C9",
+    fontFamily: "'Oswald', sans-serif",
+    fontSize: 13,
+    fontWeight: 600,
+    letterSpacing: 0.3,
+    cursor: "pointer",
+  },
+  menuBackdrop: {
+    position: "fixed",
+    inset: 0,
+    zIndex: 9,
+  },
+  menuDropdown: {
+    position: "absolute",
+    top: "calc(100% + 6px)",
+    right: 0,
+    background: "#FFFFFF",
+    border: "1px solid #E3E3E3",
+    borderRadius: 10,
+    boxShadow: "0 8px 24px rgba(0,0,0,0.14)",
+    padding: 6,
+    display: "flex",
+    flexDirection: "column",
+    gap: 2,
+    minWidth: 210,
+    zIndex: 10,
+  },
+  menuDropdownItem: {
+    display: "flex",
+    alignItems: "center",
+    gap: 10,
+    padding: "9px 12px",
+    borderRadius: 7,
+    border: "none",
+    background: "transparent",
+    color: "#1A1A1A",
+    fontSize: 14,
+    fontWeight: 600,
+    cursor: "pointer",
+    textAlign: "left",
+    width: "100%",
+  },
+  menuDropdownItemActive: {
+    background: "#E2231A",
+    color: "#FFFFFF",
+  },
+  headerStripes: {
+    height: 4,
+    background:
+      "repeating-linear-gradient(90deg, #E2231A 0px, #E2231A 40px, #111111 40px, #111111 80px)",
+  },
+  main: {
+    maxWidth: 900,
+    margin: "0 auto",
+    padding: "28px 20px",
+  },
+  errorBanner: {
+    background: "#F4E0DD",
+    color: "#8A3A31",
+    padding: "10px 14px",
+    borderRadius: 8,
+    fontSize: 13,
+    marginBottom: 16,
+  },
+  successBanner: {
+    background: "#E4EEE0",
+    color: "#2F5D46",
+    padding: "10px 14px",
+    borderRadius: 8,
+    fontSize: 13,
+    marginBottom: 16,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 10,
+  },
+  errorBannerRow: {
+    background: "#F4E0DD",
+    color: "#8A3A31",
+    padding: "10px 14px",
+    borderRadius: 8,
+    fontSize: 13,
+    marginBottom: 16,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 10,
+  },
+  selectActionBar: {
+    display: "flex",
+    alignItems: "center",
+    gap: 12,
+    background: "#F3EBDA",
+    padding: "10px 14px",
+    borderRadius: 8,
+    fontSize: 13,
+    fontWeight: 600,
+    color: "#5A4A25",
+    marginBottom: 16,
+    flexWrap: "wrap",
+  },
+  sectionHeadRow: {
+    display: "flex",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    marginBottom: 20,
+    flexWrap: "wrap",
+    gap: 12,
+  },
+  h1: {
+    fontFamily: "'Oswald', sans-serif",
+    fontSize: 26,
+    letterSpacing: 0.5,
+    margin: 0,
+    color: "#111111",
+  },
+  subtext: {
+    color: "#6B6B6B",
+    fontSize: 14,
+    margin: "4px 0 0",
+  },
+  primaryBtn: {
+    display: "flex",
+    alignItems: "center",
+    gap: 6,
+    background: "#111111",
+    color: "#FFFFFF",
+    border: "none",
+    padding: "10px 16px",
+    borderRadius: 8,
+    fontWeight: 600,
+    fontSize: 14,
+    cursor: "pointer",
+  },
+  primaryBtnSm: {
+    display: "flex",
+    alignItems: "center",
+    gap: 4,
+    background: "#111111",
+    color: "#FFFFFF",
+    border: "none",
+    padding: "8px 12px",
+    borderRadius: 8,
+    fontWeight: 600,
+    fontSize: 13,
+    cursor: "pointer",
+    whiteSpace: "nowrap",
+  },
+  compareBtn: {
+    display: "flex",
+    alignItems: "center",
+    gap: 4,
+    background: "#FFFFFF",
+    color: "#111111",
+    border: "1px solid #D9D4C7",
+    padding: "8px 12px",
+    borderRadius: 8,
+    fontWeight: 600,
+    fontSize: 13,
+    cursor: "pointer",
+    whiteSpace: "nowrap",
+  },
+  compareBtnActive: {
+    background: "#E2231A",
+    color: "#FFFFFF",
+    borderColor: "#E2231A",
+  },
+  ghostBtn: {
+    background: "transparent",
+    border: "1px solid #D9D4C7",
+    color: "#1A1A1A",
+    padding: "10px 16px",
+    borderRadius: 8,
+    fontWeight: 600,
+    fontSize: 14,
+    cursor: "pointer",
+  },
+  dangerBtn: {
+    background: "#E2231A",
+    color: "#FFFFFF",
+    border: "none",
+    padding: "10px 16px",
+    borderRadius: 8,
+    fontWeight: 600,
+    fontSize: 14,
+    cursor: "pointer",
+  },
+  addCard: {
+    display: "flex",
+    gap: 10,
+    flexWrap: "wrap",
+    background: "#FFFFFF",
+    border: "1px solid #E3E3E3",
+    padding: 16,
+    borderRadius: 10,
+    marginBottom: 20,
+    alignItems: "center",
+  },
+  addCardCol: {
+    display: "flex",
+    flexDirection: "column",
+    gap: 14,
+    background: "#FFFFFF",
+    border: "1px solid #E3E3E3",
+    padding: 16,
+    borderRadius: 10,
+    marginBottom: 20,
+  },
+  fieldLabel: {
+    fontSize: 12,
+    fontWeight: 700,
+    letterSpacing: 0.5,
+    color: "#6B6B6B",
+    textTransform: "uppercase",
+    marginBottom: 8,
+  },
+  positionGrid: {
+    display: "flex",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  positionChip: {
+    padding: "6px 12px",
+    borderRadius: 20,
+    border: "1px solid",
+    fontSize: 13,
+    fontWeight: 700,
+    cursor: "pointer",
+  },
+  positionRow: {
+    display: "flex",
+    alignItems: "center",
+    gap: 10,
+    marginTop: 4,
+  },
+  linkBtn: {
+    display: "flex",
+    alignItems: "center",
+    gap: 4,
+    background: "transparent",
+    border: "none",
+    color: "#111111",
+    fontSize: 12,
+    fontWeight: 700,
+    cursor: "pointer",
+    padding: 0,
+  },
+  linkBtnDanger: {
+    display: "flex",
+    alignItems: "center",
+    gap: 4,
+    background: "transparent",
+    border: "none",
+    color: "#E2231A",
+    fontSize: 12,
+    fontWeight: 700,
+    cursor: "pointer",
+    padding: 0,
+  },
+  positionEditCard: {
+    background: "#FFFFFF",
+    border: "1px solid #E3E3E3",
+    borderRadius: 10,
+    padding: 16,
+    marginBottom: 20,
+  },
+  input: {
+    flex: 1,
+    minWidth: 140,
+    padding: "10px 12px",
+    borderRadius: 8,
+    border: "1px solid #D9D4C7",
+    fontSize: 14,
+    fontFamily: "inherit",
+  },
+  textarea: {
+    width: "100%",
+    padding: "10px 12px",
+    borderRadius: 8,
+    border: "1px solid #D9D4C7",
+    fontSize: 14,
+    fontFamily: "inherit",
+    resize: "vertical",
+    minHeight: 64,
+    boxSizing: "border-box",
+  },
+  select: {
+    width: "100%",
+    padding: "10px 12px",
+    borderRadius: 8,
+    border: "1px solid #D9D4C7",
+    fontSize: 14,
+    fontFamily: "inherit",
+    background: "#FFFFFF",
+  },
+  emptyState: {
+    textAlign: "center",
+    padding: "48px 20px",
+    background: "#FFFFFF",
+    borderRadius: 10,
+    border: "1px dashed #D9D4C7",
+    marginBottom: 20,
+  },
+  grid: {
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))",
+    gap: 14,
+  },
+  playerCard: {
+    background: "#FFFFFF",
+    border: "1px solid #E3E3E3",
+    borderRadius: 12,
+    padding: 16,
+    cursor: "pointer",
+  },
+  playerCardSelected: {
+    borderColor: "#111111",
+    boxShadow: "0 0 0 2px #111111",
+  },
+  playerCardDisabled: {
+    opacity: 0.5,
+    cursor: "not-allowed",
+  },
+  playerCardTop: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 10,
+  },
+  numberBadge: {
+    width: 34,
+    height: 34,
+    borderRadius: "50%",
+    background: "#111111",
+    color: "#FFFFFF",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    fontFamily: "'Oswald', sans-serif",
+    fontSize: 14,
+    fontWeight: 600,
+  },
+  numberBadgeLg: {
+    width: 52,
+    height: 52,
+    borderRadius: "50%",
+    background: "#111111",
+    color: "#FFFFFF",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    fontFamily: "'Oswald', sans-serif",
+    fontSize: 18,
+    fontWeight: 600,
+    flexShrink: 0,
+  },
+  overallPill: {
+    color: "#FFFFFF",
+    fontFamily: "'Oswald', sans-serif",
+    fontSize: 13,
+    fontWeight: 700,
+    padding: "4px 10px",
+    borderRadius: 20,
+  },
+  playerName: {
+    fontWeight: 700,
+    fontSize: 16,
+    marginBottom: 2,
+  },
+  playerPos: {
+    color: "#6B6B6B",
+    fontSize: 13,
+    marginBottom: 12,
+  },
+  miniBars: {
+    display: "flex",
+    flexDirection: "column",
+    gap: 5,
+  },
+  miniBarTrack: {
+    height: 5,
+    background: "#EFEFEF",
+    borderRadius: 3,
+    overflow: "hidden",
+  },
+  miniBarFill: {
+    height: "100%",
+    borderRadius: 3,
+  },
+  evalCountTag: {
+    marginTop: 10,
+    fontSize: 11,
+    color: "#B9B2A0",
+    fontWeight: 600,
+  },
+  backBtn: {
+    display: "flex",
+    alignItems: "center",
+    gap: 4,
+    background: "transparent",
+    border: "none",
+    color: "#111111",
+    fontWeight: 600,
+    fontSize: 14,
+    cursor: "pointer",
+    padding: "6px 0",
+    marginBottom: 12,
+  },
+  playerHeadRow: {
+    display: "flex",
+    alignItems: "center",
+    gap: 14,
+    marginBottom: 16,
+  },
+  iconDangerBtn: {
+    background: "#FFFFFF",
+    border: "1px solid #E3E3E3",
+    color: "#E2231A",
+    borderRadius: 8,
+    padding: 8,
+    cursor: "pointer",
+  },
+  evalBar: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    gap: 10,
+    marginBottom: 16,
+    flexWrap: "wrap",
+  },
+  evalTabs: {
+    display: "flex",
+    gap: 8,
+    flexWrap: "wrap",
+    flex: 1,
+    minWidth: 0,
+  },
+  evalTab: {
+    background: "#FFFFFF",
+    border: "1px solid #E3E3E3",
+    borderRadius: 8,
+    padding: "6px 12px",
+    cursor: "pointer",
+    textAlign: "left",
+    fontFamily: "inherit",
+  },
+  evalTabActive: {
+    background: "#E2231A",
+    borderColor: "#E2231A",
+    color: "#FFFFFF",
+  },
+  evalTabDate: {
+    fontSize: 11,
+    opacity: 0.7,
+  },
+  evalMetaRow: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 14,
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  periodRow: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    background: "#FFFFFF",
+    border: "1px solid #E3E3E3",
+    borderRadius: 10,
+    padding: 14,
+    marginBottom: 10,
+    gap: 10,
+    flexWrap: "wrap",
+  },
+  teamFilterRow: {
+    display: "flex",
+    gap: 8,
+    flexWrap: "wrap",
+    marginBottom: 16,
+  },
+  teamFilterChip: {
+    background: "#FFFFFF",
+    border: "1px solid #D9D4C7",
+    color: "#1A1A1A",
+    padding: "6px 12px",
+    borderRadius: 20,
+    fontSize: 13,
+    fontWeight: 600,
+    cursor: "pointer",
+  },
+  teamFilterChipActive: {
+    background: "#111111",
+    borderColor: "#111111",
+    color: "#FFFFFF",
+  },
+  teamBadge: {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: 4,
+    fontSize: 11,
+    color: "#5C6B73",
+    fontWeight: 700,
+    marginBottom: 10,
+  },
+  teamRow: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 16,
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  linkCard: {
+    background: "#FFFFFF",
+    border: "1px solid #E3E3E3",
+    borderLeft: "4px solid #E2231A",
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 20,
+  },
+  linkRow: {
+    display: "flex",
+    gap: 8,
+    flexWrap: "wrap",
+    marginTop: 8,
+  },
+  linkInput: {
+    flex: 1,
+    minWidth: 180,
+    padding: "8px 10px",
+    borderRadius: 8,
+    border: "1px solid #D9D4C7",
+    fontSize: 12,
+    fontFamily: "monospace",
+    color: "#6B6B6B",
+    background: "#F7F7F5",
+  },
+  compareSelectRow: {
+    display: "flex",
+    gap: 12,
+    marginBottom: 16,
+    flexWrap: "wrap",
+  },
+  overallCompareCard: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    background: "#FFFFFF",
+    border: "1px solid #E3E3E3",
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 14,
+  },
+  overallCompareNums: {
+    display: "flex",
+    gap: 8,
+    fontFamily: "'Oswald', sans-serif",
+    fontSize: 22,
+    fontWeight: 700,
+    color: "#111111",
+  },
+  compareNums: {
+    fontSize: 13,
+    color: "#6B6B6B",
+    fontWeight: 600,
+    whiteSpace: "nowrap",
+  },
+  deltaBadge: {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: 3,
+    padding: "3px 8px",
+    borderRadius: 20,
+    fontSize: 12,
+    fontWeight: 700,
+  },
+  deltaUp: {
+    background: "#E4EEE0",
+    color: "#2F5D46",
+  },
+  deltaDown: {
+    background: "#F4E0DD",
+    color: "#8A3A31",
+  },
+  deltaNeutral: {
+    background: "#EFEFEF",
+    color: "#6B6B6B",
+  },
+  radarCard: {
+    background: "#FFFFFF",
+    border: "1px solid #E3E3E3",
+    borderRadius: 12,
+    padding: 10,
+    marginBottom: 20,
+  },
+  radarHint: {
+    fontSize: 11,
+    color: "#B9B2A0",
+    textAlign: "center",
+    margin: "4px 0 0",
+    fontWeight: 600,
+  },
+  drilldownHead: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: "6px 10px 0",
+    marginBottom: 4,
+  },
+  categoryBlock: {
+    background: "#FFFFFF",
+    border: "1px solid #E3E3E3",
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 14,
+  },
+  categoryHeadRow: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 10,
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  dot: {
+    width: 10,
+    height: 10,
+    borderRadius: "50%",
+  },
+  categoryLabel: {
+    fontFamily: "'Oswald', sans-serif",
+    fontSize: 15,
+    letterSpacing: 0.5,
+    fontWeight: 600,
+  },
+  categoryAvg: {
+    fontFamily: "'Oswald', sans-serif",
+    fontSize: 18,
+    fontWeight: 700,
+  },
+  skillRow: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    padding: "8px 0",
+    borderTop: "1px solid #F0F0F0",
+    gap: 10,
+    flexWrap: "wrap",
+  },
+  skillBlock: {
+    padding: "10px 0",
+    borderTop: "1px solid #F0F0F0",
+    display: "flex",
+    flexDirection: "column",
+    gap: 8,
+  },
+  skillTopRow: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 10,
+    flexWrap: "wrap",
+  },
+  infoBanner: {
+    background: "#F3EBDA",
+    color: "#5A4A25",
+    padding: "12px 14px",
+    borderRadius: 10,
+    fontSize: 13,
+    lineHeight: 1.5,
+    marginBottom: 20,
+  },
+  readOnlyScorePill: {
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    minWidth: 32,
+    height: 32,
+    padding: "0 8px",
+    borderRadius: 8,
+    color: "#FFFFFF",
+    fontFamily: "'Oswald', sans-serif",
+    fontSize: 15,
+    fontWeight: 700,
+  },
+  scoreButtons: {
+    display: "flex",
+    gap: 8,
+  },
+  scoreBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 10,
+    border: "1.5px solid",
+    fontSize: 16,
+    fontWeight: 700,
+    cursor: "pointer",
+    fontFamily: "'Oswald', sans-serif",
+  },
+  goalChip: {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: 4,
+    padding: "3px 8px",
+    borderRadius: 20,
+    fontSize: 11,
+    fontWeight: 700,
+  },
+  goalChipMet: {
+    background: "#E4EEE0",
+    color: "#2F5D46",
+  },
+  goalChipPending: {
+    background: "#F3EBDA",
+    color: "#8A6D3D",
+  },
+  iconBtnGhost: {
+    background: "transparent",
+    border: "none",
+    color: "#6B6B6B",
+    cursor: "pointer",
+    padding: 2,
+    display: "flex",
+    alignItems: "center",
+  },
+  goalNote: {
+    fontSize: 12,
+    color: "#6B6B6B",
+    fontStyle: "italic",
+  },
+  charCount: {
+    fontSize: 11,
+    color: "#B9B2A0",
+    textAlign: "right",
+    marginTop: -4,
+  },
+  progressRow: {
+    display: "flex",
+    alignItems: "center",
+    gap: 8,
+    flexWrap: "wrap",
+    marginTop: 4,
+  },
+  progressLabel: {
+    fontSize: 11,
+    fontWeight: 700,
+    color: "#6B6B6B",
+    textTransform: "uppercase",
+    letterSpacing: 0.4,
+  },
+  progressButtons: {
+    display: "flex",
+    gap: 3,
+    flexWrap: "wrap",
+  },
+  progressBtn: {
+    width: 26,
+    height: 26,
+    borderRadius: 6,
+    border: "1px solid",
+    fontSize: 11,
+    fontWeight: 700,
+    cursor: "pointer",
+  },
+  progressBtnCompact: {
+    width: 22,
+    height: 22,
+    borderRadius: 5,
+    border: "1px solid",
+    fontSize: 10,
+    fontWeight: 700,
+    cursor: "pointer",
+  },
+  progressValue: {
+    fontSize: 12,
+    fontWeight: 700,
+    color: "#5C6B73",
+    minWidth: 34,
+  },
+  coachPlayerCard: {
+    background: "#FFFFFF",
+    border: "1px solid #E3E3E3",
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+  },
+  coachPlayerHead: {
+    display: "flex",
+    alignItems: "center",
+    gap: 12,
+    cursor: "pointer",
+    paddingBottom: 10,
+    marginBottom: 6,
+    borderBottom: "1px solid #F0F0F0",
+  },
+  goalEditRow: {
+    display: "flex",
+    flexDirection: "column",
+    gap: 8,
+    background: "#F7F7F5",
+    borderRadius: 8,
+    padding: 10,
+  },
+  goalsOverviewCard: {
+    background: "#FFFFFF",
+    border: "1px solid #E3E3E3",
+    borderLeft: "4px solid #111111",
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 20,
+  },
+  goalsOverviewHead: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 10,
+    flexWrap: "wrap",
+    gap: 6,
+  },
+  goalOverviewRow: {
+    padding: "10px 0",
+    borderTop: "1px solid #F0F0F0",
+    display: "flex",
+    flexDirection: "column",
+    gap: 8,
+  },
+  goalOverviewTop: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    gap: 10,
+    flexWrap: "wrap",
+  },
+  goalOverviewCat: {
+    fontSize: 11,
+    color: "#B9B2A0",
+    fontWeight: 600,
+    textTransform: "uppercase",
+    letterSpacing: 0.4,
+  },
+  noSkills: {
+    color: "#B9B2A0",
+    fontSize: 13,
+    fontStyle: "italic",
+  },
+  settingsRow: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    padding: "8px 0",
+    borderTop: "1px solid #F0F0F0",
+    gap: 10,
+  },
+  skillGroupBlock: {
+    marginTop: 10,
+    paddingTop: 10,
+    borderTop: "1px dashed #E3E3E3",
+  },
+  skillGroupHeadRow: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 10,
+  },
+  skillGroupName: {
+    fontWeight: 700,
+    fontSize: 13,
+    textTransform: "uppercase",
+    letterSpacing: 0.3,
+    color: "#6B6B6B",
+  },
+  skillGroupSelect: {
+    padding: "4px 6px",
+    borderRadius: 6,
+    border: "1px solid #E3E3E3",
+    fontSize: 12,
+    fontFamily: "inherit",
+    background: "#FFFFFF",
+  },
+  groupChip: {
+    background: "#FFFFFF",
+    border: "1px solid #D9D4C7",
+    color: "#6B6B6B",
+    padding: "3px 9px",
+    borderRadius: 14,
+    fontSize: 11,
+    fontWeight: 600,
+    cursor: "pointer",
+  },
+  groupChipActive: {
+    background: "#111111",
+    borderColor: "#111111",
+    color: "#FFFFFF",
+  },
+  editInput: {
+    flex: 1,
+    padding: "6px 8px",
+    borderRadius: 6,
+    border: "1px solid #111111",
+    fontSize: 14,
+    fontFamily: "inherit",
+  },
+  iconBtn: {
+    background: "#F7F7F5",
+    border: "1px solid #E3E3E3",
+    borderRadius: 6,
+    padding: 6,
+    cursor: "pointer",
+    color: "#1A1A1A",
+  },
+  modalOverlay: {
+    position: "fixed",
+    inset: 0,
+    background: "rgba(17,17,17,0.55)",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 20,
+    zIndex: 10,
+  },
+  modalCard: {
+    background: "#FFFFFF",
+    borderRadius: 12,
+    padding: 20,
+    maxWidth: 340,
+    width: "100%",
+  },
+  modalTitle: {
+    fontFamily: "'Oswald', sans-serif",
+    fontSize: 18,
+    fontWeight: 700,
+    marginBottom: 8,
+  },
+  modalBody: {
+    fontSize: 14,
+    color: "#6B6B6B",
+    marginBottom: 18,
+  },
+  modalActions: {
+    display: "flex",
+    justifyContent: "flex-end",
+    gap: 8,
+  },
+};
