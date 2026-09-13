@@ -4763,42 +4763,16 @@ function PrintableReport({ player, teamName, config, goals, colA, colB }) {
       </div>
 
       <div style={pstyles.footerRow}>
-        <table style={pstyles.legendTable}>
-          <thead>
-            <tr>
-              <th colSpan={3} style={pstyles.legendHead}>
-                Scoreinddeling — ud af 10 aktioner
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td style={pstyles.legendTd}>Fremragende</td>
-              <td style={pstyles.legendTd}>5</td>
-              <td style={pstyles.legendTd}>9/10 vellykkede aktioner</td>
-            </tr>
-            <tr>
-              <td style={pstyles.legendTd}>Over middel</td>
-              <td style={pstyles.legendTd}>4</td>
-              <td style={pstyles.legendTd}>7/8 vellykkede aktioner</td>
-            </tr>
-            <tr>
-              <td style={pstyles.legendTd}>Middel</td>
-              <td style={pstyles.legendTd}>3</td>
-              <td style={pstyles.legendTd}>5/6 vellykkede aktioner</td>
-            </tr>
-            <tr>
-              <td style={pstyles.legendTd}>Kunne være bedre</td>
-              <td style={pstyles.legendTd}>2</td>
-              <td style={pstyles.legendTd}>3/4 vellykkede aktioner</td>
-            </tr>
-            <tr>
-              <td style={pstyles.legendTd}>Udviklingsområde</td>
-              <td style={pstyles.legendTd}>1</td>
-              <td style={pstyles.legendTd}>1/2 vellykkede aktioner</td>
-            </tr>
-          </tbody>
-        </table>
+        {GOAL_HORIZON_FIELDS.some((f) => player[f.key]) && (
+          <div style={pstyles.horizonRow}>
+            {GOAL_HORIZON_FIELDS.filter((f) => player[f.key]).map((f) => (
+              <div key={f.key} style={pstyles.horizonCell}>
+                <div style={pstyles.horizonLabel}>{f.label}</div>
+                <div>{player[f.key]}</div>
+              </div>
+            ))}
+          </div>
+        )}
 
         {Object.keys(goals).length > 0 && (
           <div style={pstyles.goalsBox}>
@@ -4825,17 +4799,6 @@ function PrintableReport({ player, teamName, config, goals, colA, colB }) {
                 </div>
               );
             })}
-          </div>
-        )}
-
-        {GOAL_HORIZON_FIELDS.some((f) => player[f.key]) && (
-          <div style={pstyles.horizonRow}>
-            {GOAL_HORIZON_FIELDS.filter((f) => player[f.key]).map((f) => (
-              <div key={f.key} style={pstyles.horizonCell}>
-                <div style={pstyles.horizonLabel}>{f.label}</div>
-                <div>{player[f.key]}</div>
-              </div>
-            ))}
           </div>
         )}
       </div>
@@ -4938,25 +4901,6 @@ const pstyles = {
     gridTemplateColumns: "1fr 1fr",
     gap: 10,
     alignItems: "start",
-  },
-  legendTable: {
-    width: "100%",
-    borderCollapse: "collapse",
-    border: "1px solid #111111",
-    fontSize: "7.5pt",
-  },
-  legendHead: {
-    border: "1px solid #111111",
-    background: "#111111",
-    color: "#FFFFFF",
-    padding: "3px 5px",
-    textAlign: "left",
-    WebkitPrintColorAdjust: "exact",
-    printColorAdjust: "exact",
-  },
-  legendTd: {
-    border: "1px solid #B0B0B0",
-    padding: "2px 5px",
   },
   goalsBox: {
     border: "1px solid #111111",
