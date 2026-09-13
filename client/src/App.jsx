@@ -4762,17 +4762,6 @@ function PrintableReport({ player, teamName, config, goals, colA, colB }) {
         })}
       </div>
 
-      {GOAL_HORIZON_FIELDS.some((f) => player[f.key]) && (
-        <div style={pstyles.horizonRow}>
-          {GOAL_HORIZON_FIELDS.filter((f) => player[f.key]).map((f) => (
-            <div key={f.key} style={pstyles.horizonCell}>
-              <div style={pstyles.horizonLabel}>{f.label}</div>
-              <div>{player[f.key]}</div>
-            </div>
-          ))}
-        </div>
-      )}
-
       <div style={pstyles.footerRow}>
         <table style={pstyles.legendTable}>
           <thead>
@@ -4838,6 +4827,17 @@ function PrintableReport({ player, teamName, config, goals, colA, colB }) {
             })}
           </div>
         )}
+
+        {GOAL_HORIZON_FIELDS.some((f) => player[f.key]) && (
+          <div style={pstyles.horizonRow}>
+            {GOAL_HORIZON_FIELDS.filter((f) => player[f.key]).map((f) => (
+              <div key={f.key} style={pstyles.horizonCell}>
+                <div style={pstyles.horizonLabel}>{f.label}</div>
+                <div>{player[f.key]}</div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -4863,8 +4863,13 @@ const pstyles = {
   subtitle: { fontSize: "8.5pt", color: "#4A4A4A" },
   horizonRow: {
     display: "flex",
-    gap: 8,
-    marginBottom: 8,
+    flexDirection: "column",
+    gap: 6,
+    // Pinned to the legend's column (rather than relying on it landing
+    // there via document order) so it stacks under Scoreinddeling even for
+    // a player with no goals set, where footerRow's second grid item
+    // (Udviklingsmål) doesn't render at all.
+    gridColumn: "1",
   },
   horizonCell: {
     flex: 1,
