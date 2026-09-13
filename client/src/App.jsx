@@ -47,6 +47,8 @@ import {
   TrendingUp,
   Menu,
   ChevronDown,
+  List,
+  ListOrdered,
 } from "lucide-react";
 import * as api from "./api.js";
 
@@ -1226,52 +1228,10 @@ function PlayerSelfEvalApp({ player, config, periods, coachEvaluations, goals, d
                 <Printer size={12} /> Print
               </button>
             </div>
-            {developmentPlan.intro && (
-              <p style={{ margin: "0 0 10px", fontSize: 14, whiteSpace: "pre-wrap" }}>
-                {developmentPlan.intro}
-              </p>
-            )}
-            {developmentPlan.matchPath.length > 0 && (
-              <div style={{ marginBottom: 10 }}>
-                <div style={styles.fieldLabel}>Kampsti</div>
-                <ul style={{ margin: "4px 0 0", paddingLeft: 18, fontSize: 14 }}>
-                  {developmentPlan.matchPath.map((l, i) => (
-                    <li key={i}>{l}</li>
-                  ))}
-                </ul>
-              </div>
-            )}
-            {developmentPlan.selfTraining && (
-              <div style={{ marginBottom: 10 }}>
-                <div style={styles.fieldLabel}>Egentræning</div>
-                <p style={{ margin: 0, fontSize: 14, whiteSpace: "pre-wrap" }}>
-                  {developmentPlan.selfTraining}
-                </p>
-              </div>
-            )}
-            {(developmentPlan.statsIntro || developmentPlan.statsItems.length > 0) && (
-              <div style={{ marginBottom: 10 }}>
-                <div style={styles.fieldLabel}>Statistik vi følger</div>
-                {developmentPlan.statsIntro && (
-                  <p style={{ margin: "0 0 4px", fontSize: 14 }}>{developmentPlan.statsIntro}</p>
-                )}
-                <ul style={{ margin: 0, paddingLeft: 18, fontSize: 14 }}>
-                  {developmentPlan.statsItems.map((l, i) => (
-                    <li key={i}>{l}</li>
-                  ))}
-                </ul>
-              </div>
-            )}
-            {developmentPlan.followups.length > 0 && (
-              <div>
-                <div style={styles.fieldLabel}>Opfølgning</div>
-                <ul style={{ margin: "4px 0 0", paddingLeft: 18, fontSize: 14 }}>
-                  {developmentPlan.followups.map((l, i) => (
-                    <li key={i}>{l}</li>
-                  ))}
-                </ul>
-              </div>
-            )}
+            <div
+              className="rp-content"
+              dangerouslySetInnerHTML={{ __html: developmentPlan.contentHtml }}
+            />
           </div>
         )}
 
@@ -1693,102 +1653,97 @@ function LongTermGoalsCard({ player, onSave }) {
   );
 }
 
-const EMPTY_DEVELOPMENT_PLAN = {
-  seasonLabel: "",
-  intro: "",
-  matchPath: [],
-  selfTraining: "",
-  statsIntro: "",
-  statsItems: [],
-  followups: [],
-};
+const EMPTY_DEVELOPMENT_PLAN = { seasonLabel: "", contentHtml: "" };
 
-// True once there's anything worth printing — used to hide the plan section
-// from both print flows (and the standalone print button) for a player
+// True once there's any actual text — used to hide the plan section from
+// both print flows (and the standalone print/read views) for a player
 // nobody has written a plan for yet, rather than printing an empty shell.
+// A contentEditable div with no real content can still hold markup like
+// "<p><br></p>", so this strips tags rather than just checking for "".
 function hasDevelopmentPlanContent(plan) {
   if (!plan) return false;
-  return Boolean(
-    (plan.intro || "").trim() ||
-      (plan.matchPath || []).some((l) => l.trim()) ||
-      (plan.selfTraining || "").trim() ||
-      (plan.statsIntro || "").trim() ||
-      (plan.statsItems || []).some((l) => l.trim()) ||
-      (plan.followups || []).some((l) => l.trim())
-  );
+  return Boolean((plan.contentHtml || "").replace(/<[^>]*>/g, "").trim());
 }
 
-// Editor for a list of free-text lines (kampsti phases, stats bullets,
-// opfølgning entries) — same "one line per row, add/remove" shape for all
-// three, so there's one component instead of three near-identical ones.
-function LineListEditor({ lines, onChange, placeholder, addLabel }) {
-  const update = (i, value) => {
-    const next = [...lines];
-    next[i] = value;
-    onChange(next);
+// Minimal rich-text box: a contentEditable div plus a small formatting
+// toolbar. Built rather than pulled in as a library because the actual
+// need is narrow — the coach pastes a plan drafted elsewhere (Word, Docs)
+// and its formatting should survive, not a full authoring tool — and the
+// browser already does the hard part of turning a paste into bold/lists/
+// headings markup. execCommand is deprecated but has no replacement for
+// this yet and every major browser still ships it; contentEditable is
+// left uncontrolled (not resynced from the `value` prop after mount) since
+// React re-rendering the DOM under an active selection would jump the
+// cursor around the whole point of typing here.
+function RichTextEditor({ value, onChange }) {
+  const ref = React.useRef(null);
+
+  useEffect(() => {
+    if (ref.current && ref.current.innerHTML !== value) {
+      ref.current.innerHTML = value || "";
+    }
+    // Intentionally only runs once on mount — see note above.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const exec = (command) => {
+    ref.current?.focus();
+    document.execCommand(command);
+    onChange(ref.current?.innerHTML || "");
   };
-  const remove = (i) => onChange(lines.filter((_, idx) => idx !== i));
 
   return (
     <div>
-      {lines.map((line, i) => (
-        <div key={i} style={{ display: "flex", gap: 6, marginBottom: 6, alignItems: "flex-start" }}>
-          <textarea
-            style={{ ...styles.textarea, minHeight: 36, flex: 1 }}
-            value={line}
-            placeholder={placeholder}
-            onChange={(e) => update(i, e.target.value)}
-          />
-          <button style={styles.ghostBtn} onClick={() => remove(i)} title="Fjern linje">
-            <X size={14} />
-          </button>
-        </div>
-      ))}
-      <button style={styles.linkBtn} onClick={() => onChange([...lines, ""])}>
-        <Plus size={12} /> {addLabel}
-      </button>
+      <div style={styles.rtToolbar}>
+        <button type="button" style={styles.rtBtn} onMouseDown={(e) => e.preventDefault()} onClick={() => exec("bold")} title="Fed">
+          <b>F</b>
+        </button>
+        <button type="button" style={styles.rtBtn} onMouseDown={(e) => e.preventDefault()} onClick={() => exec("italic")} title="Kursiv">
+          <i>K</i>
+        </button>
+        <button type="button" style={styles.rtBtn} onMouseDown={(e) => e.preventDefault()} onClick={() => exec("insertUnorderedList")} title="Punktopstilling">
+          <List size={14} />
+        </button>
+        <button type="button" style={styles.rtBtn} onMouseDown={(e) => e.preventDefault()} onClick={() => exec("insertOrderedList")} title="Nummereret liste">
+          <ListOrdered size={14} />
+        </button>
+        <button type="button" style={styles.rtBtn} onMouseDown={(e) => e.preventDefault()} onClick={() => exec("removeFormat")} title="Ryd formatering">
+          Ryd
+        </button>
+      </div>
+      <div
+        ref={ref}
+        contentEditable
+        suppressContentEditableWarning
+        className="rp-content"
+        style={styles.rtEditable}
+        onInput={(e) => onChange(e.currentTarget.innerHTML)}
+      />
     </div>
   );
 }
 
-// The one running udviklingsplan for a player — narrative intro, kampsti
-// (match path across leagues/levels), egentræning, tracked stats and the
-// follow-up cadence. Per-skill targets stay in the existing goals table and
-// are pulled in separately when this prints; this card only owns the prose
-// around them. See hasDevelopmentPlanContent for why print/read views can
-// safely no-op when nothing has been written yet.
+// The one running udviklingsplan for a player — a single rich-text document
+// the coach drafts (or pastes in) covering intro, kampsti, egentræning,
+// tracked stats and opfølgning in whatever structure they choose. Per-skill
+// targets stay in the existing goals table and are pulled in separately
+// when this prints, not duplicated here. See hasDevelopmentPlanContent for
+// why print/read views can safely no-op when nothing has been written yet.
 function DevelopmentPlanCard({ player, plan, onSave }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(EMPTY_DEVELOPMENT_PLAN);
   const current = plan || EMPTY_DEVELOPMENT_PLAN;
+  const hasContent = hasDevelopmentPlanContent(current);
 
   const startEdit = () => {
-    setDraft({
-      seasonLabel: current.seasonLabel || "",
-      intro: current.intro || "",
-      matchPath: current.matchPath && current.matchPath.length ? current.matchPath : [""],
-      selfTraining: current.selfTraining || "",
-      statsIntro: current.statsIntro || "",
-      statsItems: current.statsItems && current.statsItems.length ? current.statsItems : [""],
-      followups: current.followups && current.followups.length ? current.followups : [""],
-    });
+    setDraft({ seasonLabel: current.seasonLabel || "", contentHtml: current.contentHtml || "" });
     setEditing(true);
   };
 
   const save = () => {
-    onSave({
-      seasonLabel: draft.seasonLabel.trim(),
-      intro: draft.intro.trim(),
-      matchPath: draft.matchPath.map((l) => l.trim()).filter(Boolean),
-      selfTraining: draft.selfTraining.trim(),
-      statsIntro: draft.statsIntro.trim(),
-      statsItems: draft.statsItems.map((l) => l.trim()).filter(Boolean),
-      followups: draft.followups.map((l) => l.trim()).filter(Boolean),
-    });
+    onSave({ seasonLabel: draft.seasonLabel.trim(), contentHtml: draft.contentHtml });
     setEditing(false);
   };
-
-  const hasContent = hasDevelopmentPlanContent(current);
 
   return (
     <div style={styles.categoryBlock}>
@@ -1799,10 +1754,7 @@ function DevelopmentPlanCard({ player, plan, onSave }) {
         </div>
         <div style={{ display: "flex", gap: 8 }}>
           {!editing && hasContent && (
-            <button
-              style={styles.linkBtn}
-              onClick={() => printDevelopmentPlan(player, current)}
-            >
+            <button style={styles.linkBtn} onClick={() => printDevelopmentPlan(player, current)}>
               <Printer size={12} /> Print udviklingsplan
             </button>
           )}
@@ -1823,48 +1775,7 @@ function DevelopmentPlanCard({ player, plan, onSave }) {
           {current.seasonLabel && (
             <div style={{ fontWeight: 700, marginBottom: 6 }}>{current.seasonLabel}</div>
           )}
-          {current.intro && (
-            <p style={{ margin: "0 0 10px", fontSize: 14, whiteSpace: "pre-wrap" }}>{current.intro}</p>
-          )}
-          {current.matchPath.length > 0 && (
-            <div style={{ marginBottom: 10 }}>
-              <div style={styles.fieldLabel}>Kampsti</div>
-              <ul style={{ margin: "4px 0 0", paddingLeft: 18, fontSize: 14 }}>
-                {current.matchPath.map((l, i) => (
-                  <li key={i}>{l}</li>
-                ))}
-              </ul>
-            </div>
-          )}
-          {current.selfTraining && (
-            <div style={{ marginBottom: 10 }}>
-              <div style={styles.fieldLabel}>Egentræning</div>
-              <p style={{ margin: 0, fontSize: 14, whiteSpace: "pre-wrap" }}>{current.selfTraining}</p>
-            </div>
-          )}
-          {(current.statsIntro || current.statsItems.length > 0) && (
-            <div style={{ marginBottom: 10 }}>
-              <div style={styles.fieldLabel}>Statistik vi følger</div>
-              {current.statsIntro && (
-                <p style={{ margin: "0 0 4px", fontSize: 14 }}>{current.statsIntro}</p>
-              )}
-              <ul style={{ margin: 0, paddingLeft: 18, fontSize: 14 }}>
-                {current.statsItems.map((l, i) => (
-                  <li key={i}>{l}</li>
-                ))}
-              </ul>
-            </div>
-          )}
-          {current.followups.length > 0 && (
-            <div>
-              <div style={styles.fieldLabel}>Opfølgning</div>
-              <ul style={{ margin: "4px 0 0", paddingLeft: 18, fontSize: 14 }}>
-                {current.followups.map((l, i) => (
-                  <li key={i}>{l}</li>
-                ))}
-              </ul>
-            </div>
-          )}
+          <div className="rp-content" dangerouslySetInnerHTML={{ __html: current.contentHtml }} />
         </div>
       )}
 
@@ -1880,55 +1791,10 @@ function DevelopmentPlanCard({ player, plan, onSave }) {
             />
           </div>
           <div style={{ marginBottom: 10 }}>
-            <div style={styles.fieldLabel}>Intro til spilleren</div>
-            <textarea
-              style={{ ...styles.textarea, minHeight: 100 }}
-              value={draft.intro}
-              placeholder="Hej [navn] – her er din udviklingsplan for..."
-              onChange={(e) => setDraft({ ...draft, intro: e.target.value })}
-            />
-          </div>
-          <div style={{ marginBottom: 10 }}>
-            <div style={styles.fieldLabel}>Kampsti (måned for måned)</div>
-            <LineListEditor
-              lines={draft.matchPath}
-              onChange={(matchPath) => setDraft({ ...draft, matchPath })}
-              placeholder="fx September–november 2026: Liga 2 – afprøvning af fokusområder"
-              addLabel="Tilføj fase"
-            />
-          </div>
-          <div style={{ marginBottom: 10 }}>
-            <div style={styles.fieldLabel}>Egentræning</div>
-            <textarea
-              style={{ ...styles.textarea, minHeight: 48 }}
-              value={draft.selfTraining}
-              placeholder="fx 5-10 minutter dagligt, indhold aftales løbende"
-              onChange={(e) => setDraft({ ...draft, selfTraining: e.target.value })}
-            />
-          </div>
-          <div style={{ marginBottom: 10 }}>
-            <div style={styles.fieldLabel}>Statistik vi følger — introsætning</div>
-            <textarea
-              style={{ ...styles.textarea, minHeight: 40 }}
-              value={draft.statsIntro}
-              onChange={(e) => setDraft({ ...draft, statsIntro: e.target.value })}
-            />
-            <div style={{ marginTop: 8 }}>
-              <LineListEditor
-                lines={draft.statsItems}
-                onChange={(statsItems) => setDraft({ ...draft, statsItems })}
-                placeholder="fx Spilletid: 4 kampe, 328 minutter"
-                addLabel="Tilføj statistik-linje"
-              />
-            </div>
-          </div>
-          <div style={{ marginBottom: 10 }}>
-            <div style={styles.fieldLabel}>Opfølgning</div>
-            <LineListEditor
-              lines={draft.followups}
-              onChange={(followups) => setDraft({ ...draft, followups })}
-              placeholder="fx Hver 3. uge: Udviklingsgruppemøde"
-              addLabel="Tilføj opfølgningspunkt"
+            <div style={styles.fieldLabel}>Plan — indsæt eller skriv frit</div>
+            <RichTextEditor
+              value={draft.contentHtml}
+              onChange={(contentHtml) => setDraft((d) => ({ ...d, contentHtml }))}
             />
           </div>
           <div style={{ display: "flex", gap: 8 }}>
@@ -4366,6 +4232,23 @@ function PrintStyles() {
       @media screen {
         .print-report { display: none; }
       }
+      .rp-content { font-size: 14px; line-height: 1.55; }
+      .rp-content h1, .rp-content h2, .rp-content h3, .rp-content h4 { margin: 14px 0 6px; }
+      .rp-content h1 { font-size: 18px; }
+      .rp-content h2 { font-size: 16px; }
+      .rp-content h3, .rp-content h4 { font-size: 14px; }
+      .rp-content p { margin: 0 0 8px; }
+      .rp-content ul, .rp-content ol { margin: 0 0 8px; padding-left: 20px; }
+      .rp-content blockquote {
+        margin: 0 0 8px; padding-left: 12px; border-left: 3px solid #D9D4C7; color: #6B6B6B;
+      }
+      @media print {
+        .rp-content h1, .rp-content h2, .rp-content h3, .rp-content h4 { margin: 8px 0 4px; }
+        .rp-content h1 { font-size: 10.5pt; }
+        .rp-content h2 { font-size: 9.5pt; }
+        .rp-content h3, .rp-content h4 { font-size: 8.5pt; }
+        .rp-content p, .rp-content ul, .rp-content ol { margin: 0 0 5px; }
+      }
     `}</style>
   );
 }
@@ -4788,55 +4671,11 @@ function DevelopmentPlanPrintSection({ player, plan }) {
         </div>
       </div>
 
-      {plan.intro && (
-        <div style={{ fontSize: "9pt", lineHeight: 1.5, marginBottom: 10, whiteSpace: "pre-wrap" }}>
-          {plan.intro}
-        </div>
-      )}
-
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-        {plan.matchPath.length > 0 && (
-          <div>
-            <div style={pstyles.goalsTitle}>Kampsti</div>
-            <ul style={{ margin: 0, paddingLeft: 16, fontSize: "8.5pt", lineHeight: 1.5 }}>
-              {plan.matchPath.map((l, i) => (
-                <li key={i}>{l}</li>
-              ))}
-            </ul>
-          </div>
-        )}
-        {plan.followups.length > 0 && (
-          <div>
-            <div style={pstyles.goalsTitle}>Opfølgning</div>
-            <ul style={{ margin: 0, paddingLeft: 16, fontSize: "8.5pt", lineHeight: 1.5 }}>
-              {plan.followups.map((l, i) => (
-                <li key={i}>{l}</li>
-              ))}
-            </ul>
-          </div>
-        )}
-        {plan.selfTraining && (
-          <div>
-            <div style={pstyles.goalsTitle}>Egentræning</div>
-            <p style={{ margin: 0, fontSize: "8.5pt", lineHeight: 1.5, whiteSpace: "pre-wrap" }}>
-              {plan.selfTraining}
-            </p>
-          </div>
-        )}
-        {(plan.statsIntro || plan.statsItems.length > 0) && (
-          <div>
-            <div style={pstyles.goalsTitle}>Statistik vi følger</div>
-            {plan.statsIntro && (
-              <p style={{ margin: "0 0 4px", fontSize: "8.5pt", lineHeight: 1.5 }}>{plan.statsIntro}</p>
-            )}
-            <ul style={{ margin: 0, paddingLeft: 16, fontSize: "8.5pt", lineHeight: 1.5 }}>
-              {plan.statsItems.map((l, i) => (
-                <li key={i}>{l}</li>
-              ))}
-            </ul>
-          </div>
-        )}
-      </div>
+      <div
+        className="rp-content"
+        style={{ fontSize: "8.5pt", lineHeight: 1.5 }}
+        dangerouslySetInnerHTML={{ __html: plan.contentHtml }}
+      />
     </div>
   );
 }
@@ -4846,18 +4685,15 @@ function DevelopmentPlanPrintSection({ player, plan }) {
 // kampplaner. Kept separate from DevelopmentPlanPrintSection (the samlede
 // rapport variant) because that one shares pstyles' A4-landscape sizing with
 // PrintableReport, while this one is a normal A4-portrait letter.
+// plan.contentHtml is already sanitized server-side before it's stored (see
+// routes/developmentPlans.js), so it's safe to drop straight into the
+// popup document here.
 function printDevelopmentPlan(player, plan) {
   const printWindow = window.open("", "_blank");
   if (!printWindow) return false;
 
   const name = kpEscapeHtml(player.name || "");
   const season = kpEscapeHtml(plan.seasonLabel || "");
-  const introHtml = (plan.intro || "")
-    .split("\n")
-    .map((line) => (line.trim() ? `<p>${kpEscapeHtml(line)}</p>` : ""))
-    .join("");
-  const listHtml = (items) =>
-    items && items.length ? `<ul>${items.map((l) => `<li>${kpEscapeHtml(l)}</li>`).join("")}</ul>` : "";
 
   const doc = `<!DOCTYPE html>
 <html lang="da">
@@ -4872,9 +4708,12 @@ function printDevelopmentPlan(player, plan) {
   .dp-head img { width: 40px; height: 40px; object-fit: contain; }
   .dp-title { font-size: 20px; font-weight: 700; }
   .dp-sub { font-size: 13px; color: #4A4A4A; margin-top: 2px; }
-  h2 { font-size: 14px; margin: 20px 0 6px; border-bottom: 1px solid #B0B0B0; padding-bottom: 4px; }
-  p { font-size: 13px; line-height: 1.5; margin: 0 0 8px; }
-  ul { font-size: 13px; line-height: 1.5; margin: 0 0 8px; padding-left: 20px; }
+  .dp-body { font-size: 13px; line-height: 1.55; }
+  .dp-body h1, .dp-body h2, .dp-body h3, .dp-body h4 { margin: 18px 0 6px; }
+  .dp-body h1 { font-size: 17px; } .dp-body h2 { font-size: 15px; } .dp-body h3, .dp-body h4 { font-size: 13.5px; }
+  .dp-body p { margin: 0 0 8px; }
+  .dp-body ul, .dp-body ol { margin: 0 0 8px; padding-left: 20px; }
+  .dp-body blockquote { margin: 0 0 8px; padding-left: 12px; border-left: 3px solid #D9D4C7; color: #4A4A4A; }
   .print-bar { display: flex; justify-content: flex-end; margin-bottom: 14px; }
   .print-bar button {
     font-weight: 600; font-size: 13px; padding: 8px 16px; border-radius: 6px;
@@ -4892,17 +4731,7 @@ function printDevelopmentPlan(player, plan) {
       ${season ? `<div class="dp-sub">${season}</div>` : ""}
     </div>
   </div>
-  ${introHtml}
-  ${plan.matchPath && plan.matchPath.length ? `<h2>Kampsti</h2>${listHtml(plan.matchPath)}` : ""}
-  ${plan.selfTraining ? `<h2>Egentræning</h2><p>${kpEscapeHtml(plan.selfTraining)}</p>` : ""}
-  ${
-    plan.statsIntro || (plan.statsItems && plan.statsItems.length)
-      ? `<h2>Statistik vi følger</h2>${plan.statsIntro ? `<p>${kpEscapeHtml(plan.statsIntro)}</p>` : ""}${listHtml(
-          plan.statsItems
-        )}`
-      : ""
-  }
-  ${plan.followups && plan.followups.length ? `<h2>Opfølgning</h2>${listHtml(plan.followups)}` : ""}
+  <div class="dp-body">${plan.contentHtml || ""}</div>
 </body>
 </html>`;
 
@@ -6903,6 +6732,36 @@ const styles = {
     fontFamily: "inherit",
     resize: "vertical",
     minHeight: 64,
+    boxSizing: "border-box",
+  },
+  rtToolbar: {
+    display: "flex",
+    gap: 4,
+    padding: 6,
+    border: "1px solid #D9D4C7",
+    borderBottom: "none",
+    borderRadius: "8px 8px 0 0",
+    background: "#F6F3EC",
+  },
+  rtBtn: {
+    minWidth: 28,
+    height: 28,
+    padding: "0 8px",
+    borderRadius: 6,
+    border: "1px solid transparent",
+    background: "transparent",
+    color: "#1A1A1A",
+    fontSize: 13,
+    cursor: "pointer",
+  },
+  rtEditable: {
+    width: "100%",
+    minHeight: 220,
+    maxHeight: 480,
+    overflowY: "auto",
+    padding: "10px 12px",
+    borderRadius: "0 0 8px 8px",
+    border: "1px solid #D9D4C7",
     boxSizing: "border-box",
   },
   select: {

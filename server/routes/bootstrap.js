@@ -104,12 +104,7 @@ router.get("/", async (req, res, next) => {
       developmentPlansOut[row.player_id] = {
         playerId: row.player_id,
         seasonLabel: row.season_label || "",
-        intro: row.intro || "",
-        matchPath: row.match_path || [],
-        selfTraining: row.self_training || "",
-        statsIntro: row.stats_intro || "",
-        statsItems: row.stats_items || [],
-        followups: row.followups || [],
+        contentHtml: row.content_html || "",
         updatedAt: row.updated_at,
       };
     });

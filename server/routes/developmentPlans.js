@@ -1,19 +1,38 @@
 const express = require("express");
+const sanitizeHtml = require("sanitize-html");
 const pool = require("../db");
 
 const router = express.Router();
+
+// The coach pastes the whole plan in from wherever it was drafted (Word,
+// Google Docs, plain notes), so this has to accept real formatting — but
+// it's rendered with dangerouslySetInnerHTML on both the coach and
+// player-facing views, so whatever comes in is sanitized down to a small
+// allow-list before it's ever stored. In particular: no inline styles or
+// classes (so pasted-in fonts/colors don't fight the app's own print and
+// screen styling) and no images (a single Word-pasted image can be several
+// MB of base64 — well outside what this table is meant to hold).
+const SANITIZE_OPTIONS = {
+  allowedTags: [
+    "p", "br", "strong", "b", "em", "i", "u", "s",
+    "ul", "ol", "li",
+    "h1", "h2", "h3", "h4",
+    "blockquote", "a",
+  ],
+  allowedAttributes: { a: ["href"] },
+  allowedSchemes: ["http", "https", "mailto"],
+};
+
+function sanitizePlanHtml(html) {
+  return sanitizeHtml(html || "", SANITIZE_OPTIONS).trim();
+}
 
 function toOut(row) {
   if (!row) return null;
   return {
     playerId: row.player_id,
     seasonLabel: row.season_label || "",
-    intro: row.intro || "",
-    matchPath: row.match_path || [],
-    selfTraining: row.self_training || "",
-    statsIntro: row.stats_intro || "",
-    statsItems: row.stats_items || [],
-    followups: row.followups || [],
+    contentHtml: row.content_html || "",
     updatedAt: row.updated_at,
   };
 }
@@ -30,36 +49,19 @@ router.get("/:playerId", async (req, res, next) => {
   }
 });
 
-// One plan per player — always an upsert, no separate create/update split
-// (mirrors match_performance's on-conflict pattern rather than goals'
-// PUT-per-field pattern, since here the whole document is edited at once).
+// One plan per player — always an upsert, no separate create/update split.
 router.put("/:playerId", async (req, res, next) => {
   try {
     const b = req.body || {};
     const { rows } = await pool.query(
-      `insert into development_plans (
-         player_id, season_label, intro, match_path, self_training, stats_intro, stats_items, followups
-       ) values ($1, $2, $3, $4, $5, $6, $7, $8)
+      `insert into development_plans (player_id, season_label, content_html)
+       values ($1, $2, $3)
        on conflict (player_id) do update set
          season_label = excluded.season_label,
-         intro = excluded.intro,
-         match_path = excluded.match_path,
-         self_training = excluded.self_training,
-         stats_intro = excluded.stats_intro,
-         stats_items = excluded.stats_items,
-         followups = excluded.followups,
+         content_html = excluded.content_html,
          updated_at = now()
        returning *`,
-      [
-        req.params.playerId,
-        b.seasonLabel || "",
-        b.intro || "",
-        JSON.stringify(b.matchPath || []),
-        b.selfTraining || "",
-        b.statsIntro || "",
-        JSON.stringify(b.statsItems || []),
-        JSON.stringify(b.followups || []),
-      ]
+      [req.params.playerId, b.seasonLabel || "", sanitizePlanHtml(b.contentHtml)]
     );
     res.json(toOut(rows[0]));
   } catch (err) {

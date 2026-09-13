@@ -86,12 +86,7 @@ router.get("/:token", async (req, res, next) => {
       developmentPlan: developmentPlan.rows[0]
         ? {
             seasonLabel: developmentPlan.rows[0].season_label || "",
-            intro: developmentPlan.rows[0].intro || "",
-            matchPath: developmentPlan.rows[0].match_path || [],
-            selfTraining: developmentPlan.rows[0].self_training || "",
-            statsIntro: developmentPlan.rows[0].stats_intro || "",
-            statsItems: developmentPlan.rows[0].stats_items || [],
-            followups: developmentPlan.rows[0].followups || [],
+            contentHtml: developmentPlan.rows[0].content_html || "",
           }
         : null,
     });

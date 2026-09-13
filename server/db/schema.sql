@@ -269,24 +269,42 @@ begin
 end $$;
 
 -- One running development plan per player (not scoped to a period — it's
--- meant to be edited in place across a season, unlike goals). The narrative
--- text and match-path/follow-up lists are coach-authored prose, not data the
--- app needs to query into, so they're plain text / jsonb string arrays
--- rather than normalized rows — same reasoning as match_plans' jsonb lists.
--- The season's per-skill targets/notes live in the existing goals table and
--- are pulled in alongside this when the plan is printed, not duplicated here.
+-- meant to be edited in place across a season, unlike goals). The season's
+-- per-skill targets/notes live in the existing goals table and are pulled in
+-- alongside this when the plan is printed, not duplicated here.
 create table if not exists development_plans (
   player_id text primary key references players(id) on delete cascade,
   season_label text not null default '',
-  intro text not null default '',
-  match_path jsonb not null default '[]',
-  self_training text not null default '',
-  stats_intro text not null default '',
-  stats_items jsonb not null default '[]',
-  followups jsonb not null default '[]',
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+-- Originally five separate structured fields (intro / kampsti list /
+-- egentræning / stats / opfølgning list) filled in via five boxes. Replaced
+-- with one rich-text field: the coach drafts (or pastes from Word/Docs) the
+-- whole plan in one place and its formatting — bold, headings, bullet lists
+-- — is kept, rather than being flattened into plain text per box. Dropped
+-- without a data-preserving migration since this predates any real rollout
+-- (the one plan created under the old shape was hand-recreated as rich text
+-- afterwards). content_html is sanitized server-side before it's ever
+-- stored (see routes/developmentPlans.js) since it's rendered with
+-- dangerouslySetInnerHTML on both the coach and player-facing views.
+do $$
+begin
+  if exists (
+    select 1 from information_schema.columns
+    where table_name = 'development_plans' and column_name = 'intro'
+  ) then
+    alter table development_plans drop column intro;
+    alter table development_plans drop column match_path;
+    alter table development_plans drop column self_training;
+    alter table development_plans drop column stats_intro;
+    alter table development_plans drop column stats_items;
+    alter table development_plans drop column followups;
+  end if;
+end $$;
+
+alter table development_plans add column if not exists content_html text not null default '';
 
 create index if not exists idx_players_team_id on players(team_id);
 create index if not exists idx_evaluations_player_period on evaluations(player_id, period_id);
