@@ -16,6 +16,7 @@ router.get("/", async (req, res, next) => {
       participationLevels,
       evaluations,
       goals,
+      goalProgressLog,
       coaches,
       followups,
       developmentPlans,
@@ -36,6 +37,9 @@ router.get("/", async (req, res, next) => {
       pool.query("select player_id, period_id, skill_id, score from evaluations"),
       pool.query(
         "select player_id, period_id, skill_id, target, note, focus_areas, progress, to_char(created_date, 'YYYY-MM-DD') as created_date from goals"
+      ),
+      pool.query(
+        "select player_id, period_id, skill_id, progress, created_at from goal_progress_log order by created_at"
       ),
       pool.query("select id, name, email, team_id from coaches order by name"),
       pool.query(
@@ -78,7 +82,14 @@ router.get("/", async (req, res, next) => {
         focusAreas: row.focus_areas || "",
         progress: row.progress,
         createdDate: row.created_date,
+        progressLog: [],
       };
+    });
+    // Already ordered by created_at (see the query above) — every entry the
+    // player has ever submitted, oldest first, exactly as it should print.
+    goalProgressLog.rows.forEach((row) => {
+      const goal = goalsOut[row.player_id]?.[row.period_id]?.[row.skill_id];
+      if (goal) goal.progressLog.push({ progress: row.progress, createdAt: row.created_at });
     });
 
     const coachesOut = coaches.rows.map((c) => ({

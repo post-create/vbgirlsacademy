@@ -141,6 +141,13 @@ function formatDate(d) {
   return dt.toLocaleDateString("da-DK", { month: "short", day: "numeric", year: "numeric" });
 }
 
+// log is already ordered oldest-first by the server (see self.js/bootstrap.js) —
+// printed in that same order, per the coach's request, rather than only the
+// latest value.
+function formatProgressLog(log) {
+  return log.map((e) => `${e.progress}/10 (${formatDate(String(e.createdAt).slice(0, 10))})`).join(", ");
+}
+
 function findSkillMeta(config, skillId) {
   for (const cat of CATEGORY_META) {
     const skill = (config[cat.key] || []).find((s) => s.id === skillId);
@@ -4522,7 +4529,11 @@ function PrintableReport({ player, teamName, config, goals, colA, colB }) {
               return (
                 <div key={skillId} style={pstyles.goalLine}>
                   <strong>{meta.skill.name}</strong> — Mål: {goal.target}
-                  {typeof goal.progress === "number" ? ` — Fremskridt: ${goal.progress}/10` : ""}
+                  {goal.progressLog && goal.progressLog.length > 0
+                    ? ` — Selvevalueringer: ${formatProgressLog(goal.progressLog)}`
+                    : typeof goal.progress === "number"
+                    ? ` — Fremskridt: ${goal.progress}/10`
+                    : ""}
                   {goal.note ? ` — Målsætning: ${goal.note}` : ""}
                   {goal.focusAreas ? ` — Fokusområder: ${goal.focusAreas}` : ""}
                 </div>

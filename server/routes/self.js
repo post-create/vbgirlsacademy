@@ -1,4 +1,5 @@
 const express = require("express");
+const crypto = require("crypto");
 const pool = require("../db");
 const { buildConfig } = require("../config");
 
@@ -22,7 +23,7 @@ router.get("/:token", async (req, res, next) => {
     const player = await loadPlayerByToken(req.params.token);
     if (!player) return res.status(404).json({ error: "Invalid link" });
 
-    const [skills, skillGroups, skillGroupMembers, participationLevels, periods, evaluations, goals, developmentPlan] =
+    const [skills, skillGroups, skillGroupMembers, participationLevels, periods, evaluations, goals, progressLog, developmentPlan] =
       await Promise.all([
         pool.query("select id, category_key, name, enabled from skills order by category_key, sort_order"),
         pool.query("select id, name, sort_order from skill_groups order by sort_order"),
@@ -34,6 +35,10 @@ router.get("/:token", async (req, res, next) => {
         ]),
         pool.query(
           "select period_id, skill_id, target, note, focus_areas, progress, to_char(created_date, 'YYYY-MM-DD') as created_date from goals where player_id = $1",
+          [player.id]
+        ),
+        pool.query(
+          "select period_id, skill_id, progress, created_at from goal_progress_log where player_id = $1 order by created_at",
           [player.id]
         ),
         pool.query("select * from development_plans where player_id = $1", [player.id]),
@@ -54,7 +59,14 @@ router.get("/:token", async (req, res, next) => {
         focusAreas: row.focus_areas || "",
         progress: row.progress,
         createdDate: row.created_date,
+        progressLog: [],
       };
+    });
+    // Already ordered by created_at (see the query above) — every entry the
+    // player has ever submitted, oldest first, exactly as it should print.
+    progressLog.rows.forEach((row) => {
+      const goal = goalsOut[row.period_id]?.[row.skill_id];
+      if (goal) goal.progressLog.push({ progress: row.progress, createdAt: row.created_at });
     });
 
     const config = buildConfig(skills.rows, skillGroups.rows, skillGroupMembers.rows);
@@ -107,6 +119,26 @@ router.patch("/:token/periods/:periodId/goals/:skillId/progress", async (req, re
       [player.id, req.params.periodId, req.params.skillId, progress]
     );
     if (!rows[0]) return res.status(404).json({ error: "Goal not found" });
+
+    // Log every real submission (not a "clear", which sends null) so the
+    // full self-evaluation history survives even though goals.progress
+    // itself only ever holds the latest value.
+    let progressLog = [];
+    if (typeof progress === "number") {
+      await pool.query(
+        `insert into goal_progress_log (id, player_id, period_id, skill_id, progress)
+         values ($1, $2, $3, $4, $5)`,
+        [crypto.randomUUID(), player.id, req.params.periodId, req.params.skillId, progress]
+      );
+    }
+    const log = await pool.query(
+      `select progress, created_at from goal_progress_log
+       where player_id = $1 and period_id = $2 and skill_id = $3
+       order by created_at`,
+      [player.id, req.params.periodId, req.params.skillId]
+    );
+    progressLog = log.rows.map((r) => ({ progress: r.progress, createdAt: r.created_at }));
+
     const g = rows[0];
     res.json({
       target: g.target,
@@ -114,6 +146,7 @@ router.patch("/:token/periods/:periodId/goals/:skillId/progress", async (req, re
       focusAreas: g.focus_areas || "",
       progress: g.progress,
       createdDate: g.created_date,
+      progressLog,
     });
   } catch (err) {
     next(err);

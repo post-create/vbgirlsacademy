@@ -16,6 +16,7 @@
     "migrate": "node server/db/migrate.js"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.125.0",
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
     "nodemailer": "^9.0.4",

@@ -268,6 +268,27 @@ begin
   end if;
 end $$;
 
+-- Every self-evaluation a player has ever submitted for a goal, kept as an
+-- append-only log rather than overwriting goals.progress in place — the
+-- coach wants to see the whole history on the printed report, in the order
+-- it was submitted, not just the latest value. goals.progress is left as
+-- the "current" value (still read by the in-app progress tracker); this
+-- table is purely additive and only ever inserted into, from the player's
+-- own self-eval link (see routes/self.js) — a coach adjusting progress on
+-- the roster side does not log an entry here, since that isn't a
+-- self-evaluation.
+create table if not exists goal_progress_log (
+  id text primary key,
+  player_id text not null references players(id) on delete cascade,
+  period_id text not null references periods(id) on delete cascade,
+  skill_id text not null references skills(id) on delete cascade,
+  progress smallint not null check (progress between 0 and 10),
+  created_at timestamptz not null default now()
+);
+
+create index if not exists idx_goal_progress_log_lookup
+  on goal_progress_log(player_id, period_id, skill_id, created_at);
+
 -- One running development plan per player (not scoped to a period — it's
 -- meant to be edited in place across a season, unlike goals). The season's
 -- per-skill targets/notes live in the existing goals table and are pulled in
