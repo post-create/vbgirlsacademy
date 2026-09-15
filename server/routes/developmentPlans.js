@@ -191,7 +191,12 @@ router.post("/:playerId/generate", async (req, res, next) => {
 
     const message = await claude.getClient().messages.create({
       model: "claude-sonnet-5",
-      max_tokens: 2000,
+      // Sonnet 5 does extended thinking by default, and that eats into this
+      // budget before the visible answer even starts — 1900+ thinking
+      // tokens on a real player wasn't unusual in testing. 2000 total cut a
+      // real plan off mid-sentence; this leaves real headroom for thinking
+      // plus a full multi-section plan.
+      max_tokens: 8000,
       messages: [
         {
           role: "user",
