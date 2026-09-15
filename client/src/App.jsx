@@ -2081,12 +2081,18 @@ function DevelopmentPlanCard({ player, plan, onSave }) {
   const [draft, setDraft] = useState(EMPTY_DEVELOPMENT_PLAN);
   const [generating, setGenerating] = useState(false);
   const [genError, setGenError] = useState("");
+  // RichTextEditor only syncs its contentEditable DOM from `value` once, on
+  // mount (see its own comment — re-syncing on every prop change would fight
+  // the cursor while typing/pasting). A Claude draft arrives well after
+  // mount, so bumping this key forces a fresh mount to actually show it.
+  const [editorKey, setEditorKey] = useState(0);
   const current = plan || EMPTY_DEVELOPMENT_PLAN;
   const hasContent = hasDevelopmentPlanContent(current);
 
   const startEdit = () => {
     setDraft({ seasonLabel: current.seasonLabel || "", contentHtml: current.contentHtml || "" });
     setGenError("");
+    setEditorKey((k) => k + 1);
     setEditing(true);
   };
 
@@ -2107,6 +2113,7 @@ function DevelopmentPlanCard({ player, plan, onSave }) {
     try {
       const { contentHtml } = await api.generateDevelopmentPlan(player.id);
       setDraft((d) => ({ ...d, contentHtml }));
+      setEditorKey((k) => k + 1);
     } catch (e) {
       setGenError(e.message);
     } finally {
@@ -2176,6 +2183,7 @@ function DevelopmentPlanCard({ player, plan, onSave }) {
             </div>
             {genError && <div style={styles.errorBannerRow}>{genError}</div>}
             <RichTextEditor
+              key={editorKey}
               value={draft.contentHtml}
               onChange={(contentHtml) => setDraft((d) => ({ ...d, contentHtml }))}
             />
