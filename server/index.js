@@ -26,6 +26,7 @@ const notificationsRouter = require("./routes/notifications");
 const participationLevelsRouter = require("./routes/participationLevels");
 const matchPlansRouter = require("./routes/matchPlans");
 const developmentPlansRouter = require("./routes/developmentPlans");
+const settingsRouter = require("./routes/settings");
 
 if (!process.env.SESSION_SECRET) {
   throw new Error("SESSION_SECRET is not set. Copy .env.example to .env and fill it in.");
@@ -73,6 +74,7 @@ app.use("/api/notifications", requireAuth, notificationsRouter);
 app.use("/api/participation-levels", requireAuth, participationLevelsRouter);
 app.use("/api/match-plans", requireAuth, matchPlansRouter);
 app.use("/api/development-plans", requireAuth, developmentPlansRouter);
+app.use("/api/settings", requireAuth, settingsRouter);
 
 if (process.env.NODE_ENV === "production") {
   const clientDist = path.join(__dirname, "..", "client", "dist");

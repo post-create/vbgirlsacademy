@@ -4,7 +4,7 @@
     {
       "name": "vbgirlsacademy",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev"],
+      "runtimeArgs": ["--prefix", "C:\\Users\\post\\OneDrive\\Documents\\VB\\vbgirlsacademy\\client", "run", "dev"],
       "port": 5173
     }
   ]

@@ -338,6 +338,25 @@ end $$;
 
 alter table development_plans add column if not exists content_html text not null default '';
 
+-- Small generic key/value settings table. Currently holds exactly one row
+-- — the fixed prompt template behind "Generér med Claude" on the
+-- udviklingsplan card (see routes/developmentPlans.js and
+-- client DevelopmentPlanCard) — but kept general-purpose rather than a
+-- dedicated column somewhere, since any future one-off app-wide setting
+-- can reuse it instead of another migration.
+create table if not exists app_settings (
+  key text primary key,
+  value text not null default ''
+);
+
+-- Seeded once; a coach editing it from Indstillinger overwrites the row,
+-- and re-running this migration must never stomp that edit back to the
+-- default, hence "do nothing" on conflict.
+insert into app_settings (key, value) values (
+  'development_plan_prompt',
+  E'Du er assistenttræner for VB Pige Akademi og skal udkaste en udviklingsplan til en af klubbens spillere, baseret på hendes rigtige evaluerings- og måldata (vedhæftet nedenfor).\n\nSkriv direkte til spilleren (du-form), på dansk, i en varm men konkret trænertone — planen skal kunne læses af både spilleren selv og hendes forældre.\n\nBrug udelukkende de angivne data. Opfind aldrig konkrete tal, kampstatistik eller hændelser, der ikke fremgår nedenfor — hvis noget mangler (fx ingen mål sat endnu), så spring det afsnit over eller nævn det kort i stedet for at gætte.\n\nStrukturér planen med disse afsnit:\n1. En kort personlig indledning der hilser på spilleren og opsummerer, hvor hun står nu.\n2. Fokusområder — uddyb kort de mål, der allerede er sat; gengiv dem ikke som en ren liste, de vises i forvejen andetsteds i rapporten.\n3. Egentræning — et kort, generelt afsnit tilpasset spillerens niveau.\n4. Opfølgning — en kort opfordring til løbende dialog med træneren.\n\nSvar udelukkende med HTML og kun disse tags: <h3>, <p>, <ul>, <li>, <strong>, <em>. Ingen andre tags, ingen inline-styles, ingen billeder, ingen indledende forklaring uden for HTML''en.'
+) on conflict (key) do nothing;
+
 create index if not exists idx_players_team_id on players(team_id);
 create index if not exists idx_evaluations_player_period on evaluations(player_id, period_id);
 create index if not exists idx_goals_player on goals(player_id);

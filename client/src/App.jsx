@@ -50,6 +50,7 @@ import {
   List,
   ListOrdered,
   LogOut,
+  Sparkles,
 } from "lucide-react";
 import * as api from "./api.js";
 
@@ -57,7 +58,7 @@ const LOGO_SRC =
   "data:image/png;base64,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";
 
 // Grouped under one "Indstillinger" nav item to keep the main nav simple.
-const SETTINGS_VIEWS = ["teams", "coachProfiles", "periods", "settings", "levels"];
+const SETTINGS_VIEWS = ["teams", "coachProfiles", "periods", "settings", "levels", "aiPrompt"];
 
 const SETTINGS_TABS = [
   { key: "teams", label: "Hold", icon: Layers },
@@ -65,6 +66,7 @@ const SETTINGS_TABS = [
   { key: "periods", label: "Perioder", icon: CalendarRange },
   { key: "settings", label: "Kriterier", icon: SlidersHorizontal },
   { key: "levels", label: "Niveauer", icon: BarChart3 },
+  { key: "aiPrompt", label: "AI-udkast", icon: Sparkles },
 ];
 
 const CATEGORY_META = [
@@ -1335,6 +1337,8 @@ export default function AcademyApp() {
           />
         )}
 
+        {view === "aiPrompt" && <AiPromptView />}
+
         {view === "coaches" && (
           <CoachesOverviewView
             data={data}
@@ -2075,11 +2079,14 @@ function DevelopmentPlanCard({ player, plan, onSave }) {
   const [editing, setEditing] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const [draft, setDraft] = useState(EMPTY_DEVELOPMENT_PLAN);
+  const [generating, setGenerating] = useState(false);
+  const [genError, setGenError] = useState("");
   const current = plan || EMPTY_DEVELOPMENT_PLAN;
   const hasContent = hasDevelopmentPlanContent(current);
 
   const startEdit = () => {
     setDraft({ seasonLabel: current.seasonLabel || "", contentHtml: current.contentHtml || "" });
+    setGenError("");
     setEditing(true);
   };
 
@@ -2087,6 +2094,24 @@ function DevelopmentPlanCard({ player, plan, onSave }) {
     onSave({ seasonLabel: draft.seasonLabel.trim(), contentHtml: draft.contentHtml });
     setEditing(false);
     setExpanded(true);
+  };
+
+  // Drafts into the editor for review — never saved automatically, so a
+  // bad or unwanted draft costs nothing to discard (just don't hit Gem).
+  const generate = async () => {
+    if (hasDevelopmentPlanContent({ contentHtml: draft.contentHtml })) {
+      if (!window.confirm("Dette erstatter teksten i feltet med et Claude-udkast. Fortsæt?")) return;
+    }
+    setGenError("");
+    setGenerating(true);
+    try {
+      const { contentHtml } = await api.generateDevelopmentPlan(player.id);
+      setDraft((d) => ({ ...d, contentHtml }));
+    } catch (e) {
+      setGenError(e.message);
+    } finally {
+      setGenerating(false);
+    }
   };
 
   return (
@@ -2143,7 +2168,13 @@ function DevelopmentPlanCard({ player, plan, onSave }) {
             />
           </div>
           <div style={{ marginBottom: 10 }}>
-            <div style={styles.fieldLabel}>Plan — indsæt eller skriv frit</div>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <div style={styles.fieldLabel}>Plan — indsæt eller skriv frit</div>
+              <button style={styles.linkBtn} onClick={generate} disabled={generating}>
+                <Sparkles size={12} /> {generating ? "Genererer…" : "Generér med Claude"}
+              </button>
+            </div>
+            {genError && <div style={styles.errorBannerRow}>{genError}</div>}
             <RichTextEditor
               value={draft.contentHtml}
               onChange={(contentHtml) => setDraft((d) => ({ ...d, contentHtml }))}
@@ -2454,6 +2485,81 @@ function ParticipationLevelsView({ levels, onCreate, onUpdate, onDelete }) {
           </div>
         </div>
       ))}
+    </div>
+  );
+}
+
+// Self-contained (fetches/saves its own state) rather than threaded through
+// the top-level bootstrap payload — it's one string, read only by the
+// server-side "Generér med Claude" call, never needed anywhere else in the
+// client, so plumbing it through App-wide state would be pure overhead.
+function AiPromptView() {
+  const [prompt, setPrompt] = useState(null); // null while loading
+  const [draft, setDraft] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    api
+      .getSettings()
+      .then((s) => {
+        const value = s.development_plan_prompt || "";
+        setPrompt(value);
+        setDraft(value);
+      })
+      .catch((e) => setError(e.message));
+  }, []);
+
+  const save = async () => {
+    setSaving(true);
+    setError("");
+    setSaved(false);
+    try {
+      await api.updateSetting("development_plan_prompt", draft);
+      setPrompt(draft);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div>
+      <div style={styles.sectionHeadRow}>
+        <div>
+          <h1 style={styles.h1}>AI-udkast</h1>
+          <p style={styles.subtext}>
+            Den faste instruktion, som "Generér med Claude" (på udviklingsplan-kortet) sender
+            sammen med spillerens rigtige evalueringer og mål. Claude ser kun disse to ting —
+            aldrig andre spilleres data.
+          </p>
+        </div>
+      </div>
+
+      {error && <div style={styles.errorBannerRow}>{error}</div>}
+
+      {prompt === null && !error ? (
+        <p style={styles.subtext}>Indlæser…</p>
+      ) : (
+        <div style={styles.addCardCol}>
+          <textarea
+            style={{ ...styles.textarea, minHeight: 320, fontFamily: "inherit" }}
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+          />
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <button style={styles.primaryBtn} onClick={save} disabled={saving || draft === prompt}>
+              {saving ? "Gemmer…" : "Gem"}
+            </button>
+            {draft !== prompt && !saving && <span style={styles.subtext}>Ikke gemt endnu</span>}
+            {saved && <span style={{ ...styles.subtext, color: "#4D7B4D" }}>Gemt.</span>}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -202,6 +202,18 @@ export function deleteMatchPlan(id) {
   return request("DELETE", `/api/match-plans/${id}`);
 }
 
+export function generateDevelopmentPlan(playerId) {
+  return request("POST", `/api/development-plans/${playerId}/generate`);
+}
+
+export function getSettings() {
+  return request("GET", "/api/settings");
+}
+
+export function updateSetting(key, value) {
+  return request("PUT", `/api/settings/${key}`, { value });
+}
+
 export function setMatchPerformanceScore(planId, playerId, score) {
   return request("PUT", `/api/match-plans/${planId}/performance/${playerId}`, { score });
 }
