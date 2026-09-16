@@ -3931,6 +3931,21 @@ function PlayerView({
   onSaveDevelopmentPlan,
   backLabel,
 }) {
+  // The app's own header (ClubHeader) is already position:sticky/top:0, so
+  // the back button can't also stick at top:0 — it needs to sit right
+  // below the header's actual rendered height instead, which varies (the
+  // coach name/logout row wraps differently at different widths), hence
+  // measuring it rather than hardcoding a pixel value.
+  const [headerHeight, setHeaderHeight] = useState(0);
+  useEffect(() => {
+    const measure = () => {
+      const header = document.querySelector("header");
+      setHeaderHeight(header ? header.offsetHeight : 0);
+    };
+    measure();
+    window.addEventListener("resize", measure);
+    return () => window.removeEventListener("resize", measure);
+  }, []);
   const [editingPositions, setEditingPositions] = useState(false);
   const [editingTeam, setEditingTeam] = useState(false);
   const [editingLevel, setEditingLevel] = useState(false);
@@ -4017,7 +4032,7 @@ function PlayerView({
         .player-settings { display: none; }
         .player-settings.player-settings-open { display: block; }
       `}</style>
-      <button style={styles.backBtnSticky} onClick={onBack}>
+      <button style={{ ...styles.backBtnSticky, top: headerHeight }} onClick={onBack}>
         <ChevronLeft size={16} /> {backLabel || "Spillertrup"}
       </button>
 
@@ -7878,7 +7893,7 @@ const styles = {
     marginBottom: 4,
     position: "sticky",
     top: 0,
-    zIndex: 20,
+    zIndex: 4,
   },
   playerHeadRow: {
     display: "flex",
