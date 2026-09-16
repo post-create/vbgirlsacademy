@@ -3895,11 +3895,9 @@ function PlayerView({
   const [printPanelOpen, setPrintPanelOpen] = useState(false);
   const [printColBMode, setPrintColBMode] = useState("goal");
   const [printColBPeriodId, setPrintColBPeriodId] = useState(null);
-  // Each category (Teknik/Fysisk/Taktik/Mentalt) starts collapsed on mobile
-  // — there's no room to show all four fully expanded on a phone screen —
-  // but the CSS below only hides the skill list under the mobile
-  // breakpoint, so on desktop every category stays expanded regardless of
-  // this state, same as before.
+  // Each category (Teknik/Fysisk/Taktik/Mentalt) starts collapsed — tap a
+  // category's header (or its chevron) to expand just that one and see/
+  // score its individual skills. Same on every screen size.
   const [expandedCats, setExpandedCats] = useState({});
 
   const positions = player.positions || [];
@@ -3952,13 +3950,9 @@ function PlayerView({
   return (
     <div>
       <style>{`
-        .category-collapse-toggle { display: none !important; }
-        @media (max-width: 640px) {
-          .category-skills { display: none; }
-          .category-skills.category-skills-open { display: block; }
-          .category-collapse-toggle { display: inline-flex !important; }
-          .category-head-row-collapsible { cursor: pointer; }
-        }
+        .category-skills { display: none; }
+        .category-skills.category-skills-open { display: block; }
+        .category-head-row-collapsible { cursor: pointer; }
       `}</style>
       <button style={styles.backBtn} onClick={onBack}>
         <ChevronLeft size={16} /> Spillertrup
