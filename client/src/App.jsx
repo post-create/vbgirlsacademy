@@ -3443,13 +3443,6 @@ function RosterView({
   const [sending, setSending] = useState(false);
   const [sendResult, setSendResult] = useState(null);
   const [emailsCopied, setEmailsCopied] = useState(false);
-  // Teknik/Fysisk/Taktik/Mentalt mini-bars are hidden by default on mobile
-  // (see the CSS below) — there's no room for them next to name/position on
-  // a phone-width card, and their info is a hover tooltip, which doesn't
-  // exist on touch anyway. Tapping the toggle reveals them on that one
-  // card; actually correcting a score still means opening the player, same
-  // as today — this is purely a "let me glance at it" affordance.
-  const [expandedStats, setExpandedStats] = useState({});
   const teams = data.teams || [];
 
   const toggleSelectMode = () => {
@@ -3560,14 +3553,6 @@ function RosterView({
 
   return (
     <div>
-      <style>{`
-        .roster-stats-toggle { display: none !important; }
-        @media (max-width: 640px) {
-          .roster-mini-bars { display: none !important; }
-          .roster-mini-bars.roster-mini-bars-open { display: flex !important; }
-          .roster-stats-toggle { display: inline-flex !important; }
-        }
-      `}</style>
       <div style={styles.sectionHeadRow}>
         <div>
           <h1 style={styles.h1}>Spillertrup</h1>
@@ -3817,38 +3802,21 @@ function RosterView({
                   <BarChart3 size={10} /> {level.name}
                 </div>
               )}
-              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                <div
-                  className={`roster-mini-bars${expandedStats[p.id] ? " roster-mini-bars-open" : ""}`}
-                  style={styles.miniBars}
-                >
-                  {CATEGORY_META.map((c) => {
-                    const avg = categoryAverage(data.config, scores, c.key, p);
-                    return (
-                      <div key={c.key} style={styles.miniBarTrack} title={`${c.label}: ${avg ? avg.toFixed(1) : "—"}`}>
-                        <div
-                          style={{
-                            ...styles.miniBarFill,
-                            width: avg ? `${(avg / 5) * 100}%` : "0%",
-                            background: c.accent,
-                          }}
-                        />
-                      </div>
-                    );
-                  })}
-                </div>
-                <button
-                  type="button"
-                  className="roster-stats-toggle"
-                  style={styles.iconBtnGhost}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setExpandedStats((prev) => ({ ...prev, [p.id]: !prev[p.id] }));
-                  }}
-                  title={expandedStats[p.id] ? "Skjul vurdering" : "Vis vurdering (Teknik/Fysisk/Taktik/Mentalt)"}
-                >
-                  {expandedStats[p.id] ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-                </button>
+              <div style={styles.miniBars}>
+                {CATEGORY_META.map((c) => {
+                  const avg = categoryAverage(data.config, scores, c.key, p);
+                  return (
+                    <div key={c.key} style={styles.miniBarTrack} title={`${c.label}: ${avg ? avg.toFixed(1) : "—"}`}>
+                      <div
+                        style={{
+                          ...styles.miniBarFill,
+                          width: avg ? `${(avg / 5) * 100}%` : "0%",
+                          background: c.accent,
+                        }}
+                      />
+                    </div>
+                  );
+                })}
               </div>
               {goalIds.length > 0 && (
                 <div
