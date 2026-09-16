@@ -370,6 +370,12 @@ create table if not exists match_stats (
   -- What the file said that game, not copied from players.number — squad
   -- numbers can shift game to game, so this stays a record of the source.
   player_number text not null default '',
+  -- Position as the tracking export labelled it that game (GK/CB/LB/RB/...
+  -- — English abbreviations, distinct from the app's own 1-11 formation
+  -- numbers used in players.positions), kept as free text since export
+  -- vocabularies vary and this is informational, not matched against
+  -- anything.
+  position text not null default '',
   minutes int,
   distance_mi numeric(5,1),
   avg_speed_mph numeric(4,1),
@@ -391,6 +397,8 @@ create table if not exists match_stats (
   updated_at timestamptz not null default now(),
   primary key (match_plan_id, player_id)
 );
+
+alter table match_stats add column if not exists position text not null default '';
 
 create index if not exists idx_match_stats_player on match_stats(player_id);
 

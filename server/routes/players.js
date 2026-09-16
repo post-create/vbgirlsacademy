@@ -25,6 +25,7 @@ router.get("/:id/stats", async (req, res, next) => {
       matchPlanId: r.match_plan_id,
       opponent: r.opponent || "",
       matchDate: r.match_date,
+      position: r.position || "",
       minutes: r.minutes,
       distanceMi: r.distance_mi,
       avgSpeedMph: r.avg_speed_mph,

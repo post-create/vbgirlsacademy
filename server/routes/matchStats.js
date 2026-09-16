@@ -25,10 +25,52 @@ const COLUMN_TO_DB = {
   fouls: "fouls", saves: "saves", totalEvents: "total_events",
 };
 
+// The tracking export labels positions with English abbreviations; the app
+// tags players with classic formation numbers (1-11, see POSITIONS in
+// App.jsx) instead of letters. Maps a file position to the app number(s)
+// it plausibly corresponds to, so the review screen can flag a row where
+// the file's position doesn't fit any position the matched player is
+// tagged with — a cheap sanity check on top of the jersey-number match,
+// not a hard rule (a coach may tag a player differently than a one-off
+// export labels her that game). CB is kept ambiguous between the classic
+// left/right centre-back numbers (4 and 5) since the export doesn't say
+// which side.
+const FILE_POSITION_TO_APP_NUMBERS = {
+  GK: ["1"],
+  RB: ["2"],
+  LB: ["3"],
+  CB: ["4", "5"],
+  DM: ["6"],
+  DMF: ["6"],
+  CDM: ["6"],
+  RM: ["7"],
+  RW: ["7"],
+  CM: ["8"],
+  ST: ["9"],
+  CF: ["9"],
+  CAM: ["10"],
+  AM: ["10"],
+  OM: ["10"],
+  OMF: ["10"],
+  LM: ["11"],
+  LW: ["11"],
+  LWB: ["3"],
+  RWB: ["2"],
+};
+
+// SUB ("substitute") isn't a position, so it's deliberately absent from
+// the map above and never flagged as a mismatch.
+function positionMismatch(filePosition, playerPositions) {
+  const expected = FILE_POSITION_TO_APP_NUMBERS[String(filePosition || "").toUpperCase()];
+  if (!expected || !playerPositions || playerPositions.length === 0) return false;
+  return !expected.some((n) => playerPositions.includes(n));
+}
+
 function rowOut(row) {
   const out = {
     playerId: row.player_id,
     playerNumber: row.player_number,
+    position: row.position || "",
     updatedAt: row.updated_at,
     extra: row.extra || {},
   };
@@ -68,7 +110,7 @@ router.post("/parse", upload.single("file"), async (req, res, next) => {
       return res.status(400).json({ error: "Kunne ikke læse filen: " + e.message });
     }
 
-    const { rows: players } = await pool.query("select id, name, number from players");
+    const { rows: players } = await pool.query("select id, name, number, positions from players");
     const byNumber = new Map(players.filter((p) => p.number).map((p) => [p.number, p]));
 
     const preview = parsed.rows.map((row) => {
@@ -79,6 +121,7 @@ router.post("/parse", upload.single("file"), async (req, res, next) => {
         fileName: row.name,
         matchedPlayerId: match ? match.id : null,
         matchedPlayerName: match ? match.name : null,
+        positionMismatch: match ? positionMismatch(row.position, match.positions) : false,
         stats: row.stats,
         extra: row.extra,
       };
@@ -106,8 +149,8 @@ router.post("/commit", async (req, res, next) => {
       await client.query("BEGIN");
       for (const row of rows) {
         if (!row.playerId) continue; // still unmatched — coach chose to skip it
-        const cols = ["match_plan_id", "player_id", "player_number"];
-        const values = [req.params.matchPlanId, row.playerId, row.fileNumber || ""];
+        const cols = ["match_plan_id", "player_id", "player_number", "position"];
+        const values = [req.params.matchPlanId, row.playerId, row.fileNumber || "", row.filePosition || ""];
         STAT_COLUMNS.forEach((key) => {
           cols.push(COLUMN_TO_DB[key]);
           values.push(row.stats?.[key] ?? null);

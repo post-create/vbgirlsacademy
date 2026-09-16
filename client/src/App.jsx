@@ -6171,6 +6171,23 @@ function KpReserveTable({ reserves, onUpdate, onAdd, onRemove, playerNames }) {
   );
 }
 
+// Mirrors FILE_POSITION_TO_APP_NUMBERS in server/routes/matchStats.js — the
+// server flags a mismatch at parse time, but the coach can re-match a row to
+// a different player in the review table below, so this has to be
+// recomputed client-side on every selection change rather than trusting the
+// server's one-time flag.
+const FILE_POSITION_TO_APP_NUMBERS = {
+  GK: ["1"], RB: ["2"], LB: ["3"], CB: ["4", "5"], DM: ["6"], DMF: ["6"], CDM: ["6"],
+  RM: ["7"], RW: ["7"], CM: ["8"], ST: ["9"], CF: ["9"], CAM: ["10"],
+  AM: ["10"], OM: ["10"], OMF: ["10"], LM: ["11"], LW: ["11"], LWB: ["3"], RWB: ["2"],
+};
+
+function kpPositionMismatch(filePosition, playerPositions) {
+  const expected = FILE_POSITION_TO_APP_NUMBERS[String(filePosition || "").toUpperCase()];
+  if (!expected || !playerPositions || playerPositions.length === 0) return false;
+  return !expected.some((n) => playerPositions.includes(n));
+}
+
 // Uploads a GPS/video-tracking export (.ods/.xlsx/.csv) for this specific
 // match — stats only ever exist attached to a Kampplan, never freestanding
 // (see schema.sql). The server matches each row to a roster player by
@@ -6274,33 +6291,49 @@ function KpStatsUpload({ planId, players }) {
                 <tr>
                   <th style={{ textAlign: "left", padding: "4px 8px" }}>Nr.</th>
                   <th style={{ textAlign: "left", padding: "4px 8px" }}>Navn i filen</th>
+                  <th style={{ textAlign: "left", padding: "4px 8px" }}>Position i filen</th>
                   <th style={{ textAlign: "left", padding: "4px 8px" }}>Spiller i appen</th>
                 </tr>
               </thead>
               <tbody>
-                {preview.rows.map((r, i) => (
-                  <tr key={i} style={{ borderTop: "1px solid #E3E3E3" }}>
-                    <td style={{ padding: "4px 8px" }}>{r.fileNumber}</td>
-                    <td style={{ padding: "4px 8px" }}>{r.fileName}</td>
-                    <td style={{ padding: "4px 8px" }}>
-                      <select
-                        style={{
-                          ...styles.select,
-                          ...(!r.playerId ? { borderColor: "#C22A1F" } : {}),
-                        }}
-                        value={r.playerId || ""}
-                        onChange={(e) => setRowPlayer(i, e.target.value)}
+                {preview.rows.map((r, i) => {
+                  const matched = r.playerId ? players.find((p) => p.id === r.playerId) : null;
+                  const mismatch = matched ? kpPositionMismatch(r.filePosition, matched.positions) : false;
+                  return (
+                    <tr key={i} style={{ borderTop: "1px solid #E3E3E3" }}>
+                      <td style={{ padding: "4px 8px" }}>{r.fileNumber}</td>
+                      <td style={{ padding: "4px 8px" }}>{r.fileName}</td>
+                      <td
+                        style={{ padding: "4px 8px" }}
+                        title={
+                          mismatch
+                            ? `Filen siger ${r.filePosition}, men spilleren er ikke tagget med den position i appen`
+                            : undefined
+                        }
                       >
-                        <option value="">— spring over —</option>
-                        {players.map((p) => (
-                          <option key={p.id} value={p.id}>
-                            {p.name}
-                          </option>
-                        ))}
-                      </select>
-                    </td>
-                  </tr>
-                ))}
+                        {r.filePosition || "—"}
+                        {mismatch && <span style={{ color: "#C22A1F", marginLeft: 4 }}>⚠</span>}
+                      </td>
+                      <td style={{ padding: "4px 8px" }}>
+                        <select
+                          style={{
+                            ...styles.select,
+                            ...(!r.playerId ? { borderColor: "#C22A1F" } : {}),
+                          }}
+                          value={r.playerId || ""}
+                          onChange={(e) => setRowPlayer(i, e.target.value)}
+                        >
+                          <option value="">— spring over —</option>
+                          {players.map((p) => (
+                            <option key={p.id} value={p.id}>
+                              {p.name}
+                            </option>
+                          ))}
+                        </select>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -6319,6 +6352,7 @@ function KpStatsUpload({ planId, players }) {
             <thead>
               <tr>
                 <th style={{ textAlign: "left", padding: "4px 8px" }}>Spiller</th>
+                <th style={{ textAlign: "left", padding: "4px 8px" }}>Position</th>
                 <th style={{ textAlign: "right", padding: "4px 8px" }}>Min</th>
                 <th style={{ textAlign: "right", padding: "4px 8px" }}>Afstand</th>
                 <th style={{ textAlign: "right", padding: "4px 8px" }}>Pasn.</th>
@@ -6331,6 +6365,7 @@ function KpStatsUpload({ planId, players }) {
               {existing.map((r) => (
                 <tr key={r.playerId} style={{ borderTop: "1px solid #E3E3E3" }}>
                   <td style={{ padding: "4px 8px", fontWeight: 600 }}>{r.playerName}</td>
+                  <td style={{ padding: "4px 8px" }}>{r.position || "—"}</td>
                   <td style={{ padding: "4px 8px", textAlign: "right" }}>{r.minutes ?? "—"}</td>
                   <td style={{ padding: "4px 8px", textAlign: "right" }}>
                     {r.distanceMi != null ? `${r.distanceMi}mi` : "—"}
