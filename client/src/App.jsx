@@ -3895,6 +3895,12 @@ function PlayerView({
   const [printPanelOpen, setPrintPanelOpen] = useState(false);
   const [printColBMode, setPrintColBMode] = useState("goal");
   const [printColBPeriodId, setPrintColBPeriodId] = useState(null);
+  // Each category (Teknik/Fysisk/Taktik/Mentalt) starts collapsed on mobile
+  // — there's no room to show all four fully expanded on a phone screen —
+  // but the CSS below only hides the skill list under the mobile
+  // breakpoint, so on desktop every category stays expanded regardless of
+  // this state, same as before.
+  const [expandedCats, setExpandedCats] = useState({});
 
   const positions = player.positions || [];
 
@@ -3945,6 +3951,15 @@ function PlayerView({
 
   return (
     <div>
+      <style>{`
+        .category-collapse-toggle { display: none !important; }
+        @media (max-width: 640px) {
+          .category-skills { display: none; }
+          .category-skills.category-skills-open { display: block; }
+          .category-collapse-toggle { display: inline-flex !important; }
+          .category-head-row-collapsible { cursor: pointer; }
+        }
+      `}</style>
       <button style={styles.backBtn} onClick={onBack}>
         <ChevronLeft size={16} /> Spillertrup
       </button>
@@ -4411,10 +4426,27 @@ function PlayerView({
                 {CATEGORY_META.map((cat) => {
                   const skills = categorySkillsForPlayer(config, player, cat.key);
                   const avg = categoryAverage(config, scores, cat.key, player);
+                  const catExpanded = Boolean(expandedCats[cat.key]);
                   return (
                     <div key={cat.key} style={styles.categoryBlock}>
-                      <div style={styles.categoryHeadRow}>
+                      <div
+                        className="category-head-row-collapsible"
+                        style={styles.categoryHeadRow}
+                        onClick={() => setExpandedCats((prev) => ({ ...prev, [cat.key]: !prev[cat.key] }))}
+                      >
                         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                          <button
+                            type="button"
+                            className="category-collapse-toggle"
+                            style={styles.iconBtnGhost}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setExpandedCats((prev) => ({ ...prev, [cat.key]: !prev[cat.key] }));
+                            }}
+                            title={catExpanded ? "Skjul kriterier" : "Vis kriterier"}
+                          >
+                            {catExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                          </button>
                           <div style={{ ...styles.dot, background: cat.accent }} />
                           <span style={styles.categoryLabel}>{cat.label}</span>
                         </div>
@@ -4422,6 +4454,7 @@ function PlayerView({
                           {avg ? avg.toFixed(1) : "—"}
                         </span>
                       </div>
+                      <div className={`category-skills${catExpanded ? " category-skills-open" : ""}`}>
                       {skills.length === 0 ? (
                         <div style={styles.noSkills}>Ingen aktive kriterier i denne kategori.</div>
                       ) : (
@@ -4561,6 +4594,7 @@ function PlayerView({
                           );
                         })
                       )}
+                      </div>
                     </div>
                   );
                 })}
