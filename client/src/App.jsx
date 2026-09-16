@@ -1367,7 +1367,7 @@ export default function AcademyApp() {
           <FollowupsLogView data={data} onRemoveFollowup={removeFollowup} />
         )}
 
-        {view === "matchPlans" && <KampplanView players={data.players} />}
+        {view === "matchPlans" && <KampplanView data={data} />}
 
         {view === "kampScore" && <KampPerformanceView players={data.players} />}
 
@@ -6498,7 +6498,35 @@ function KpNotesField({ value, onChange }) {
   );
 }
 
-function KampplanEditor({ plan, setPlan, onBack, onSave, onPrint, saving, players }) {
+// The most recent period overall (by date), regardless of whether anyone's
+// been scored in it yet — goals can be set ahead of the first evaluation,
+// so this deliberately doesn't require scores the way getLatestScoredPeriod
+// does (that one's for "what should the roster card show", this is "what's
+// the player currently working towards").
+function kpLatestPeriod(data) {
+  const periods = sortedPeriods(data.periods);
+  return periods.length ? periods[periods.length - 1] : null;
+}
+
+// A player's currently defined goals, for the "Individuelt mål" list-select
+// on a Kampplan — skill name + Fokusområder only (not Målsætning; that's a
+// longer-form note, not a short tactical prompt for a single match). Goals
+// with no Fokusområder set are skipped since there'd be nothing to show.
+function kpGoalOptionsForPlayer(data, playerId) {
+  const period = kpLatestPeriod(data);
+  if (!period) return [];
+  const goals = data.goals[playerId]?.[period.id] || {};
+  return Object.keys(goals)
+    .map((skillId) => {
+      const meta = findSkillMeta(data.config, skillId);
+      const goal = goals[skillId];
+      if (!meta || !goal.focusAreas) return null;
+      return { skillId, label: `${meta.skill.name} — Fokusområder: ${goal.focusAreas}` };
+    })
+    .filter(Boolean);
+}
+
+function KampplanEditor({ plan, setPlan, onBack, onSave, onPrint, saving, players, data }) {
   const roster = [...plan.positions]
     .filter((r) => r.name && r.name.trim())
     .sort((a, b) => Number(a.position) - Number(b.position));
@@ -6506,6 +6534,12 @@ function KampplanEditor({ plan, setPlan, onBack, onSave, onPrint, saving, player
   const playerNames = [...new Set((players || []).map((p) => p.name).filter(Boolean))].sort((a, b) =>
     a.localeCompare(b, "da")
   );
+  const nameToPlayer = new Map((players || []).filter((p) => p.name).map((p) => [p.name, p]));
+  // Whether each player's "Individuelt mål" row is in list-select mode —
+  // purely local UI state (not saved with the plan, same as a text field's
+  // focus state), matching the same "list or free text" convenience the
+  // position/reserve rows already have via their `useList` flag.
+  const [goalUseList, setGoalUseList] = useState({});
   // Older plans stored reserves as plain name strings; normalize those to
   // the { name, useList } shape used going forward before any edit touches
   // them, so a merge patch never spreads onto a raw string.
@@ -6707,25 +6741,67 @@ function KampplanEditor({ plan, setPlan, onBack, onSave, onPrint, saving, player
                 <th style={{ textAlign: "left", fontSize: 11, textTransform: "uppercase", letterSpacing: 0.5, color: "#6B6B6B", padding: "0 8px 6px 0", fontWeight: 700 }}>
                   Individuelt mål
                 </th>
+                <th
+                  style={{ width: 60, textAlign: "center", fontSize: 11, textTransform: "uppercase", letterSpacing: 0.5, color: "#6B6B6B", padding: "0 8px 6px 0", fontWeight: 700 }}
+                  title="Vælg fra spillerens definerede mål frem for at skrive frit"
+                >
+                  Liste
+                </th>
               </tr>
             </thead>
             <tbody>
               {rosterNames.map((name) => {
                 const posForName = roster.find((r) => r.name.trim() === name);
+                const player = nameToPlayer.get(name);
+                const goalOptions = player ? kpGoalOptionsForPlayer(data, player.id) : [];
+                const useList = goalUseList[name] && goalOptions.length > 0;
                 return (
                   <tr key={name}>
                     <td style={{ width: 60, padding: "4px 8px 4px 0" }}>{posForName ? posForName.position : ""}</td>
                     <td style={{ width: 110, padding: "4px 8px 4px 0" }}>{name}</td>
                     <td style={{ padding: "4px 0" }}>
-                      <textarea
-                        style={{ ...styles.textarea, minHeight: 38 }}
-                        placeholder="Individuelt mål"
-                        value={plan.playerGoals[name] || ""}
-                        onChange={(e) =>
-                          setPlan({
-                            ...plan,
-                            playerGoals: { ...plan.playerGoals, [name]: e.target.value },
-                          })
+                      {useList ? (
+                        <select
+                          style={styles.select}
+                          value={plan.playerGoals[name] || ""}
+                          onChange={(e) =>
+                            setPlan({
+                              ...plan,
+                              playerGoals: { ...plan.playerGoals, [name]: e.target.value },
+                            })
+                          }
+                        >
+                          <option value="">Vælg mål</option>
+                          {goalOptions.map((g) => (
+                            <option key={g.skillId} value={g.label}>
+                              {g.label}
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        <textarea
+                          style={{ ...styles.textarea, minHeight: 38 }}
+                          placeholder="Individuelt mål"
+                          value={plan.playerGoals[name] || ""}
+                          onChange={(e) =>
+                            setPlan({
+                              ...plan,
+                              playerGoals: { ...plan.playerGoals, [name]: e.target.value },
+                            })
+                          }
+                        />
+                      )}
+                    </td>
+                    <td style={{ width: 60, padding: "4px 8px 4px 0", textAlign: "center" }}>
+                      <input
+                        type="checkbox"
+                        checked={useList}
+                        disabled={goalOptions.length === 0}
+                        onChange={(e) => setGoalUseList({ ...goalUseList, [name]: e.target.checked })}
+                        title={
+                          goalOptions.length === 0
+                            ? "Spilleren har ingen mål med fokusområder sat endnu"
+                            : "Vælg fra spillerens definerede mål frem for at skrive frit"
                         }
                       />
                     </td>
@@ -6951,7 +7027,8 @@ function KampPerformanceView({ players }) {
   );
 }
 
-function KampplanView({ players }) {
+function KampplanView({ data }) {
+  const players = data.players;
   const [subView, setSubView] = useState("list");
   const [loading, setLoading] = useState(true);
   const [planIndex, setPlanIndex] = useState([]);
@@ -7069,6 +7146,7 @@ function KampplanView({ players }) {
           onPrint={kpPrintPlan}
           saving={saving}
           players={players}
+          data={data}
         />
       )}
     </div>
