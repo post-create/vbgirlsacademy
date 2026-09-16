@@ -3899,6 +3899,11 @@ function PlayerView({
   // category's header (or its chevron) to expand just that one and see/
   // score its individual skills. Same on every screen size.
   const [expandedCats, setExpandedCats] = useState({});
+  // Number/hold/niveau/e-mail/gruppe — same collapse-by-default pattern as
+  // the category blocks below, as one group rather than five separate
+  // toggles since they're edited together rarely and just add scroll
+  // length above the actual evaluation.
+  const [settingsExpanded, setSettingsExpanded] = useState(false);
 
   const positions = player.positions || [];
 
@@ -3953,6 +3958,8 @@ function PlayerView({
         .category-skills { display: none; }
         .category-skills.category-skills-open { display: block; }
         .category-head-row-collapsible { cursor: pointer; }
+        .player-settings { display: none; }
+        .player-settings.player-settings-open { display: block; }
       `}</style>
       <button style={styles.backBtn} onClick={onBack}>
         <ChevronLeft size={16} /> Spillertrup
@@ -3987,6 +3994,20 @@ function PlayerView({
           </button>
         </div>
       )}
+
+      <div style={styles.categoryBlock}>
+      <button
+        type="button"
+        className="category-head-row-collapsible"
+        style={{ ...styles.collapseHeaderBtn, marginBottom: 8 }}
+        onClick={() => setSettingsExpanded((v) => !v)}
+      >
+        {settingsExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+        <Settings size={14} color="#1A1A1A" />
+        <span style={styles.categoryLabel}>Indstillinger</span>
+      </button>
+
+      <div className={`player-settings${settingsExpanded ? " player-settings-open" : ""}`}>
 
       <div style={styles.teamRow}>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -4171,6 +4192,9 @@ function PlayerView({
         <button style={styles.linkBtn} onClick={() => setEditingSkillGroup((v) => !v)}>
           <Pencil size={12} /> {editingSkillGroup ? "Færdig" : "Rediger"}
         </button>
+      </div>
+
+      </div>
       </div>
 
       <LongTermGoalsCard player={player} onSave={onUpdateGoalHorizons} />
