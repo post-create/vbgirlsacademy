@@ -206,6 +206,41 @@ export function generateDevelopmentPlan(playerId) {
   return request("POST", `/api/development-plans/${playerId}/generate`);
 }
 
+export function getMatchStats(matchPlanId) {
+  return request("GET", `/api/match-plans/${matchPlanId}/stats`);
+}
+
+// Multipart, not JSON — can't go through request(), which always
+// JSON.stringify's the body. The browser sets its own Content-Type (with
+// the multipart boundary) for FormData, so none is passed here.
+export async function parseMatchStats(matchPlanId, file) {
+  const formData = new FormData();
+  formData.append("file", file);
+  const res = await fetch(`/api/match-plans/${matchPlanId}/stats/parse`, {
+    method: "POST",
+    body: formData,
+  });
+  if (!res.ok) {
+    let message = `parse failed with ${res.status}`;
+    try {
+      const body = await res.json();
+      if (body?.error) message = body.error;
+    } catch (e) {
+      /* not JSON */
+    }
+    throw new Error(message);
+  }
+  return res.json();
+}
+
+export function commitMatchStats(matchPlanId, rows) {
+  return request("POST", `/api/match-plans/${matchPlanId}/stats/commit`, { rows });
+}
+
+export function getPlayerStats(playerId) {
+  return request("GET", `/api/players/${playerId}/stats`);
+}
+
 export function getSettings() {
   return request("GET", "/api/settings");
 }

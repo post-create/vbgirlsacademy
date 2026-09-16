@@ -25,6 +25,7 @@ const followupsRouter = require("./routes/followups");
 const notificationsRouter = require("./routes/notifications");
 const participationLevelsRouter = require("./routes/participationLevels");
 const matchPlansRouter = require("./routes/matchPlans");
+const matchStatsRouter = require("./routes/matchStats");
 const developmentPlansRouter = require("./routes/developmentPlans");
 const settingsRouter = require("./routes/settings");
 
@@ -73,6 +74,7 @@ app.use("/api/coaches", requireAuth, coachesRouter);
 app.use("/api/notifications", requireAuth, notificationsRouter);
 app.use("/api/participation-levels", requireAuth, participationLevelsRouter);
 app.use("/api/match-plans", requireAuth, matchPlansRouter);
+app.use("/api/match-plans/:matchPlanId/stats", requireAuth, matchStatsRouter);
 app.use("/api/development-plans", requireAuth, developmentPlansRouter);
 app.use("/api/settings", requireAuth, settingsRouter);
 

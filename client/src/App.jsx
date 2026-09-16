@@ -51,6 +51,7 @@ import {
   ListOrdered,
   LogOut,
   Sparkles,
+  Upload,
 } from "lucide-react";
 import * as api from "./api.js";
 
@@ -6170,6 +6171,190 @@ function KpReserveTable({ reserves, onUpdate, onAdd, onRemove, playerNames }) {
   );
 }
 
+// Uploads a GPS/video-tracking export (.ods/.xlsx/.csv) for this specific
+// match — stats only ever exist attached to a Kampplan, never freestanding
+// (see schema.sql). The server matches each row to a roster player by
+// jersey number; anything it couldn't match (or matched to the wrong
+// person — squad numbers do shift game to game) is fixed here before
+// anything is actually saved to development_plans... to match_stats,
+// rather.
+function KpStatsUpload({ planId, players }) {
+  const [existing, setExisting] = useState(null);
+  const [uploading, setUploading] = useState(false);
+  const [preview, setPreview] = useState(null); // { rows, skipped } | null
+  const [previewError, setPreviewError] = useState("");
+  const [committing, setCommitting] = useState(false);
+  const [commitError, setCommitError] = useState("");
+  const fileInputRef = React.useRef(null);
+
+  useEffect(() => {
+    if (!planId) return;
+    api.getMatchStats(planId).then(setExisting).catch(() => setExisting([]));
+  }, [planId]);
+
+  const handleFile = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // lets the same filename be picked again later
+    if (!file) return;
+    setPreviewError("");
+    setUploading(true);
+    try {
+      const result = await api.parseMatchStats(planId, file);
+      setPreview({
+        rows: result.rows.map((r) => ({ ...r, playerId: r.matchedPlayerId })),
+        skipped: result.skipped,
+      });
+    } catch (err) {
+      setPreviewError(err.message);
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const setRowPlayer = (i, playerId) => {
+    setPreview((p) => ({
+      ...p,
+      rows: p.rows.map((r, idx) => (idx === i ? { ...r, playerId: playerId || null } : r)),
+    }));
+  };
+
+  const commit = async () => {
+    setCommitError("");
+    setCommitting(true);
+    try {
+      const saved = await api.commitMatchStats(planId, preview.rows);
+      setExisting(saved);
+      setPreview(null);
+    } catch (err) {
+      setCommitError(err.message);
+    } finally {
+      setCommitting(false);
+    }
+  };
+
+  const matchedCount = preview ? preview.rows.filter((r) => r.playerId).length : 0;
+
+  return (
+    <div style={styles.categoryBlock}>
+      <div style={styles.categoryHeadRow}>
+        <span style={styles.categoryLabel}>Kampstatistik</span>
+        {planId && (
+          <button style={styles.linkBtn} onClick={() => fileInputRef.current?.click()} disabled={uploading}>
+            <Upload size={12} /> {uploading ? "Læser fil…" : "Upload statistik"}
+          </button>
+        )}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".ods,.xlsx,.xls,.csv"
+          style={{ display: "none" }}
+          onChange={handleFile}
+        />
+      </div>
+
+      {!planId && (
+        <p style={styles.noSkills}>Gem kampplanen først — så kan du uploade statistik bagefter.</p>
+      )}
+
+      {previewError && <div style={styles.errorBannerRow}>{previewError}</div>}
+
+      {preview ? (
+        <div>
+          <p style={styles.subtext}>
+            {matchedCount} af {preview.rows.length} rækker matchet automatisk på spillernummer.
+            {preview.skipped > 0
+              ? ` ${preview.skipped} række${preview.skipped !== 1 ? "r" : ""} uden spillernavn (fx modstanderens spillere) sprunget over.`
+              : ""}{" "}
+            Ret forkerte match herunder, før du gemmer.
+          </p>
+          {commitError && <div style={styles.errorBannerRow}>{commitError}</div>}
+          <div style={{ overflowX: "auto" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+              <thead>
+                <tr>
+                  <th style={{ textAlign: "left", padding: "4px 8px" }}>Nr.</th>
+                  <th style={{ textAlign: "left", padding: "4px 8px" }}>Navn i filen</th>
+                  <th style={{ textAlign: "left", padding: "4px 8px" }}>Spiller i appen</th>
+                </tr>
+              </thead>
+              <tbody>
+                {preview.rows.map((r, i) => (
+                  <tr key={i} style={{ borderTop: "1px solid #E3E3E3" }}>
+                    <td style={{ padding: "4px 8px" }}>{r.fileNumber}</td>
+                    <td style={{ padding: "4px 8px" }}>{r.fileName}</td>
+                    <td style={{ padding: "4px 8px" }}>
+                      <select
+                        style={{
+                          ...styles.select,
+                          ...(!r.playerId ? { borderColor: "#C22A1F" } : {}),
+                        }}
+                        value={r.playerId || ""}
+                        onChange={(e) => setRowPlayer(i, e.target.value)}
+                      >
+                        <option value="">— spring over —</option>
+                        {players.map((p) => (
+                          <option key={p.id} value={p.id}>
+                            {p.name}
+                          </option>
+                        ))}
+                      </select>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+            <button style={styles.primaryBtnSm} onClick={commit} disabled={committing || matchedCount === 0}>
+              {committing ? "Gemmer…" : `Gem statistik for ${matchedCount} spiller${matchedCount !== 1 ? "e" : ""}`}
+            </button>
+            <button style={styles.ghostBtn} onClick={() => setPreview(null)}>
+              Annuller
+            </button>
+          </div>
+        </div>
+      ) : existing && existing.length > 0 ? (
+        <div style={{ overflowX: "auto" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+            <thead>
+              <tr>
+                <th style={{ textAlign: "left", padding: "4px 8px" }}>Spiller</th>
+                <th style={{ textAlign: "right", padding: "4px 8px" }}>Min</th>
+                <th style={{ textAlign: "right", padding: "4px 8px" }}>Afstand</th>
+                <th style={{ textAlign: "right", padding: "4px 8px" }}>Pasn.</th>
+                <th style={{ textAlign: "right", padding: "4px 8px" }}>Pasn. %</th>
+                <th style={{ textAlign: "right", padding: "4px 8px" }}>Tacklinger</th>
+                <th style={{ textAlign: "right", padding: "4px 8px" }}>Topfart</th>
+              </tr>
+            </thead>
+            <tbody>
+              {existing.map((r) => (
+                <tr key={r.playerId} style={{ borderTop: "1px solid #E3E3E3" }}>
+                  <td style={{ padding: "4px 8px", fontWeight: 600 }}>{r.playerName}</td>
+                  <td style={{ padding: "4px 8px", textAlign: "right" }}>{r.minutes ?? "—"}</td>
+                  <td style={{ padding: "4px 8px", textAlign: "right" }}>
+                    {r.distanceMi != null ? `${r.distanceMi}mi` : "—"}
+                  </td>
+                  <td style={{ padding: "4px 8px", textAlign: "right" }}>{r.passes ?? "—"}</td>
+                  <td style={{ padding: "4px 8px", textAlign: "right" }}>
+                    {r.passSuccessPct != null ? `${r.passSuccessPct}%` : "—"}
+                  </td>
+                  <td style={{ padding: "4px 8px", textAlign: "right" }}>{r.tackles ?? "—"}</td>
+                  <td style={{ padding: "4px 8px", textAlign: "right" }}>
+                    {r.topSpeedMph != null ? `${r.topSpeedMph}mph` : "—"}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        planId && <p style={styles.noSkills}>Ingen statistik uploadet endnu for denne kamp.</p>
+      )}
+    </div>
+  );
+}
+
 // Coach-entered 1-5 rating of how each player performed in this specific
 // match, keyed by player name (same convention as playerGoals). Screen-only —
 // deliberately never read by kpPrintPlan — used to build a per-player
@@ -6531,6 +6716,8 @@ function KampplanEditor({ plan, setPlan, onBack, onSave, onPrint, saving, player
         scores={plan.performanceScores || {}}
         onSetScore={onSetPerformanceScore}
       />
+
+      <KpStatsUpload planId={plan.id} players={(players || []).slice().sort((a, b) => a.name.localeCompare(b.name, "da"))} />
 
       <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 20, position: "sticky", bottom: 16 }}>
         <div style={{ background: "#FFFFFF", border: "1px solid #E3E3E3", padding: 10, borderRadius: 10, display: "flex", gap: 10, boxShadow: "0 4px 16px rgba(0,0,0,0.1)" }}>

@@ -8,6 +8,84 @@ function makeSelfToken() {
   return crypto.randomBytes(24).toString("hex");
 }
 
+// Per-match rows plus season totals computed on the fly from them — never
+// stored separately, so there's nothing that can drift out of sync with
+// what's actually been uploaded (see server/routes/matchStats.js).
+router.get("/:id/stats", async (req, res, next) => {
+  try {
+    const { rows } = await pool.query(
+      `select ms.*, mp.opponent, to_char(mp.match_date, 'YYYY-MM-DD') as match_date
+       from match_stats ms join match_plans mp on mp.id = ms.match_plan_id
+       where ms.player_id = $1
+       order by mp.match_date desc`,
+      [req.params.id]
+    );
+
+    const matches = rows.map((r) => ({
+      matchPlanId: r.match_plan_id,
+      opponent: r.opponent || "",
+      matchDate: r.match_date,
+      minutes: r.minutes,
+      distanceMi: r.distance_mi,
+      avgSpeedMph: r.avg_speed_mph,
+      topSpeedMph: r.top_speed_mph,
+      sprints: r.sprints,
+      highIntensityRuns: r.high_intensity_runs,
+      passes: r.passes,
+      passSuccessPct: r.pass_success_pct,
+      dribbles: r.dribbles,
+      shots: r.shots,
+      tackles: r.tackles,
+      interceptions: r.interceptions,
+      looseBallRecoveries: r.loose_ball_recoveries,
+      goalKicks: r.goal_kicks,
+      fouls: r.fouls,
+      saves: r.saves,
+      totalEvents: r.total_events,
+    }));
+
+    // Sums for counting stats, a passes-weighted average for the success
+    // rate (not a plain average of per-match percentages — a 100% game on
+    // 2 passes shouldn't count the same as a 45% game on 30 passes), max
+    // for top speed, plain average for the rest.
+    const sum = (key) => matches.reduce((s, m) => s + (m[key] || 0), 0);
+    const totalPasses = sum("passes");
+    const weightedSuccess = matches.reduce(
+      (s, m) => s + ((m.passSuccessPct || 0) * (m.passes || 0)) / 100,
+      0
+    );
+
+    const season =
+      matches.length === 0
+        ? null
+        : {
+            matches: matches.length,
+            minutes: sum("minutes"),
+            distanceMi: Math.round(sum("distanceMi") * 10) / 10,
+            avgSpeedMph:
+              Math.round((matches.reduce((s, m) => s + (m.avgSpeedMph || 0), 0) / matches.length) * 10) / 10,
+            topSpeedMph: Math.max(...matches.map((m) => m.topSpeedMph || 0)),
+            sprints: sum("sprints"),
+            highIntensityRuns: sum("highIntensityRuns"),
+            passes: totalPasses,
+            passSuccessPct: totalPasses > 0 ? Math.round((weightedSuccess / totalPasses) * 10000) / 100 : null,
+            dribbles: sum("dribbles"),
+            shots: sum("shots"),
+            tackles: sum("tackles"),
+            interceptions: sum("interceptions"),
+            looseBallRecoveries: sum("looseBallRecoveries"),
+            goalKicks: sum("goalKicks"),
+            fouls: sum("fouls"),
+            saves: sum("saves"),
+            totalEvents: sum("totalEvents"),
+          };
+
+    res.json({ season, matches });
+  } catch (err) {
+    next(err);
+  }
+});
+
 router.post("/", async (req, res, next) => {
   try {
     const { name, positions, number, email, teamId, skillGroupId } = req.body;

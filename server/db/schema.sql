@@ -357,6 +357,43 @@ insert into app_settings (key, value) values (
   E'Du er assistenttræner for VB Pige Akademi og skal udkaste en udviklingsplan til en af klubbens spillere, baseret på hendes rigtige evaluerings- og måldata (vedhæftet nedenfor).\n\nSkriv direkte til spilleren (du-form), på dansk, i en varm men konkret trænertone — planen skal kunne læses af både spilleren selv og hendes forældre.\n\nBrug udelukkende de angivne data. Opfind aldrig konkrete tal, kampstatistik eller hændelser, der ikke fremgår nedenfor — hvis noget mangler (fx ingen mål sat endnu), så spring det afsnit over eller nævn det kort i stedet for at gætte.\n\nStrukturér planen med disse afsnit:\n1. En kort personlig indledning der hilser på spilleren og opsummerer, hvor hun står nu.\n2. Fokusområder — uddyb kort de mål, der allerede er sat; gengiv dem ikke som en ren liste, de vises i forvejen andetsteds i rapporten.\n3. Egentræning — et kort, generelt afsnit tilpasset spillerens niveau.\n4. Opfølgning — en kort opfordring til løbende dialog med træneren.\n\nSvar udelukkende med HTML og kun disse tags: <h3>, <p>, <ul>, <li>, <strong>, <em>. Ingen andre tags, ingen inline-styles, ingen billeder, ingen indledende forklaring uden for HTML''en.'
 ) on conflict (key) do nothing;
 
+-- Per-player tracking stats for one Kampplan (= one game — stats never
+-- exist without a match to attach to, same relationship match_performance
+-- already has). Imported from a GPS/video-tracking tool export (.ods/.xlsx/
+-- .csv); see server/statsImport.js for the parser. Only the fields we
+-- actively surface are real columns — anything the source file has that we
+-- don't yet map to a named column lands in `extra` instead of being
+-- dropped or forcing a migration to accept a new export.
+create table if not exists match_stats (
+  match_plan_id text not null references match_plans(id) on delete cascade,
+  player_id text not null references players(id) on delete cascade,
+  -- What the file said that game, not copied from players.number — squad
+  -- numbers can shift game to game, so this stays a record of the source.
+  player_number text not null default '',
+  minutes int,
+  distance_mi numeric(5,1),
+  avg_speed_mph numeric(4,1),
+  top_speed_mph numeric(4,1),
+  sprints int,
+  high_intensity_runs int,
+  passes int,
+  pass_success_pct numeric(5,2),
+  dribbles int,
+  shots int,
+  tackles int,
+  interceptions int,
+  loose_ball_recoveries int,
+  goal_kicks int,
+  fouls int,
+  saves int,
+  total_events int,
+  extra jsonb not null default '{}',
+  updated_at timestamptz not null default now(),
+  primary key (match_plan_id, player_id)
+);
+
+create index if not exists idx_match_stats_player on match_stats(player_id);
+
 create index if not exists idx_players_team_id on players(team_id);
 create index if not exists idx_evaluations_player_period on evaluations(player_id, period_id);
 create index if not exists idx_goals_player on goals(player_id);
