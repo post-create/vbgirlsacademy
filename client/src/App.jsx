@@ -4017,7 +4017,7 @@ function PlayerView({
         .player-settings { display: none; }
         .player-settings.player-settings-open { display: block; }
       `}</style>
-      <button style={styles.backBtn} onClick={onBack}>
+      <button style={styles.backBtnSticky} onClick={onBack}>
         <ChevronLeft size={16} /> {backLabel || "Spillertrup"}
       </button>
 
@@ -7858,6 +7858,27 @@ const styles = {
     cursor: "pointer",
     padding: "6px 0",
     marginBottom: 12,
+  },
+  // Player page only (see PlayerView) — a long page with a lot to scroll
+  // past (Indstillinger, categories, development plan), so the back
+  // button stays pinned at the top instead of needing a scroll back up.
+  // The app background color (not transparent) is required here so
+  // scrolled-past content doesn't show through underneath it.
+  backBtnSticky: {
+    display: "flex",
+    alignItems: "center",
+    gap: 4,
+    background: "#F7F7F5",
+    border: "none",
+    color: "#111111",
+    fontWeight: 600,
+    fontSize: 14,
+    cursor: "pointer",
+    padding: "10px 0",
+    marginBottom: 4,
+    position: "sticky",
+    top: 0,
+    zIndex: 20,
   },
   playerHeadRow: {
     display: "flex",
