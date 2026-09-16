@@ -755,6 +755,26 @@ export default function AcademyApp() {
   const [saveError, setSaveError] = useState(false);
   const [view, setView] = useState("roster");
   const [selectedId, setSelectedId] = useState(null);
+  // Which list ("roster" or "coaches") a player was opened from, so "back"
+  // returns to that list instead of always Spillertrup — and where each
+  // list's scroll position was when it was left, so "back" restores it
+  // instead of landing back at the top. Scroll position is a ref (not
+  // state) since restoring it is a DOM side effect, not something a
+  // re-render should reflect.
+  const [playerOriginView, setPlayerOriginView] = useState("roster");
+  const scrollPositionsRef = React.useRef({});
+  const pendingScrollRestoreRef = React.useRef(null);
+
+  useEffect(() => {
+    if (pendingScrollRestoreRef.current != null) {
+      // No rAF wrapper — rAF is throttled to near-zero on a backgrounded/
+      // hidden tab, and by the time this effect runs the DOM has already
+      // committed and painted, so scrolling immediately is both simpler
+      // and more reliable.
+      window.scrollTo(0, pendingScrollRestoreRef.current);
+      pendingScrollRestoreRef.current = null;
+    }
+  }, [view]);
   const [addingPlayer, setAddingPlayer] = useState(false);
   const [newName, setNewName] = useState("");
   const [newPositions, setNewPositions] = useState([]);
@@ -1345,6 +1365,8 @@ export default function AcademyApp() {
             data={data}
             onSetGoalProgress={setGoalProgress}
             onOpenPlayer={(id) => {
+              scrollPositionsRef.current.coaches = window.scrollY;
+              setPlayerOriginView("coaches");
               setSelectedId(id);
               setView("player");
             }}
@@ -1397,6 +1419,8 @@ export default function AcademyApp() {
             data={data}
             periods={periods}
             onOpen={(id) => {
+              scrollPositionsRef.current.roster = window.scrollY;
+              setPlayerOriginView("roster");
               setSelectedId(id);
               setView("player");
             }}
@@ -1429,9 +1453,11 @@ export default function AcademyApp() {
             developmentPlan={(data.developmentPlans || {})[selectedPlayer.id] || null}
             onSaveDevelopmentPlan={(plan) => saveDevelopmentPlan(selectedPlayer.id, plan)}
             onBack={() => {
-              setView("roster");
+              pendingScrollRestoreRef.current = scrollPositionsRef.current[playerOriginView] || 0;
+              setView(playerOriginView);
               setSelectedId(null);
             }}
+            backLabel={playerOriginView === "coaches" ? "Træneroverblik" : "Spillertrup"}
             onScore={(periodId, subskillId, value) =>
               setScore(selectedPlayer.id, periodId, subskillId, value)
             }
@@ -3903,6 +3929,7 @@ function PlayerView({
   onGoToPeriods,
   developmentPlan,
   onSaveDevelopmentPlan,
+  backLabel,
 }) {
   const [editingPositions, setEditingPositions] = useState(false);
   const [editingTeam, setEditingTeam] = useState(false);
@@ -3991,7 +4018,7 @@ function PlayerView({
         .player-settings.player-settings-open { display: block; }
       `}</style>
       <button style={styles.backBtn} onClick={onBack}>
-        <ChevronLeft size={16} /> Spillertrup
+        <ChevronLeft size={16} /> {backLabel || "Spillertrup"}
       </button>
 
       <div style={styles.playerHeadRow}>
