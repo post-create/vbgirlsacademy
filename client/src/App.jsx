@@ -760,7 +760,10 @@ export default function AcademyApp() {
   // list's scroll position was when it was left, so "back" restores it
   // instead of landing back at the top. Scroll position is a ref (not
   // state) since restoring it is a DOM side effect, not something a
-  // re-render should reflect.
+  // re-render should reflect. pendingScrollRestoreRef does double duty:
+  // set to a saved list position when going back, or to 0 when opening a
+  // player (a player page should always start at the top, never inherit
+  // wherever the list happened to be scrolled to).
   const [playerOriginView, setPlayerOriginView] = useState("roster");
   const scrollPositionsRef = React.useRef({});
   const pendingScrollRestoreRef = React.useRef(null);
@@ -1366,6 +1369,7 @@ export default function AcademyApp() {
             onSetGoalProgress={setGoalProgress}
             onOpenPlayer={(id) => {
               scrollPositionsRef.current.coaches = window.scrollY;
+              pendingScrollRestoreRef.current = 0;
               setPlayerOriginView("coaches");
               setSelectedId(id);
               setView("player");
@@ -1420,6 +1424,7 @@ export default function AcademyApp() {
             periods={periods}
             onOpen={(id) => {
               scrollPositionsRef.current.roster = window.scrollY;
+              pendingScrollRestoreRef.current = 0;
               setPlayerOriginView("roster");
               setSelectedId(id);
               setView("player");
@@ -4032,9 +4037,11 @@ function PlayerView({
         .player-settings { display: none; }
         .player-settings.player-settings-open { display: block; }
       `}</style>
-      <button style={{ ...styles.backBtnSticky, top: headerHeight }} onClick={onBack}>
-        <ChevronLeft size={16} /> {backLabel || "Spillertrup"}
-      </button>
+      <div style={{ ...styles.backBarSticky, top: headerHeight }}>
+        <button style={styles.backBtnInBar} onClick={onBack}>
+          <ChevronLeft size={16} /> {backLabel || "Spillertrup"}
+        </button>
+      </div>
 
       <div style={styles.playerHeadRow}>
         <div style={styles.numberBadgeLg}>{player.number || "—"}</div>
@@ -7879,21 +7886,34 @@ const styles = {
   // button stays pinned at the top instead of needing a scroll back up.
   // The app background color (not transparent) is required here so
   // scrolled-past content doesn't show through underneath it.
-  backBtnSticky: {
+  // Full viewport width (the "calc(50% - 50vw)" margin trick breaks out of
+  // main's centered maxWidth:900 column) so the grey background reaches
+  // both edges of the screen, not just the content column. `top` is set
+  // inline per-render to the app header's actual measured height (see
+  // PlayerView) since the header wraps differently at different widths.
+  backBarSticky: {
+    position: "sticky",
+    background: "#F7F7F5",
+    width: "100vw",
+    marginLeft: "calc(50% - 50vw)",
+    marginBottom: 4,
+    zIndex: 4,
+  },
+  backBtnInBar: {
     display: "flex",
     alignItems: "center",
     gap: 4,
-    background: "#F7F7F5",
+    background: "transparent",
     border: "none",
     color: "#111111",
     fontWeight: 600,
     fontSize: 14,
     cursor: "pointer",
-    padding: "10px 0",
-    marginBottom: 4,
-    position: "sticky",
-    top: 0,
-    zIndex: 4,
+    maxWidth: 900,
+    margin: "0 auto",
+    padding: "10px 20px",
+    boxSizing: "border-box",
+    width: "100%",
   },
   playerHeadRow: {
     display: "flex",
