@@ -2617,6 +2617,11 @@ function CoachesOverviewView({ data, onSetGoalProgress, onOpenPlayer, onAddFollo
   const [followupPlayerId, setFollowupPlayerId] = useState(null);
   const [followupNote, setFollowupNote] = useState("");
   const [followupCoachId, setFollowupCoachId] = useState("");
+  // Goals start collapsed per player — with every player's full goal list
+  // (note/focus areas/progress buttons) expanded at once, this page got
+  // very long very fast. The header still shows the count so a coach can
+  // tell at a glance who has goals set without opening each one.
+  const [expandedGoals, setExpandedGoals] = useState({});
 
   useEffect(() => {
     if (!selectedPeriodId && periods.length) {
@@ -2663,6 +2668,11 @@ function CoachesOverviewView({ data, onSetGoalProgress, onOpenPlayer, onAddFollo
 
   return (
     <div>
+      <style>{`
+        .category-skills { display: none; }
+        .category-skills.category-skills-open { display: block; }
+        .category-head-row-collapsible { cursor: pointer; }
+      `}</style>
       <div style={styles.sectionHeadRow}>
         <div>
           <h1 style={styles.h1}>Træneroverblik</h1>
@@ -2845,6 +2855,24 @@ function CoachesOverviewView({ data, onSetGoalProgress, onOpenPlayer, onAddFollo
               )}
             </div>
 
+            {entries.length > 0 && (
+              <button
+                type="button"
+                className="category-head-row-collapsible"
+                style={{ ...styles.collapseHeaderBtn, margin: "10px 0 4px" }}
+                onClick={() =>
+                  setExpandedGoals((prev) => ({ ...prev, [player.id]: !prev[player.id] }))
+                }
+              >
+                {expandedGoals[player.id] ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                <Target size={14} color="#1A1A1A" />
+                <span style={styles.categoryLabel}>{entries.length} mål</span>
+              </button>
+            )}
+
+            <div
+              className={`category-skills${expandedGoals[player.id] ? " category-skills-open" : ""}`}
+            >
             {entries.map(({ skillId, goal, skill, category }) => {
               const currentVal = scores[skillId];
               const achieved = typeof currentVal === "number" && currentVal >= goal.target;
@@ -2889,6 +2917,7 @@ function CoachesOverviewView({ data, onSetGoalProgress, onOpenPlayer, onAddFollo
                 </div>
               );
             })}
+            </div>
           </div>
         );
       })}
