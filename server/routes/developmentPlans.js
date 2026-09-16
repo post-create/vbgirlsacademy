@@ -64,10 +64,51 @@ async function buildPlayerContext(playerId) {
     goals = g.rows;
   }
 
-  return { player, latestPeriod, scores, goals };
+  // Season stats aggregated from every match the player has uploaded stats
+  // for (see server/routes/matchStats.js) — the same numbers GET
+  // /players/:id/stats returns, recomputed here rather than shared so this
+  // stays a plain read with no cross-module coupling.
+  const { rows: statRows } = await pool.query(
+    `select ms.minutes, ms.distance_mi, ms.avg_speed_mph, ms.top_speed_mph, ms.sprints,
+            ms.high_intensity_runs, ms.passes, ms.pass_success_pct, ms.dribbles, ms.shots,
+            ms.tackles, ms.interceptions, ms.loose_ball_recoveries, ms.goal_kicks, ms.fouls, ms.saves
+     from match_stats ms
+     where ms.player_id = $1`,
+    [playerId]
+  );
+
+  let matchStats = null;
+  if (statRows.length) {
+    const sum = (key) => statRows.reduce((s, r) => s + (Number(r[key]) || 0), 0);
+    const totalPasses = sum("passes");
+    const weightedSuccess = statRows.reduce(
+      (s, r) => s + ((Number(r.pass_success_pct) || 0) * (Number(r.passes) || 0)) / 100,
+      0
+    );
+    matchStats = {
+      matches: statRows.length,
+      minutes: sum("minutes"),
+      distanceMi: Math.round(sum("distance_mi") * 10) / 10,
+      topSpeedMph: Math.max(...statRows.map((r) => Number(r.top_speed_mph) || 0)),
+      sprints: sum("sprints"),
+      highIntensityRuns: sum("high_intensity_runs"),
+      passes: totalPasses,
+      passSuccessPct: totalPasses > 0 ? Math.round((weightedSuccess / totalPasses) * 10000) / 100 : null,
+      dribbles: sum("dribbles"),
+      shots: sum("shots"),
+      tackles: sum("tackles"),
+      interceptions: sum("interceptions"),
+      looseBallRecoveries: sum("loose_ball_recoveries"),
+      goalKicks: sum("goal_kicks"),
+      fouls: sum("fouls"),
+      saves: sum("saves"),
+    };
+  }
+
+  return { player, latestPeriod, scores, goals, matchStats };
 }
 
-function formatPlayerContext({ player, latestPeriod, scores, goals }) {
+function formatPlayerContext({ player, latestPeriod, scores, goals, matchStats }) {
   const lines = [`Spiller: ${player.name}`];
   if (player.positions?.length) lines.push(`Position(er): ${player.positions.join(", ")}`);
   if (player.level_name) {
@@ -98,6 +139,30 @@ function formatPlayerContext({ player, latestPeriod, scores, goals }) {
       if (g.focus_areas) line += ` — Fokusområder: ${g.focus_areas}`;
       lines.push(line);
     });
+  }
+
+  if (matchStats) {
+    lines.push("", `Kampstatistik (sæsontotal, ${matchStats.matches} kamp(e) med registreret statistik):`);
+    lines.push(`- Spilletid: ${matchStats.minutes} min`);
+    lines.push(`- Distance: ${matchStats.distanceMi} mi`);
+    lines.push(`- Tophastighed: ${matchStats.topSpeedMph} mph`);
+    lines.push(`- Sprints: ${matchStats.sprints}`);
+    lines.push(`- High intensity runs: ${matchStats.highIntensityRuns}`);
+    lines.push(
+      `- Pasninger: ${matchStats.passes}${
+        matchStats.passSuccessPct != null ? ` (${matchStats.passSuccessPct}% fuldførte)` : ""
+      }`
+    );
+    lines.push(`- Driblinger: ${matchStats.dribbles}`);
+    lines.push(`- Afslutninger: ${matchStats.shots}`);
+    lines.push(`- Tacklinger: ${matchStats.tackles}`);
+    lines.push(`- Erobringer: ${matchStats.interceptions}`);
+    lines.push(`- Bolderobringer (løse bolde): ${matchStats.looseBallRecoveries}`);
+    lines.push(`- Målspark: ${matchStats.goalKicks}`);
+    lines.push(`- Forseelser: ${matchStats.fouls}`);
+    lines.push(`- Redninger: ${matchStats.saves}`);
+  } else {
+    lines.push("", "(Ingen kampstatistik uploadet endnu.)");
   }
 
   return lines.join("\n");
