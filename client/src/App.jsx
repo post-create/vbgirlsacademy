@@ -5742,11 +5742,22 @@ function kpPrintPlan(p) {
     .filter((r) => r.name && r.name.trim())
     .sort((a, b) => Number(a.position) - Number(b.position));
   const rosterNamesUnique = [...new Set(rosterSorted.map((r) => r.name.trim()))];
+  // Individuelle mål covers reserves too (see KampplanEditor) — a reserve
+  // can still come on, so her goal needs to print as well.
+  const reserveNamesUnique = [
+    ...new Set(
+      (p.reserves || [])
+        .map((r) => (typeof r === "string" ? r : r.name))
+        .map((n) => n && n.trim())
+        .filter(Boolean)
+    ),
+  ];
+  const goalNamesUnique = [...rosterNamesUnique, ...reserveNamesUnique.filter((n) => !rosterNamesUnique.includes(n))];
   const goalsRows =
-    rosterNamesUnique
+    goalNamesUnique
       .map((name) => {
         const posForName = rosterSorted.find((r) => r.name.trim() === name);
-        return `<tr><td>${kpEscapeHtml(posForName ? posForName.position : "")}</td><td>${kpEscapeHtml(
+        return `<tr><td>${kpEscapeHtml(posForName ? posForName.position : "Res.")}</td><td>${kpEscapeHtml(
           name
         )}</td><td>${kpEscapeHtml(p.playerGoals[name] || "")}</td></tr>`;
       })
@@ -6546,6 +6557,12 @@ function KampplanEditor({ plan, setPlan, onBack, onSave, onPrint, saving, player
   const reserves = (plan.reserves || []).map((r) =>
     typeof r === "string" ? { name: r, useList: false } : r
   );
+  // Individuelle mål covers the lineup 1 starters plus reserves — a reserve
+  // can still come on, so she needs the same "what to focus on" prompt.
+  // Starters first (in position order, via rosterNames), then any
+  // reserve-only names after.
+  const reserveNames = [...new Set(reserves.map((r) => r.name && r.name.trim()).filter(Boolean))];
+  const individualGoalNames = [...rosterNames, ...reserveNames.filter((n) => !rosterNames.includes(n))];
   // Performance scoring covers anyone in either lineup or the reserves list,
   // not just the lineup 1 starters — but only names that resolve to a real
   // player record, since a rating links to a player_id, not a free-text name.
@@ -6724,9 +6741,9 @@ function KampplanEditor({ plan, setPlan, onBack, onSave, onPrint, saving, player
         <div style={styles.categoryHeadRow}>
           <span style={styles.categoryLabel}>Individuelle mål</span>
         </div>
-        {rosterNames.length === 0 ? (
+        {individualGoalNames.length === 0 ? (
           <p style={styles.noSkills}>
-            Tilføj spillere under "Position &amp; opstilling" for at sætte individuelle mål.
+            Tilføj spillere under "Position &amp; opstilling" eller "Reserver" for at sætte individuelle mål.
           </p>
         ) : (
           <table style={{ width: "100%", borderCollapse: "collapse" }}>
@@ -6750,14 +6767,14 @@ function KampplanEditor({ plan, setPlan, onBack, onSave, onPrint, saving, player
               </tr>
             </thead>
             <tbody>
-              {rosterNames.map((name) => {
+              {individualGoalNames.map((name) => {
                 const posForName = roster.find((r) => r.name.trim() === name);
                 const player = nameToPlayer.get(name);
                 const goalOptions = player ? kpGoalOptionsForPlayer(data, player.id) : [];
-                const useList = goalUseList[name] && goalOptions.length > 0;
+                const useList = Boolean(goalUseList[name]) && goalOptions.length > 0;
                 return (
                   <tr key={name}>
-                    <td style={{ width: 60, padding: "4px 8px 4px 0" }}>{posForName ? posForName.position : ""}</td>
+                    <td style={{ width: 60, padding: "4px 8px 4px 0" }}>{posForName ? posForName.position : "Res."}</td>
                     <td style={{ width: 110, padding: "4px 8px 4px 0" }}>{name}</td>
                     <td style={{ padding: "4px 0" }}>
                       {useList ? (
