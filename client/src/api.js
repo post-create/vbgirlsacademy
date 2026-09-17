@@ -237,6 +237,10 @@ export function commitMatchStats(matchPlanId, rows) {
   return request("POST", `/api/match-plans/${matchPlanId}/stats/commit`, { rows });
 }
 
+export function deleteMatchStats(matchPlanId) {
+  return request("DELETE", `/api/match-plans/${matchPlanId}/stats`);
+}
+
 export function getPlayerStats(playerId) {
   return request("GET", `/api/players/${playerId}/stats`);
 }

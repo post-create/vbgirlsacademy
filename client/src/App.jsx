@@ -6343,6 +6343,8 @@ function KpStatsUpload({ planId, players }) {
   const [previewError, setPreviewError] = useState("");
   const [committing, setCommitting] = useState(false);
   const [commitError, setCommitError] = useState("");
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
   const fileInputRef = React.useRef(null);
 
   useEffect(() => {
@@ -6392,15 +6394,42 @@ function KpStatsUpload({ planId, players }) {
 
   const matchedCount = preview ? preview.rows.filter((r) => r.playerId).length : 0;
 
+  const removeStats = async () => {
+    if (
+      !window.confirm(
+        `Slet al kampstatistik for denne kamp (${existing.length} spiller${existing.length !== 1 ? "e" : ""})? Det kan ikke fortrydes.`
+      )
+    ) {
+      return;
+    }
+    setDeleteError("");
+    setDeleting(true);
+    try {
+      await api.deleteMatchStats(planId);
+      setExisting([]);
+    } catch (err) {
+      setDeleteError(err.message);
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   return (
     <div style={styles.categoryBlock}>
       <div style={styles.categoryHeadRow}>
         <span style={styles.categoryLabel}>Kampstatistik</span>
-        {planId && (
-          <button style={styles.linkBtn} onClick={() => fileInputRef.current?.click()} disabled={uploading}>
-            <Upload size={12} /> {uploading ? "Læser fil…" : "Upload statistik"}
-          </button>
-        )}
+        <div style={{ display: "flex", gap: 8 }}>
+          {planId && (
+            <button style={styles.linkBtn} onClick={() => fileInputRef.current?.click()} disabled={uploading}>
+              <Upload size={12} /> {uploading ? "Læser fil…" : "Upload statistik"}
+            </button>
+          )}
+          {existing && existing.length > 0 && !preview && (
+            <button style={styles.linkBtnDanger} onClick={removeStats} disabled={deleting}>
+              <Trash2 size={12} /> {deleting ? "Sletter…" : "Slet statistik"}
+            </button>
+          )}
+        </div>
         <input
           ref={fileInputRef}
           type="file"
@@ -6489,6 +6518,7 @@ function KpStatsUpload({ planId, players }) {
         </div>
       ) : existing && existing.length > 0 ? (
         <div style={{ overflowX: "auto" }}>
+          {deleteError && <div style={styles.errorBannerRow}>{deleteError}</div>}
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
             <thead>
               <tr>

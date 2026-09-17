@@ -104,6 +104,19 @@ router.get("/", async (req, res, next) => {
   }
 });
 
+// Clears every stat row for this match — e.g. the wrong file got uploaded
+// and committed. Re-uploading afterward is a normal commit (upsert), so
+// this is only needed to get back to a clean slate first, not as part of
+// the regular correct-a-mistake flow.
+router.delete("/", async (req, res, next) => {
+  try {
+    await pool.query("delete from match_stats where match_plan_id = $1", [req.params.matchPlanId]);
+    res.status(204).end();
+  } catch (err) {
+    next(err);
+  }
+});
+
 // Parses the uploaded file and matches each row to a roster player by
 // jersey number — nothing is written to the database here. The coach
 // reviews the result (including any unmatched numbers) and only rows
