@@ -43,16 +43,36 @@ router.get("/:id/stats", async (req, res, next) => {
       fouls: r.fouls,
       saves: r.saves,
       totalEvents: r.total_events,
+      assists: r.assists,
+      conversionRate: r.conversion_rate,
+      passesSuccessful: r.passes_successful,
+      passesUnsuccessful: r.passes_unsuccessful,
+      goals: r.goals,
+      goalInvolvements: r.goal_involvements,
+      totalAttempts: r.total_attempts,
+      corners: r.corners,
+      penaltyKicks: r.penalty_kicks,
+      freeKicks: r.free_kicks,
+      throwIns: r.throw_ins,
+      starts: r.starts,
+      captaincies: r.captaincies,
+      playerOfTheMatch: r.player_of_the_match,
     }));
 
     // Sums for counting stats, a passes-weighted average for the success
     // rate (not a plain average of per-match percentages — a 100% game on
     // 2 passes shouldn't count the same as a 45% game on 30 passes), max
-    // for top speed, plain average for the rest.
+    // for top speed, plain average for the rest. Conversion rate gets the
+    // same weighted treatment, by total attempts rather than passes.
     const sum = (key) => matches.reduce((s, m) => s + (m[key] || 0), 0);
     const totalPasses = sum("passes");
     const weightedSuccess = matches.reduce(
       (s, m) => s + ((m.passSuccessPct || 0) * (m.passes || 0)) / 100,
+      0
+    );
+    const totalAttempts = sum("totalAttempts");
+    const weightedConversion = matches.reduce(
+      (s, m) => s + ((m.conversionRate || 0) * (m.totalAttempts || 0)) / 100,
       0
     );
 
@@ -79,6 +99,21 @@ router.get("/:id/stats", async (req, res, next) => {
             fouls: sum("fouls"),
             saves: sum("saves"),
             totalEvents: sum("totalEvents"),
+            assists: sum("assists"),
+            conversionRate:
+              totalAttempts > 0 ? Math.round((weightedConversion / totalAttempts) * 10000) / 100 : null,
+            passesSuccessful: sum("passesSuccessful"),
+            passesUnsuccessful: sum("passesUnsuccessful"),
+            goals: sum("goals"),
+            goalInvolvements: sum("goalInvolvements"),
+            totalAttempts,
+            corners: sum("corners"),
+            penaltyKicks: sum("penaltyKicks"),
+            freeKicks: sum("freeKicks"),
+            throwIns: sum("throwIns"),
+            starts: sum("starts"),
+            captaincies: sum("captaincies"),
+            playerOfTheMatch: sum("playerOfTheMatch"),
           };
 
     res.json({ season, matches });

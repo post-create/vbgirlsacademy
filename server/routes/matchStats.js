@@ -15,6 +15,9 @@ const STAT_COLUMNS = [
   "highIntensityRuns", "passes", "passSuccessPct", "dribbles", "shots",
   "tackles", "interceptions", "looseBallRecoveries", "goalKicks", "fouls",
   "saves", "totalEvents",
+  "assists", "conversionRate", "passesSuccessful", "passesUnsuccessful",
+  "goals", "goalInvolvements", "totalAttempts", "corners", "penaltyKicks",
+  "freeKicks", "throwIns", "starts", "captaincies", "playerOfTheMatch",
 ];
 const COLUMN_TO_DB = {
   minutes: "minutes", distanceMi: "distance_mi", avgSpeedMph: "avg_speed_mph",
@@ -23,6 +26,12 @@ const COLUMN_TO_DB = {
   shots: "shots", tackles: "tackles", interceptions: "interceptions",
   looseBallRecoveries: "loose_ball_recoveries", goalKicks: "goal_kicks",
   fouls: "fouls", saves: "saves", totalEvents: "total_events",
+  assists: "assists", conversionRate: "conversion_rate",
+  passesSuccessful: "passes_successful", passesUnsuccessful: "passes_unsuccessful",
+  goals: "goals", goalInvolvements: "goal_involvements", totalAttempts: "total_attempts",
+  corners: "corners", penaltyKicks: "penalty_kicks", freeKicks: "free_kicks",
+  throwIns: "throw_ins", starts: "starts", captaincies: "captaincies",
+  playerOfTheMatch: "player_of_the_match",
 };
 
 // The tracking export labels positions with English abbreviations; the app

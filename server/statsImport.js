@@ -2,18 +2,31 @@ const XLSX = require("xlsx");
 
 // The tracking tool exports two shapes we've seen so far: a season-to-date
 // file with a text header row ("Player", "Matches", "Shots", ...), and a
-// per-match file with no header row at all, just 32 positional columns.
-// Column 0-17 line up identically between the two (verified against a
-// goalkeeper's row — Goal kicks and Saves land exactly where the headered
-// file's column names say they should), so the positional layout below is
-// authoritative; header text, when present, is used only to confirm we're
-// reading a compatible file, not to remap anything.
+// per-match file with no header row at all. Column 0-17 line up identically
+// between the two (verified against a goalkeeper's row — Goal kicks and
+// Saves land exactly where the headered file's column names say they
+// should), so the positional layout below is authoritative; header text,
+// when present, is used only to confirm we're reading a compatible file,
+// not to remap anything.
+//
+// Columns 18-31 (assists onward) only exist in a newer version of the
+// export ("...NY.ods" in the samples we've seen) — an older per-match file
+// simply doesn't have those cells, so they come back null, same as any
+// other missing value.
 const COLUMNS = [
   "matches", "shots", "totalEvents", "distanceMi", "avgSpeedMph", "sprints",
   "minutes", "highIntensityRuns", "passes", "passSuccessPct", "dribbles",
   "tackles", "looseBallRecoveries", "interceptions", "goalKicks", "fouls",
   "saves", "topSpeedMph",
+  "assists", "conversionRate", "passesSuccessful", "passesUnsuccessful",
+  "goals", "goalInvolvements", "totalAttempts", "corners", "penaltyKicks",
+  "freeKicks", "throwIns", "starts", "captaincies", "playerOfTheMatch",
 ];
+
+// Every field name is stored internally in miles/mph regardless of which
+// unit the export used for that row — see parseDistanceOrSpeedCell.
+const DISTANCE_SPEED_FIELDS = new Set(["distanceMi", "avgSpeedMph", "topSpeedMph"]);
+const PERCENT_FIELDS = new Set(["passSuccessPct", "conversionRate"]);
 
 const HEADER_HINTS = ["player", "matches", "shots"];
 
@@ -36,6 +49,23 @@ function parseNumberCell(value, { percent } = {}) {
     .trim();
   const n = parseFloat(cleaned);
   return Number.isFinite(n) ? n : null;
+}
+
+// A newer version of the export ("...NY.ods" in the samples we've seen)
+// reports distance/speed in metric ("25,6km", "5,8km/t.") instead of the
+// original imperial ("15,9mi", "3,6mph") — confirmed by diffing the two
+// sample files for the same player: every other stat is byte-identical,
+// and 15.9mi * 1.60934 = 25.6km, 3.6mph * 1.60934 = 5.8km/h, to the
+// displayed precision. Rather than store two unit systems (or migrate the
+// column names/existing rows), metric values are converted to miles/mph
+// here so match_stats.distance_mi etc. stay meaningful regardless of which
+// export version a given file came from.
+const KM_TO_MI = 0.621371;
+function parseDistanceOrSpeedCell(value) {
+  const n = parseNumberCell(value);
+  if (n === null) return null;
+  const isMetric = /km/i.test(String(value));
+  return isMetric ? Math.round(n * KM_TO_MI * 10) / 10 : n;
 }
 
 // The player cell shows up in at least three layouts depending on which
@@ -96,7 +126,9 @@ function parseStatsFile(buffer, filename) {
     const stats = {};
     COLUMNS.forEach((key, i) => {
       const cellIndex = i + 1; // cells[0] is the player cell
-      stats[key] = parseNumberCell(cells[cellIndex], { percent: key === "passSuccessPct" });
+      stats[key] = DISTANCE_SPEED_FIELDS.has(key)
+        ? parseDistanceOrSpeedCell(cells[cellIndex])
+        : parseNumberCell(cells[cellIndex], { percent: PERCENT_FIELDS.has(key) });
     });
 
     const extra = {};

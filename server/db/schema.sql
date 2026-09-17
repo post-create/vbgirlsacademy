@@ -393,12 +393,43 @@ create table if not exists match_stats (
   fouls int,
   saves int,
   total_events int,
+  -- Added when the tracking tool's export grew from 18 to 32 stat columns
+  -- (see server/statsImport.js) — a season-to-date shaped export, but
+  -- still imported one Kampplan at a time like everything else here.
+  assists int,
+  conversion_rate numeric(5,2),
+  passes_successful int,
+  passes_unsuccessful int,
+  goals int,
+  goal_involvements int,
+  total_attempts int,
+  corners int,
+  penalty_kicks int,
+  free_kicks int,
+  throw_ins int,
+  starts int,
+  captaincies int,
+  player_of_the_match int,
   extra jsonb not null default '{}',
   updated_at timestamptz not null default now(),
   primary key (match_plan_id, player_id)
 );
 
 alter table match_stats add column if not exists position text not null default '';
+alter table match_stats add column if not exists assists int;
+alter table match_stats add column if not exists conversion_rate numeric(5,2);
+alter table match_stats add column if not exists passes_successful int;
+alter table match_stats add column if not exists passes_unsuccessful int;
+alter table match_stats add column if not exists goals int;
+alter table match_stats add column if not exists goal_involvements int;
+alter table match_stats add column if not exists total_attempts int;
+alter table match_stats add column if not exists corners int;
+alter table match_stats add column if not exists penalty_kicks int;
+alter table match_stats add column if not exists free_kicks int;
+alter table match_stats add column if not exists throw_ins int;
+alter table match_stats add column if not exists starts int;
+alter table match_stats add column if not exists captaincies int;
+alter table match_stats add column if not exists player_of_the_match int;
 
 create index if not exists idx_match_stats_player on match_stats(player_id);
 
