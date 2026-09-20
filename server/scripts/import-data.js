@@ -48,7 +48,7 @@ async function main() {
   await insertRows(
     pool,
     "players",
-    ["id", "name", "positions", "number", "email", "team_id", "self_token"],
+    ["id", "name", "primary_position", "secondary_position", "number", "email", "team_id", "self_token"],
     data.players || []
   );
   await insertRows(pool, "coaches", ["id", "name", "email", "team_id"], data.coaches || []);

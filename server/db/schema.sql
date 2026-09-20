@@ -12,7 +12,8 @@ create table if not exists teams (
 create table if not exists players (
   id text primary key,
   name text not null,
-  positions text[] not null default '{}',
+  primary_position text,
+  secondary_position text,
   number text not null default '',
   email text not null default '',
   team_id text references teams(id) on delete set null,
@@ -22,6 +23,82 @@ create table if not exists players (
 -- Added after the initial release; safe to re-run against a database that
 -- already has the players table from before this column existed.
 alter table players add column if not exists email text not null default '';
+
+alter table players add column if not exists primary_position text;
+alter table players add column if not exists secondary_position text;
+
+-- Replaces the old free-form `positions text[]` tagging (a player could
+-- carry any number of position tags, mixing letter codes and formation
+-- numbers — see server/positions.js) with exactly one primary and one
+-- optional secondary formation number. Any database still carrying that
+-- column gets it backfilled here — first tag becomes primary, second
+-- becomes secondary, any 3rd+ tag is dropped, which is the intended
+-- simplification — then the column is retired. Guarded so re-running
+-- schema.sql after a coach clears a player's position doesn't resurrect
+-- the old tags.
+do $$
+begin
+  if exists (
+    select 1 from information_schema.columns
+    where table_name = 'players' and column_name = 'positions'
+  ) then
+    update players set
+      primary_position = positions[1],
+      secondary_position = positions[2]
+    where primary_position is null and coalesce(array_length(positions, 1), 0) > 0;
+    alter table players drop column positions;
+  end if;
+end $$;
+
+-- Coach-editable companion to the fixed 1-11 formation catalog in
+-- server/positions.js (id/Danish label/abbreviation never change). Two
+-- things live here instead, both meant to be tuned per position: which
+-- English position abbreviations a stats-tracking export might use for
+-- that slot (see server/routes/matchStats.js — this is what lets the
+-- import recognise "RM"/"LB"/etc. and match/flag rows against a player's
+-- tagged position), and a free-text description of what characterises the
+-- position, fed into the AI development-plan prompt (see
+-- server/routes/developmentPlans.js). Seeded below with sensible defaults;
+-- `on conflict do nothing` so a coach's edits are never overwritten by a
+-- later schema.sql run.
+create table if not exists position_settings (
+  id text primary key,
+  aliases text[] not null default '{}',
+  characteristics text not null default ''
+);
+
+-- The characteristics text below is a detailed taktisk/teknik/fysik/mentalt
+-- profile per position, supplied by the club; ids 7 and 11 cross-reference
+-- each other by number ("spejlbillede af 11'eren") — 7 is Venstre
+-- kant/midtbane and 11 is Højre kant/midtbane per the catalog above, so
+-- keep those two in sync if either is ever renumbered.
+insert into position_settings (id, aliases, characteristics) values
+  ('1', ARRAY['GK'], E'Taktisk: Bruges aktivt til at skabe taloverlægenhed i opbygningen mod højt pres, tør spille langt ved numerisk ligetal/overtal på modstanders sidste linje, indleder etableringen af den kompakte kæde bagfra ved genoprebalance.\nTeknik: Sikker boldbehandling med fødderne under pres, præcise korte og lange afleveringer, god førsteberøring ved opbygning.\nFysik: Eksplosivitet i reaktioner, god rækkevidde, hurtig genrejsning efter redning.\nMentalt: Ro og selvtillid til at spille sig ud af pres frem for at clearere, mod til at tage beslutninger under høj risiko, tydelig kommunikator.'),
+  ('2', ARRAY['RB', 'RWB'], E'Taktisk: Smal bagved og bred foran i opbygningen, tiltrækker pres for at skabe rum til medspillere, indgår i forsvarsfeltets zoneprincip centralt/bagerst men presser mandsorienteret i siderummet ved erobringsspil, forsinker og etablerer blokken på siden ved genoprebalance.\nTeknik: Førsteberøring under pres i smal position, kvalitet i indlæg/afleveringer fra bred position foran, sikker 1v1-forsvar.\nFysik: Udholdenhed til konstant op/ned-løb, hurtighed i tilbageløb, styrke i dueller i siderummet.\nMentalt: Disciplin til at vælge smal/bred korrekt situationsbestemt, mod til at tiltrække pres, koncentration i det mandsorienterede sideransvar.'),
+  ('3', ARRAY['LB', 'LWB'], E'Taktisk: Spejlbillede af højre back – samme rolle i opbygning (smal bagved/bred foran) og samme mandsorienterede ansvar for siderummet defensivt.\nTeknik/Fysik/Mentalt: Samme profil som 2''eren, spejlvendt (venstrefod til indlæg og løbemønstre).'),
+  ('4', ARRAY['CB'], E'Taktisk: Del af zoneforsvaret centralt og bagerst, clearer mod siderum og så langt frem som muligt når presset ikke kan modstås, giver bevidst indrømmelser i det modsatte siderum efter blokprincippet, etablerer den kompakte kæde hurtigst muligt bagfra.\nTeknik: Præcis opspilspasning under pres, ren teknik i clearinger mod siderum, godt førsteberøring i pressede situationer.\nFysik: Styrke i luftdueller, hurtighed i tilbageløb ved dybe bolde, robusthed i den fysiske duel.\nMentalt: Ro til at "stå på bolden" og true rum uden at forhaste beslutningen, mod til at acceptere indrømmelser i modsatte siderum efter blokprincippet.'),
+  ('5', ARRAY['CB'], E'Taktisk: Makker til 4''eren i zoneforsvaret – samme ansvar for kompakthed centralt/bagerst, pumper og gør organisationen kompakt når bolden spilles til siden eller baglæns.\nTeknik/Fysik/Mentalt: Samme profil som 4''eren, med ekstra vægt på kommunikation og synkronisering af linjen med makkeren.'),
+  ('6', ARRAY['DM', 'DMF', 'CDM'], E'Taktisk: Dybe løb markeres mandsorienteret, søger retvendte mellemrumsspillere i opbygning, central i genpres (nærmeste spiller genpresser efter boldtab for at skabe hurtige reaktioner), lukker vandrette pasningslinjer i det høje pres.\nTeknik: Retvendt boldmodtagelse i mellemrum, sikker aflevering under pres, godt for- og bagvendt spil.\nFysik: Stor arbejdskapacitet til genpres, hurtig acceleration i sprint efter boldtab.\nMentalt: Skarp koncentration til at læse dybe løb mandsorienteret, mod til at lukke rum aggressivt i genpres.'),
+  ('7', ARRAY['LM', 'LW'], E'Taktisk: Spejlbillede af 11''eren – 1v1 i siderum, dybe bevægelser i halvrum, presser skråt i det høje pres og bidrager til at overhale boldholder ved forbiløb af højt pres.\nTeknik/Fysik/Mentalt: Samme profil som 11''eren, spejlvendt.'),
+  ('8', ARRAY['CM'], E'Taktisk: Udnytter overtal lokalt og fastholder efter erobring ved at spille væk fra pres og gerne bagud, dybe 6/8-løb markeres mandsorienteret defensivt, lokker modstander i bestemte rum og sprinter når bolden er undervejs i pres fra organiseret forsvarsspil.\nTeknik: Alsidig pasningsteknik i begge retninger, godt under pres i trange rum.\nFysik: Box-to-box-udholdenhed, styrke til at vinde dueller centralt.\nMentalt: Situationsfornemmelse for hvornår der skal lokkes/presses vs. holdes position, ro til at spille bagud efter erobring.'),
+  ('9', ARRAY['ST', 'CF'], E'Taktisk: Tiltrækker pres og vender spillet i gennembrudsfasen, dybe løb i ryggen på modstander centralt, fylder de prioriterede rum i feltet ved afslutning (forreste, bagerste, cut-back, centralt uden for feltet), leder det høje pres indefra og ud.\nTeknik: Afslutningskvalitet med begge fødder/hoved, boldkontrol med ryggen til mål.\nFysik: Styrke i dueller ryg mod modstander, eksplosivitet i dybe løb.\nMentalt: Vedholdenhed efter fejlslagne chancer, mod til at tiltrække pres og vende spillet.'),
+  ('10', ARRAY['CAM', 'AM', 'OM', 'OMF'], E'Taktisk: Modsatrettede bevægelser og bevægelse før pasning for at skabe gennembrud, søger retvendte mellemrumsspillere, en af "+1"-spillerne i restforsvar ved afslutning på angreb, mandsorienteret i erobringsspillet.\nTeknik: Kreativ sidste aflevering, teknisk sikkerhed i trange rum, godt sammenspil på lille plads.\nFysik: Hurtighed i modsatrettede bevægelser, smidighed til retningsskift.\nMentalt: Kreativitet og risikovillighed i sidste tredjedel, ansvarlighed i restforsvar efter boldtab.'),
+  ('11', ARRAY['RM', 'RW'], E'Taktisk: Skaber og udnytter 1v1-situationer i siderummet, bevæger sig dybt i halvrum/siderum før pasning, presser skråt indefra og ud i det høje pres, forbi højt pres ved at overhale boldholder og skabe flere niveauer/vinkler.\nTeknik: Driblekvalitet i 1v1, præcision i afsluttende indlæg/afslutning, godt førsteberøring i fart.\nFysik: Eksplosiv hurtighed, evne til gentagne sprints (offensivt og i genpres).\nMentalt: Mod til at gå i 1v1 gentagne gange selvom det mislykkes, vilje til at presse skråt tilbage.')
+on conflict (id) do nothing;
+
+-- 7 and 11 were originally seeded backwards (7 right/11 left instead of
+-- 7 left/11 right) — this fixes an already-seeded database's aliases, but
+-- only if they still hold the original wrong default, so a coach who has
+-- since edited either one by hand isn't overwritten.
+do $$
+begin
+  if exists (select 1 from position_settings where id = '7' and aliases = ARRAY['RM', 'RW']) then
+    update position_settings set aliases = ARRAY['LM', 'LW'] where id = '7';
+  end if;
+  if exists (select 1 from position_settings where id = '11' and aliases = ARRAY['LM', 'LW']) then
+    update position_settings set aliases = ARRAY['RM', 'RW'] where id = '11';
+  end if;
+end $$;
 
 create table if not exists periods (
   id text primary key,
@@ -354,7 +431,7 @@ create table if not exists app_settings (
 -- default, hence "do nothing" on conflict.
 insert into app_settings (key, value) values (
   'development_plan_prompt',
-  E'Du er assistenttræner for VB Pige Akademi og skal udkaste en udviklingsplan til en af klubbens spillere, baseret på hendes rigtige evaluerings- og måldata (vedhæftet nedenfor).\n\nSkriv direkte til spilleren (du-form), på dansk, i en varm men konkret trænertone — planen skal kunne læses af både spilleren selv og hendes forældre.\n\nBrug udelukkende de angivne data. Opfind aldrig konkrete tal, kampstatistik eller hændelser, der ikke fremgår nedenfor — hvis noget mangler (fx ingen mål sat endnu), så spring det afsnit over eller nævn det kort i stedet for at gætte.\n\nStrukturér planen med disse afsnit:\n1. En kort personlig indledning der hilser på spilleren og opsummerer, hvor hun står nu.\n2. Fokusområder — uddyb kort de mål, der allerede er sat; gengiv dem ikke som en ren liste, de vises i forvejen andetsteds i rapporten.\n3. Egentræning — et kort, generelt afsnit tilpasset spillerens niveau.\n4. Opfølgning — en kort opfordring til løbende dialog med træneren.\n\nSvar udelukkende med HTML og kun disse tags: <h3>, <p>, <ul>, <li>, <strong>, <em>. Ingen andre tags, ingen inline-styles, ingen billeder, ingen indledende forklaring uden for HTML''en.'
+  E'Du er assistenttræner for VB Pige Akademi og skal udkaste en udviklingsplan til en af klubbens spillere, baseret på hendes rigtige evaluerings- og måldata (vedhæftet nedenfor).\n\nSkriv direkte til spilleren (du-form), på dansk, i en varm men konkret trænertone — planen skal kunne læses af både spilleren selv og hendes forældre.\n\nBrug udelukkende de angivne data. Opfind aldrig konkrete tal, kampstatistik eller hændelser, der ikke fremgår nedenfor — hvis noget mangler (fx ingen mål sat endnu), så spring det afsnit over eller nævn det kort i stedet for at gætte.\n\nStrukturér planen med disse afsnit:\n1. En kort personlig indledning der hilser på spilleren og opsummerer, hvor hun står nu.\n2. Fokusområder — uddyb kort de mål, der allerede er sat; gengiv dem ikke som en ren liste, de vises i forvejen andetsteds i rapporten.\n3. Egentræning — et kort, generelt afsnit tilpasset spillerens niveau og position (brug kendetegnene for spillerens position, hvis de er angivet).\n4. Opfølgning — en kort opfordring til løbende dialog med træneren.\n\nSvar udelukkende med HTML og kun disse tags: <h3>, <p>, <ul>, <li>, <strong>, <em>. Ingen andre tags, ingen inline-styles, ingen billeder, ingen indledende forklaring uden for HTML''en.'
 ) on conflict (key) do nothing;
 
 -- Per-player tracking stats for one Kampplan (= one game — stats never
@@ -372,14 +449,14 @@ create table if not exists match_stats (
   player_number text not null default '',
   -- Position as the tracking export labelled it that game (GK/CB/LB/RB/...
   -- — English abbreviations, distinct from the app's own 1-11 formation
-  -- numbers used in players.positions), kept as free text since export
-  -- vocabularies vary and this is informational, not matched against
-  -- anything.
+  -- numbers used in players.primary_position/secondary_position), kept as
+  -- free text since export vocabularies vary and this is informational,
+  -- not matched against anything.
   position text not null default '',
   minutes int,
-  distance_mi numeric(5,1),
-  avg_speed_mph numeric(4,1),
-  top_speed_mph numeric(4,1),
+  distance_km numeric(5,1),
+  avg_speed_kmh numeric(4,1),
+  top_speed_kmh numeric(4,1),
   sprints int,
   high_intensity_runs int,
   passes int,
@@ -430,6 +507,27 @@ alter table match_stats add column if not exists throw_ins int;
 alter table match_stats add column if not exists starts int;
 alter table match_stats add column if not exists captaincies int;
 alter table match_stats add column if not exists player_of_the_match int;
+
+-- Imported stats used to be stored in miles/mph (see server/statsImport.js
+-- git history); any database still carrying those columns gets them renamed
+-- to their metric equivalents, with existing values converted in place
+-- (1mi = 1.60934km) so already-imported matches stay accurate rather than
+-- being silently reinterpreted as km/km-h.
+do $$
+begin
+  if exists (
+    select 1 from information_schema.columns
+    where table_name = 'match_stats' and column_name = 'distance_mi'
+  ) then
+    alter table match_stats rename column distance_mi to distance_km;
+    alter table match_stats rename column avg_speed_mph to avg_speed_kmh;
+    alter table match_stats rename column top_speed_mph to top_speed_kmh;
+    update match_stats set
+      distance_km = round((distance_km * 1.60934)::numeric, 1),
+      avg_speed_kmh = round((avg_speed_kmh * 1.60934)::numeric, 1),
+      top_speed_kmh = round((top_speed_kmh * 1.60934)::numeric, 1);
+  end if;
+end $$;
 
 create index if not exists idx_match_stats_player on match_stats(player_id);
 

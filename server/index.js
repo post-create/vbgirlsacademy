@@ -28,6 +28,7 @@ const matchPlansRouter = require("./routes/matchPlans");
 const matchStatsRouter = require("./routes/matchStats");
 const developmentPlansRouter = require("./routes/developmentPlans");
 const settingsRouter = require("./routes/settings");
+const positionSettingsRouter = require("./routes/positionSettings");
 
 if (!process.env.SESSION_SECRET) {
   throw new Error("SESSION_SECRET is not set. Copy .env.example to .env and fill it in.");
@@ -77,6 +78,7 @@ app.use("/api/match-plans", requireAuth, matchPlansRouter);
 app.use("/api/match-plans/:matchPlanId/stats", requireAuth, matchStatsRouter);
 app.use("/api/development-plans", requireAuth, developmentPlansRouter);
 app.use("/api/settings", requireAuth, settingsRouter);
+app.use("/api/position-settings", requireAuth, positionSettingsRouter);
 
 if (process.env.NODE_ENV === "production") {
   const clientDist = path.join(__dirname, "..", "client", "dist");

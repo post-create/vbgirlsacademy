@@ -23,7 +23,7 @@ router.get("/", async (req, res, next) => {
     ] = await Promise.all([
       pool.query("select id, name from teams order by name"),
       pool.query(
-        `select id, name, positions, number, email, team_id, self_token, skill_group_id,
+        `select id, name, primary_position, secondary_position, number, email, team_id, self_token, skill_group_id,
                 participation_level_id, goal_2_3y, goal_1_2y, goal_under_1y
          from players order by name`
       ),
@@ -51,7 +51,8 @@ router.get("/", async (req, res, next) => {
     const playersOut = players.rows.map((p) => ({
       id: p.id,
       name: p.name,
-      positions: p.positions || [],
+      primaryPosition: p.primary_position,
+      secondaryPosition: p.secondary_position,
       number: p.number || "",
       email: p.email || "",
       teamId: p.team_id,

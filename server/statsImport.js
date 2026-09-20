@@ -14,18 +14,18 @@ const XLSX = require("xlsx");
 // simply doesn't have those cells, so they come back null, same as any
 // other missing value.
 const COLUMNS = [
-  "matches", "shots", "totalEvents", "distanceMi", "avgSpeedMph", "sprints",
+  "matches", "shots", "totalEvents", "distanceKm", "avgSpeedKmh", "sprints",
   "minutes", "highIntensityRuns", "passes", "passSuccessPct", "dribbles",
   "tackles", "looseBallRecoveries", "interceptions", "goalKicks", "fouls",
-  "saves", "topSpeedMph",
+  "saves", "topSpeedKmh",
   "assists", "conversionRate", "passesSuccessful", "passesUnsuccessful",
   "goals", "goalInvolvements", "totalAttempts", "corners", "penaltyKicks",
   "freeKicks", "throwIns", "starts", "captaincies", "playerOfTheMatch",
 ];
 
-// Every field name is stored internally in miles/mph regardless of which
+// Every field name is stored internally in km/km-h regardless of which
 // unit the export used for that row — see parseDistanceOrSpeedCell.
-const DISTANCE_SPEED_FIELDS = new Set(["distanceMi", "avgSpeedMph", "topSpeedMph"]);
+const DISTANCE_SPEED_FIELDS = new Set(["distanceKm", "avgSpeedKmh", "topSpeedKmh"]);
 const PERCENT_FIELDS = new Set(["passSuccessPct", "conversionRate"]);
 
 const HEADER_HINTS = ["player", "matches", "shots"];
@@ -53,19 +53,19 @@ function parseNumberCell(value, { percent } = {}) {
 
 // A newer version of the export ("...NY.ods" in the samples we've seen)
 // reports distance/speed in metric ("25,6km", "5,8km/t.") instead of the
-// original imperial ("15,9mi", "3,6mph") — confirmed by diffing the two
-// sample files for the same player: every other stat is byte-identical,
-// and 15.9mi * 1.60934 = 25.6km, 3.6mph * 1.60934 = 5.8km/h, to the
-// displayed precision. Rather than store two unit systems (or migrate the
-// column names/existing rows), metric values are converted to miles/mph
-// here so match_stats.distance_mi etc. stay meaningful regardless of which
-// export version a given file came from.
-const KM_TO_MI = 0.621371;
+// original imperial ("15,9mi", "3,6mph") used by the older export —
+// confirmed by diffing the two sample files for the same player: every
+// other stat is byte-identical, and 15.9mi * 1.60934 = 25.6km,
+// 3.6mph * 1.60934 = 5.8km/h, to the displayed precision. Metric is the
+// canonical unit regardless of source, so imperial values are converted
+// here and metric ones pass through unchanged — match_stats.distance_km
+// etc. always mean km/km-h no matter which export version a file came from.
+const MI_TO_KM = 1.60934;
 function parseDistanceOrSpeedCell(value) {
   const n = parseNumberCell(value);
   if (n === null) return null;
   const isMetric = /km/i.test(String(value));
-  return isMetric ? Math.round(n * KM_TO_MI * 10) / 10 : n;
+  return isMetric ? n : Math.round(n * MI_TO_KM * 10) / 10;
 }
 
 // The player cell shows up in at least three layouts depending on which

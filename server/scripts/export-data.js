@@ -22,7 +22,7 @@ async function main() {
     periods: "select id, label, date::text as date from periods",
     skills: "select id, category_key, name, enabled, sort_order from skills",
     players:
-      "select id, name, positions, number, email, team_id, self_token from players",
+      "select id, name, primary_position, secondary_position, number, email, team_id, self_token from players",
     coaches: "select id, name, email, team_id from coaches",
     evaluations: "select player_id, period_id, skill_id, score from evaluations",
     goals:

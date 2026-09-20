@@ -11,7 +11,7 @@ const router = express.Router({ mergeParams: true });
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
 
 const STAT_COLUMNS = [
-  "minutes", "distanceMi", "avgSpeedMph", "topSpeedMph", "sprints",
+  "minutes", "distanceKm", "avgSpeedKmh", "topSpeedKmh", "sprints",
   "highIntensityRuns", "passes", "passSuccessPct", "dribbles", "shots",
   "tackles", "interceptions", "looseBallRecoveries", "goalKicks", "fouls",
   "saves", "totalEvents",
@@ -20,8 +20,8 @@ const STAT_COLUMNS = [
   "freeKicks", "throwIns", "starts", "captaincies", "playerOfTheMatch",
 ];
 const COLUMN_TO_DB = {
-  minutes: "minutes", distanceMi: "distance_mi", avgSpeedMph: "avg_speed_mph",
-  topSpeedMph: "top_speed_mph", sprints: "sprints", highIntensityRuns: "high_intensity_runs",
+  minutes: "minutes", distanceKm: "distance_km", avgSpeedKmh: "avg_speed_kmh",
+  topSpeedKmh: "top_speed_kmh", sprints: "sprints", highIntensityRuns: "high_intensity_runs",
   passes: "passes", passSuccessPct: "pass_success_pct", dribbles: "dribbles",
   shots: "shots", tackles: "tackles", interceptions: "interceptions",
   looseBallRecoveries: "loose_ball_recoveries", goalKicks: "goal_kicks",
@@ -34,45 +34,31 @@ const COLUMN_TO_DB = {
   playerOfTheMatch: "player_of_the_match",
 };
 
-// The tracking export labels positions with English abbreviations; the app
-// tags players with classic formation numbers (1-11, see POSITIONS in
-// App.jsx) instead of letters. Maps a file position to the app number(s)
-// it plausibly corresponds to, so the review screen can flag a row where
-// the file's position doesn't fit any position the matched player is
-// tagged with — a cheap sanity check on top of the jersey-number match,
-// not a hard rule (a coach may tag a player differently than a one-off
-// export labels her that game). CB is kept ambiguous between the classic
-// left/right centre-back numbers (4 and 5) since the export doesn't say
-// which side.
-const FILE_POSITION_TO_APP_NUMBERS = {
-  GK: ["1"],
-  RB: ["2"],
-  LB: ["3"],
-  CB: ["4", "5"],
-  DM: ["6"],
-  DMF: ["6"],
-  CDM: ["6"],
-  RM: ["7"],
-  RW: ["7"],
-  CM: ["8"],
-  ST: ["9"],
-  CF: ["9"],
-  CAM: ["10"],
-  AM: ["10"],
-  OM: ["10"],
-  OMF: ["10"],
-  LM: ["11"],
-  LW: ["11"],
-  LWB: ["3"],
-  RWB: ["2"],
-};
+// { id: [alias, ...] } for every formation slot, straight from the
+// coach-editable position_settings table (see server/routes/positionSettings.js)
+// — Positionsopsætning under Indstillinger is where a coach links English
+// import abbreviations like "RM"/"LB" to a Danish position number.
+async function loadPositionAliases() {
+  const { rows } = await pool.query("select id, aliases from position_settings");
+  return new Map(rows.map((r) => [r.id, (r.aliases || []).map((a) => a.toUpperCase())]));
+}
 
-// SUB ("substitute") isn't a position, so it's deliberately absent from
-// the map above and never flagged as a mismatch.
-function positionMismatch(filePosition, playerPositions) {
-  const expected = FILE_POSITION_TO_APP_NUMBERS[String(filePosition || "").toUpperCase()];
-  if (!expected || !playerPositions || playerPositions.length === 0) return false;
-  return !expected.some((n) => playerPositions.includes(n));
+// The tracking export labels positions with English abbreviations; the app
+// tags each player with a primary/secondary formation number (1-11, see
+// server/positions.js) instead of letters. Flags a row where the file's
+// position doesn't fit either position the matched player is tagged with —
+// a cheap sanity check on top of the jersey-number match, not a hard rule
+// (a coach may tag a player differently than a one-off export labels her
+// that game). Only flags a mismatch when some position's alias list
+// actually recognises the file's term — an export using a term no coach
+// has linked to any position (e.g. "SUB") is silently allowed through
+// rather than treated as always wrong.
+function positionMismatch(filePosition, playerPositions, aliasesById) {
+  if (!filePosition || !playerPositions || playerPositions.length === 0) return false;
+  const term = String(filePosition).toUpperCase();
+  const recognised = [...aliasesById.values()].some((aliases) => aliases.includes(term));
+  if (!recognised) return false;
+  return !playerPositions.some((id) => (aliasesById.get(id) || []).includes(term));
 }
 
 function rowOut(row) {
@@ -132,24 +118,38 @@ router.post("/parse", upload.single("file"), async (req, res, next) => {
       return res.status(400).json({ error: "Kunne ikke læse filen: " + e.message });
     }
 
-    const { rows: players } = await pool.query("select id, name, number, positions from players");
+    const [{ rows: players }, aliasesById] = await Promise.all([
+      pool.query("select id, name, number, primary_position, secondary_position from players"),
+      loadPositionAliases(),
+    ]);
     const byNumber = new Map(players.filter((p) => p.number).map((p) => [p.number, p]));
 
     const preview = parsed.rows.map((row) => {
       const match = byNumber.get(row.playerNumber) || null;
+      const matchPositions = match
+        ? [match.primary_position, match.secondary_position].filter(Boolean)
+        : [];
       return {
         fileNumber: row.playerNumber,
         filePosition: row.position,
         fileName: row.name,
         matchedPlayerId: match ? match.id : null,
         matchedPlayerName: match ? match.name : null,
-        positionMismatch: match ? positionMismatch(row.position, match.positions) : false,
+        positionMismatch: match ? positionMismatch(row.position, matchPositions, aliasesById) : false,
         stats: row.stats,
         extra: row.extra,
       };
     });
 
-    res.json({ rows: preview, skipped: parsed.skipped, allPlayers: players });
+    // positionAliases is sent along so the client can recompute mismatches
+    // live if the coach re-matches a row to a different player — the flag
+    // above is only ever right at parse time.
+    res.json({
+      rows: preview,
+      skipped: parsed.skipped,
+      allPlayers: players,
+      positionAliases: Object.fromEntries(aliasesById),
+    });
   } catch (err) {
     next(err);
   }

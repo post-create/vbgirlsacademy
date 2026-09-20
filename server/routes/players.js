@@ -1,11 +1,32 @@
 const express = require("express");
 const crypto = require("crypto");
 const pool = require("../db");
+const { POSITIONS } = require("../positions");
 
 const router = express.Router();
 
+const VALID_POSITION_IDS = new Set(POSITIONS.map((p) => p.id));
+
 function makeSelfToken() {
   return crypto.randomBytes(24).toString("hex");
+}
+
+// Returns an error string, or null if { primaryPosition, secondaryPosition }
+// is acceptable — either left out entirely (existing value kept, handled by
+// the caller), or one of the 11 formation numbers, with the two not equal
+// to each other (the picker in App.jsx already excludes that, this is the
+// server-side backstop).
+function validatePositions(primaryPosition, secondaryPosition) {
+  if (primaryPosition != null && !VALID_POSITION_IDS.has(primaryPosition)) {
+    return "Ugyldig primær position.";
+  }
+  if (secondaryPosition != null && !VALID_POSITION_IDS.has(secondaryPosition)) {
+    return "Ugyldig sekundær position.";
+  }
+  if (primaryPosition != null && primaryPosition === secondaryPosition) {
+    return "Primær og sekundær position kan ikke være den samme.";
+  }
+  return null;
 }
 
 // Per-match rows plus season totals computed on the fly from them — never
@@ -27,9 +48,9 @@ router.get("/:id/stats", async (req, res, next) => {
       matchDate: r.match_date,
       position: r.position || "",
       minutes: r.minutes,
-      distanceMi: r.distance_mi,
-      avgSpeedMph: r.avg_speed_mph,
-      topSpeedMph: r.top_speed_mph,
+      distanceKm: r.distance_km,
+      avgSpeedKmh: r.avg_speed_kmh,
+      topSpeedKmh: r.top_speed_kmh,
       sprints: r.sprints,
       highIntensityRuns: r.high_intensity_runs,
       passes: r.passes,
@@ -82,10 +103,10 @@ router.get("/:id/stats", async (req, res, next) => {
         : {
             matches: matches.length,
             minutes: sum("minutes"),
-            distanceMi: Math.round(sum("distanceMi") * 10) / 10,
-            avgSpeedMph:
-              Math.round((matches.reduce((s, m) => s + (m.avgSpeedMph || 0), 0) / matches.length) * 10) / 10,
-            topSpeedMph: Math.max(...matches.map((m) => m.topSpeedMph || 0)),
+            distanceKm: Math.round(sum("distanceKm") * 10) / 10,
+            avgSpeedKmh:
+              Math.round((matches.reduce((s, m) => s + (m.avgSpeedKmh || 0), 0) / matches.length) * 10) / 10,
+            topSpeedKmh: Math.max(...matches.map((m) => m.topSpeedKmh || 0)),
             sprints: sum("sprints"),
             highIntensityRuns: sum("highIntensityRuns"),
             passes: totalPasses,
@@ -124,9 +145,12 @@ router.get("/:id/stats", async (req, res, next) => {
 
 router.post("/", async (req, res, next) => {
   try {
-    const { name, positions, number, email, teamId, skillGroupId } = req.body;
+    const { name, primaryPosition, secondaryPosition, number, email, teamId, skillGroupId } = req.body;
     if (!name || !name.trim()) return res.status(400).json({ error: "name is required" });
     if (!skillGroupId) return res.status(400).json({ error: "skillGroupId is required" });
+
+    const positionError = validatePositions(primaryPosition || null, secondaryPosition || null);
+    if (positionError) return res.status(400).json({ error: positionError });
 
     const { rows: groupRows } = await pool.query("select id from skill_groups where id = $1", [
       skillGroupId,
@@ -136,12 +160,13 @@ router.post("/", async (req, res, next) => {
     const id = crypto.randomUUID();
     const selfToken = makeSelfToken();
     await pool.query(
-      `insert into players (id, name, positions, number, email, team_id, self_token, skill_group_id)
-       values ($1, $2, $3, $4, $5, $6, $7, $8)`,
+      `insert into players (id, name, primary_position, secondary_position, number, email, team_id, self_token, skill_group_id)
+       values ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
       [
         id,
         name.trim(),
-        positions || [],
+        primaryPosition || null,
+        secondaryPosition || null,
         (number || "").trim(),
         (email || "").trim(),
         teamId || null,
@@ -152,7 +177,8 @@ router.post("/", async (req, res, next) => {
     res.status(201).json({
       id,
       name: name.trim(),
-      positions: positions || [],
+      primaryPosition: primaryPosition || null,
+      secondaryPosition: secondaryPosition || null,
       number: (number || "").trim(),
       email: (email || "").trim(),
       teamId: teamId || null,
@@ -167,7 +193,7 @@ router.post("/", async (req, res, next) => {
 router.patch("/:id", async (req, res, next) => {
   try {
     const current = await pool.query(
-      `select id, name, positions, number, email, team_id, self_token, skill_group_id,
+      `select id, name, primary_position, secondary_position, number, email, team_id, self_token, skill_group_id,
               participation_level_id, goal_2_3y, goal_1_2y, goal_under_1y
        from players where id = $1`,
       [req.params.id]
@@ -176,7 +202,12 @@ router.patch("/:id", async (req, res, next) => {
     const existing = current.rows[0];
 
     const name = req.body.name !== undefined ? req.body.name : existing.name;
-    const positions = req.body.positions !== undefined ? req.body.positions : existing.positions;
+    const primaryPosition =
+      req.body.primaryPosition !== undefined ? req.body.primaryPosition : existing.primary_position;
+    const secondaryPosition =
+      req.body.secondaryPosition !== undefined ? req.body.secondaryPosition : existing.secondary_position;
+    const positionError = validatePositions(primaryPosition || null, secondaryPosition || null);
+    if (positionError) return res.status(400).json({ error: positionError });
     const number = req.body.number !== undefined ? req.body.number : existing.number;
     const email = req.body.email !== undefined ? req.body.email : existing.email;
     const teamId = req.body.teamId !== undefined ? req.body.teamId : existing.team_id;
@@ -202,16 +233,17 @@ router.patch("/:id", async (req, res, next) => {
     }
 
     const { rows } = await pool.query(
-      `update players set name = $2, positions = $3, number = $4, email = $5, team_id = $6,
-              participation_level_id = $7, goal_2_3y = $8, goal_1_2y = $9, goal_under_1y = $10,
-              skill_group_id = $11
+      `update players set name = $2, primary_position = $3, secondary_position = $4, number = $5, email = $6,
+              team_id = $7, participation_level_id = $8, goal_2_3y = $9, goal_1_2y = $10, goal_under_1y = $11,
+              skill_group_id = $12
        where id = $1
-       returning id, name, positions, number, email, team_id, self_token, skill_group_id,
+       returning id, name, primary_position, secondary_position, number, email, team_id, self_token, skill_group_id,
                  participation_level_id, goal_2_3y, goal_1_2y, goal_under_1y`,
       [
         req.params.id,
         name,
-        positions,
+        primaryPosition || null,
+        secondaryPosition || null,
         number,
         email,
         teamId,
@@ -226,7 +258,8 @@ router.patch("/:id", async (req, res, next) => {
     res.json({
       id: p.id,
       name: p.name,
-      positions: p.positions || [],
+      primaryPosition: p.primary_position,
+      secondaryPosition: p.secondary_position,
       number: p.number || "",
       email: p.email || "",
       teamId: p.team_id,

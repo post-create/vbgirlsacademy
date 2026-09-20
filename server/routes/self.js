@@ -10,7 +10,7 @@ const router = express.Router();
 // into the browser and filtered by token client-side.
 async function loadPlayerByToken(token) {
   const { rows } = await pool.query(
-    `select id, name, positions, number, team_id, skill_group_id, participation_level_id,
+    `select id, name, primary_position, secondary_position, number, team_id, skill_group_id, participation_level_id,
             goal_2_3y, goal_1_2y, goal_under_1y
      from players where self_token = $1`,
     [token]
@@ -82,7 +82,8 @@ router.get("/:token", async (req, res, next) => {
       player: {
         id: player.id,
         name: player.name,
-        positions: player.positions || [],
+        primaryPosition: player.primary_position,
+        secondaryPosition: player.secondary_position,
         number: player.number || "",
         teamId: player.team_id,
         skillGroupId: player.skill_group_id,

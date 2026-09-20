@@ -54,12 +54,13 @@ import {
   Upload,
 } from "lucide-react";
 import * as api from "./api.js";
+import { POSITION_CATALOG, formatPlayerPositions } from "./positions.js";
 
 const LOGO_SRC =
   "data:image/png;base64,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";
 
 // Grouped under one "Indstillinger" nav item to keep the main nav simple.
-const SETTINGS_VIEWS = ["teams", "coachProfiles", "periods", "settings", "levels", "aiPrompt"];
+const SETTINGS_VIEWS = ["teams", "coachProfiles", "periods", "settings", "levels", "positionSettings", "aiPrompt"];
 
 const SETTINGS_TABS = [
   { key: "teams", label: "Hold", icon: Layers },
@@ -67,6 +68,7 @@ const SETTINGS_TABS = [
   { key: "periods", label: "Perioder", icon: CalendarRange },
   { key: "settings", label: "Kriterier", icon: SlidersHorizontal },
   { key: "levels", label: "Niveauer", icon: BarChart3 },
+  { key: "positionSettings", label: "Positionsopsætning", icon: Hash },
   { key: "aiPrompt", label: "AI-udkast", icon: Sparkles },
 ];
 
@@ -83,35 +85,6 @@ const DEFAULT_SKILLS = {
   tactical: ["Positionering", "Beslutningstagning", "Overblik", "Samarbejde", "Forsvarsspil", "Bevægelse uden bold"],
   mental: ["Selvtillid", "Ro", "Målrettethed", "Disciplin", "Kommunikation", "Lederskab"],
 };
-
-const POSITIONS = [
-  "MV",
-  "CB",
-  "VB",
-  "HB",
-  "VWB",
-  "HWB",
-  "DM",
-  "CM",
-  "OM",
-  "VM",
-  "HM",
-  "VK",
-  "HK",
-  "CF",
-  "ST",
-  "1",
-  "2",
-  "3",
-  "4",
-  "5",
-  "6",
-  "7",
-  "8",
-  "9",
-  "10",
-  "11",
-];
 
 const EVAL_COLORS = ["#4A4A4A", "#E2231A"];
 const GOAL_COLOR = "#1A1A1A";
@@ -335,27 +308,49 @@ function SkillDrilldownRadar({ config, catKey, player, scores, goals, onClose })
   );
 }
 
-function PositionPicker({ selected, onToggle }) {
+// One primary position (required to have a value once set — a coach can
+// still leave it empty) and one optional secondary, both drawn from the
+// same 11-slot formation catalog (see client/src/positions.js). Replaces
+// the old free-tag PositionPicker that let a coach stack up any number of
+// letter/number tags with no primary/secondary distinction.
+function PositionFields({ primaryPosition, secondaryPosition, onChangePrimary, onChangeSecondary }) {
   return (
-    <div style={styles.positionGrid}>
-      {POSITIONS.map((pos) => {
-        const active = selected.includes(pos);
-        return (
-          <button
-            key={pos}
-            type="button"
-            onClick={() => onToggle(pos)}
-            style={{
-              ...styles.positionChip,
-              background: active ? "#111111" : "#FFFFFF",
-              color: active ? "#FFFFFF" : "#1A1A1A",
-              borderColor: active ? "#111111" : "#D9D4C7",
-            }}
-          >
-            {pos}
-          </button>
-        );
-      })}
+    <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+      <div style={{ flex: 1, minWidth: 160 }}>
+        <div style={styles.fieldLabel}>Primær position</div>
+        <select
+          style={styles.select}
+          value={primaryPosition || ""}
+          onChange={(e) => {
+            const value = e.target.value || null;
+            onChangePrimary(value);
+            // A position can't be both primary and secondary at once.
+            if (value && value === secondaryPosition) onChangeSecondary(null);
+          }}
+        >
+          <option value="">Vælg position</option>
+          {POSITION_CATALOG.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.id}
+            </option>
+          ))}
+        </select>
+      </div>
+      <div style={{ flex: 1, minWidth: 160 }}>
+        <div style={styles.fieldLabel}>Sekundær position</div>
+        <select
+          style={styles.select}
+          value={secondaryPosition || ""}
+          onChange={(e) => onChangeSecondary(e.target.value || null)}
+        >
+          <option value="">Ingen</option>
+          {POSITION_CATALOG.filter((p) => p.id !== primaryPosition).map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.id}
+            </option>
+          ))}
+        </select>
+      </div>
     </div>
   );
 }
@@ -780,7 +775,8 @@ export default function AcademyApp() {
   }, [view]);
   const [addingPlayer, setAddingPlayer] = useState(false);
   const [newName, setNewName] = useState("");
-  const [newPositions, setNewPositions] = useState([]);
+  const [newPrimaryPosition, setNewPrimaryPosition] = useState(null);
+  const [newSecondaryPosition, setNewSecondaryPosition] = useState(null);
   const [newNumber, setNewNumber] = useState("");
   const [newEmail, setNewEmail] = useState("");
   const [newTeamId, setNewTeamId] = useState("");
@@ -960,7 +956,8 @@ export default function AcademyApp() {
       if (!newName.trim() || !newSkillGroupId) return;
       const created = await api.createPlayer({
         name: newName.trim(),
-        positions: newPositions,
+        primaryPosition: newPrimaryPosition,
+        secondaryPosition: newSecondaryPosition,
         number: newNumber.trim(),
         email: newEmail.trim(),
         teamId: newTeamId || null,
@@ -968,7 +965,8 @@ export default function AcademyApp() {
       });
       setData({ ...data, players: [...data.players, created] });
       setNewName("");
-      setNewPositions([]);
+      setNewPrimaryPosition(null);
+      setNewSecondaryPosition(null);
       setNewNumber("");
       setNewEmail("");
       setNewTeamId("");
@@ -992,10 +990,10 @@ export default function AcademyApp() {
       }
     });
 
-  const updatePlayerPositions = (playerId, positions) =>
+  const updatePlayerPositions = (playerId, patch) =>
     runMutation(async () => {
-      await api.updatePlayer(playerId, { positions });
-      const players = data.players.map((p) => (p.id === playerId ? { ...p, positions } : p));
+      await api.updatePlayer(playerId, patch);
+      const players = data.players.map((p) => (p.id === playerId ? { ...p, ...patch } : p));
       setData({ ...data, players });
     });
 
@@ -1361,6 +1359,8 @@ export default function AcademyApp() {
           />
         )}
 
+        {view === "positionSettings" && <PositionSettingsView />}
+
         {view === "aiPrompt" && <AiPromptView />}
 
         {view === "coaches" && (
@@ -1433,8 +1433,10 @@ export default function AcademyApp() {
             setAddingPlayer={setAddingPlayer}
             newName={newName}
             setNewName={setNewName}
-            newPositions={newPositions}
-            setNewPositions={setNewPositions}
+            newPrimaryPosition={newPrimaryPosition}
+            setNewPrimaryPosition={setNewPrimaryPosition}
+            newSecondaryPosition={newSecondaryPosition}
+            setNewSecondaryPosition={setNewSecondaryPosition}
             newNumber={newNumber}
             setNewNumber={setNewNumber}
             newEmail={newEmail}
@@ -1467,7 +1469,7 @@ export default function AcademyApp() {
               setScore(selectedPlayer.id, periodId, subskillId, value)
             }
             onDelete={() => setConfirmDelete(selectedPlayer.id)}
-            onUpdatePositions={(positions) => updatePlayerPositions(selectedPlayer.id, positions)}
+            onUpdatePositions={(patch) => updatePlayerPositions(selectedPlayer.id, patch)}
             onUpdateTeam={(teamId) => updatePlayerTeam(selectedPlayer.id, teamId)}
             onUpdateEmail={(email) => updatePlayerEmail(selectedPlayer.id, email)}
             onUpdateNumber={(number) => updatePlayerNumber(selectedPlayer.id, number)}
@@ -1569,11 +1571,7 @@ function PlayerSelfEvalApp({ player, config, periods, coachEvaluations, goals, d
           <div style={styles.numberBadgeLg}>{player.number || "—"}</div>
           <div>
             <h1 style={styles.h1}>{player.name}</h1>
-            <p style={styles.subtext}>
-              {player.positions && player.positions.length > 0
-                ? player.positions.join(" · ")
-                : "Position ikke angivet"}
-            </p>
+            <p style={styles.subtext}>{formatPlayerPositions(player) || "Position ikke angivet"}</p>
           </div>
         </div>
 
@@ -2604,6 +2602,121 @@ function AiPromptView() {
   );
 }
 
+// The 11 formation numbers themselves never change (server/positions.js),
+// but which English stats-import abbreviations map to each one, and what
+// characterises the position, are coach-editable here — used respectively
+// by the stats-import mismatch check (matchStats.js) and the AI
+// development-plan prompt (developmentPlans.js).
+function PositionSettingsView() {
+  const [positions, setPositions] = useState(null); // null while loading
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    api.getPositionSettings().then(setPositions).catch((e) => setError(e.message));
+  }, []);
+
+  const save = async (id, patch) => {
+    const updated = await api.updatePositionSetting(id, patch);
+    setPositions((prev) => prev.map((p) => (p.id === id ? updated : p)));
+  };
+
+  return (
+    <div>
+      <div style={styles.sectionHeadRow}>
+        <div>
+          <h1 style={styles.h1}>Positionsopsætning</h1>
+          <p style={styles.subtext}>
+            Kobl hver af de 11 positioner til de engelske positionsbetegnelser, statistik-
+            importen kan bruge for den (fx "RM", "RW" for højre kant/midtbane) — det er det,
+            der lader importen genkende og advare om en forkert position. Beskrivelsen bruges
+            desuden som kendetegn for positionen i AI-genererede udviklingsplaner.
+          </p>
+        </div>
+      </div>
+
+      {error && <div style={styles.errorBannerRow}>{error}</div>}
+
+      {positions === null && !error ? (
+        <p style={styles.subtext}>Indlæser…</p>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          {(positions || []).map((p) => (
+            <PositionSettingRow key={p.id} position={p} onSave={save} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PositionSettingRow({ position, onSave }) {
+  const [aliasesDraft, setAliasesDraft] = useState(position.aliases.join(", "));
+  const [charDraft, setCharDraft] = useState(position.characteristics);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [error, setError] = useState("");
+
+  const dirty = aliasesDraft !== position.aliases.join(", ") || charDraft !== position.characteristics;
+
+  const save = async () => {
+    setSaving(true);
+    setError("");
+    setSaved(false);
+    try {
+      const aliases = aliasesDraft
+        .split(/[,\s]+/)
+        .map((a) => a.trim())
+        .filter(Boolean);
+      await onSave(position.id, { aliases, characteristics: charDraft.trim() });
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div style={styles.positionEditCard}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
+        <div style={styles.numberBadge}>{position.id}</div>
+        <strong>{position.label}</strong>
+        <span style={styles.subtext}>({position.abbr})</span>
+      </div>
+
+      <div style={{ marginBottom: 10 }}>
+        <div style={styles.fieldLabel}>Engelske positionsbetegnelser (adskilt med komma)</div>
+        <input
+          style={styles.input}
+          value={aliasesDraft}
+          onChange={(e) => setAliasesDraft(e.target.value)}
+          placeholder="fx RM, RW"
+        />
+      </div>
+
+      <div style={{ marginBottom: 10 }}>
+        <div style={styles.fieldLabel}>Kendetegn for positionen</div>
+        <textarea
+          style={{ ...styles.textarea, minHeight: 70, width: "100%", boxSizing: "border-box" }}
+          value={charDraft}
+          onChange={(e) => setCharDraft(e.target.value)}
+        />
+      </div>
+
+      {error && <div style={styles.errorBannerRow}>{error}</div>}
+
+      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <button style={styles.primaryBtnSm} onClick={save} disabled={saving || !dirty}>
+          {saving ? "Gemmer…" : "Gem"}
+        </button>
+        {dirty && !saving && <span style={styles.subtext}>Ikke gemt endnu</span>}
+        {saved && <span style={{ ...styles.subtext, color: "#4D7B4D" }}>Gemt.</span>}
+      </div>
+    </div>
+  );
+}
+
 function ProgressTracker({ value, onChange, compact }) {
   return (
     <div style={styles.progressRow}>
@@ -2794,11 +2907,7 @@ function CoachesOverviewView({ data, onSetGoalProgress, onOpenPlayer, onAddFollo
               <div style={styles.numberBadge}>{player.number || "—"}</div>
               <div style={{ flex: 1 }}>
                 <div style={styles.playerName}>{player.name}</div>
-                <div style={styles.subtext}>
-                  {player.positions && player.positions.length > 0
-                    ? player.positions.join(" · ")
-                    : "Position ikke angivet"}
-                </div>
+                <div style={styles.subtext}>{formatPlayerPositions(player) || "Position ikke angivet"}</div>
                 {levelById[player.participationLevelId] && (
                   <div style={styles.teamBadge}>
                     <BarChart3 size={10} /> {levelById[player.participationLevelId].name}
@@ -3484,8 +3593,10 @@ function RosterView({
   setAddingPlayer,
   newName,
   setNewName,
-  newPositions,
-  setNewPositions,
+  newPrimaryPosition,
+  setNewPrimaryPosition,
+  newSecondaryPosition,
+  setNewSecondaryPosition,
   newNumber,
   setNewNumber,
   newEmail,
@@ -3564,12 +3675,6 @@ function RosterView({
     } finally {
       setSending(false);
     }
-  };
-
-  const togglePosition = (pos) => {
-    setNewPositions((prev) =>
-      prev.includes(pos) ? prev.filter((p) => p !== pos) : [...prev, pos]
-    );
   };
 
   const teamName = (teamId) => teams.find((t) => t.id === teamId)?.name || null;
@@ -3772,10 +3877,12 @@ function RosterView({
               ))}
             </select>
           </div>
-          <div>
-            <div style={styles.fieldLabel}>Position(er)</div>
-            <PositionPicker selected={newPositions} onToggle={togglePosition} />
-          </div>
+          <PositionFields
+            primaryPosition={newPrimaryPosition}
+            secondaryPosition={newSecondaryPosition}
+            onChangePrimary={setNewPrimaryPosition}
+            onChangeSecondary={setNewSecondaryPosition}
+          />
           <div style={{ display: "flex", gap: 8 }}>
             <button style={styles.primaryBtn} onClick={onAdd}>
               Gem
@@ -3847,11 +3954,7 @@ function RosterView({
                 </div>
               </div>
               <div style={styles.playerName}>{p.name}</div>
-              <div style={styles.playerPos}>
-                {p.positions && p.positions.length > 0
-                  ? p.positions.join(" · ")
-                  : "Position ikke angivet"}
-              </div>
+              <div style={styles.playerPos}>{formatPlayerPositions(p) || "Position ikke angivet"}</div>
               {teamName(p.teamId) && (
                 <div style={styles.teamBadge}>
                   <Layers size={10} /> {teamName(p.teamId)}
@@ -3981,8 +4084,6 @@ function PlayerView({
   // length above the actual evaluation.
   const [settingsExpanded, setSettingsExpanded] = useState(false);
 
-  const positions = player.positions || [];
-
   useEffect(() => {
     if (!selectedPeriodId && periods.length) {
       setSelectedPeriodId(periods[periods.length - 1].id);
@@ -3992,13 +4093,6 @@ function PlayerView({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [periods.length]);
-
-  const togglePosition = (pos) => {
-    const next = positions.includes(pos)
-      ? positions.filter((p) => p !== pos)
-      : [...positions, pos];
-    onUpdatePositions(next);
-  };
 
   const selectedPeriod = periods.find((p) => p.id === selectedPeriodId) || null;
   const scores = selectedPeriod ? evaluations[selectedPeriod.id]?.scores || {} : {};
@@ -4049,9 +4143,7 @@ function PlayerView({
           <h1 style={styles.h1}>{player.name}</h1>
           {!editingPositions && (
             <div style={styles.positionRow}>
-              <span style={styles.subtext}>
-                {positions.length > 0 ? positions.join(" · ") : "Position ikke angivet"}
-              </span>
+              <span style={styles.subtext}>{formatPlayerPositions(player) || "Position ikke angivet"}</span>
               <button style={styles.linkBtn} onClick={() => setEditingPositions(true)}>
                 <Pencil size={12} /> Rediger
               </button>
@@ -4065,9 +4157,13 @@ function PlayerView({
 
       {editingPositions && (
         <div style={styles.positionEditCard}>
-          <div style={styles.fieldLabel}>Position(er)</div>
-          <PositionPicker selected={positions} onToggle={togglePosition} />
-          <button style={styles.ghostBtn} onClick={() => setEditingPositions(false)}>
+          <PositionFields
+            primaryPosition={player.primaryPosition}
+            secondaryPosition={player.secondaryPosition}
+            onChangePrimary={(primaryPosition) => onUpdatePositions({ primaryPosition })}
+            onChangeSecondary={(secondaryPosition) => onUpdatePositions({ secondaryPosition })}
+          />
+          <button style={{ ...styles.ghostBtn, marginTop: 12 }} onClick={() => setEditingPositions(false)}>
             Færdig
           </button>
         </div>
@@ -4908,9 +5004,9 @@ function PrintStyles() {
 }
 
 function buildPositionGroups(data) {
-  return POSITIONS.filter((pos) => /^\d+$/.test(pos)).map((pos) => {
+  return POSITION_CATALOG.map(({ id }) => {
     const rows = data.players
-      .filter((p) => (p.positions || []).includes(pos))
+      .filter((p) => p.primaryPosition === id || p.secondaryPosition === id)
       .map((p) => {
         const latestPeriod = getLatestScoredPeriod(data, p.id);
         const scores = latestPeriod ? getPlayerScores(data, p.id, latestPeriod.id) : {};
@@ -4918,7 +5014,7 @@ function buildPositionGroups(data) {
         return { player: p, overall };
       })
       .sort((a, b) => (b.overall ?? -Infinity) - (a.overall ?? -Infinity));
-    return { pos, rows };
+    return { pos: id, rows };
   });
 }
 
@@ -4950,9 +5046,7 @@ function PositionOverviewPrint({ data }) {
                 <ol style={{ margin: 0, paddingLeft: 14 }}>
                   {rows.map(({ player, overall }) => (
                     <li key={player.id} style={{ fontSize: "7.5pt", marginBottom: 2 }}>
-                      <span
-                        style={(player.positions || []).length <= 1 ? { fontWeight: 700 } : undefined}
-                      >
+                      <span style={!player.secondaryPosition ? { fontWeight: 700 } : undefined}>
                         {player.name}
                       </span>{" "}
                       <span style={{ color: "#6B6B6B" }}>
@@ -4979,9 +5073,9 @@ function PositionOverviewView({ data }) {
         <div>
           <h1 style={styles.h1}>Positionsoversigt</h1>
           <p style={styles.subtext}>
-            Hver spiller vist under de(n) position(er), de er registreret på — rangeret efter
-            seneste samlede score. Spillere med flere positioner optræder flere gange. Spillere
-            der kun spiller én position er vist med <strong>fed skrift</strong>.
+            Hver spiller vist under sin primære og evt. sekundære position — rangeret efter
+            seneste samlede score. Spillere med både primær og sekundær position optræder to
+            gange. Spillere der kun har én position er vist med <strong>fed skrift</strong>.
           </p>
         </div>
         <button style={styles.primaryBtn} onClick={() => window.print()}>
@@ -5001,9 +5095,7 @@ function PositionOverviewView({ data }) {
               <ol style={{ margin: "10px 0 0", paddingLeft: 18 }}>
                 {rows.map(({ player, overall }) => (
                   <li key={player.id} style={{ fontSize: 14, marginBottom: 6 }}>
-                    <span
-                      style={(player.positions || []).length <= 1 ? { fontWeight: 700 } : undefined}
-                    >
+                    <span style={!player.secondaryPosition ? { fontWeight: 700 } : undefined}>
                       {player.name}
                     </span>{" "}
                     <span style={{ color: "#8A8A8A" }}>
@@ -5034,7 +5126,7 @@ function PrintableReport({ player, teamName, config, goals, colA, colB }) {
         <div>
           <div style={pstyles.title}>
             Spillerprofil {player.name}
-            {player.positions && player.positions.length > 0 ? ` — ${player.positions.join(", ")}` : ""}
+            {formatPlayerPositions(player) ? ` — ${formatPlayerPositions(player)}` : ""}
           </div>
           {teamName && <div style={pstyles.subtitle}>{teamName}</div>}
           {level && (
@@ -6312,21 +6404,19 @@ function KpReserveTable({ reserves, onUpdate, onAdd, onRemove, playerNames }) {
   );
 }
 
-// Mirrors FILE_POSITION_TO_APP_NUMBERS in server/routes/matchStats.js — the
-// server flags a mismatch at parse time, but the coach can re-match a row to
-// a different player in the review table below, so this has to be
-// recomputed client-side on every selection change rather than trusting the
-// server's one-time flag.
-const FILE_POSITION_TO_APP_NUMBERS = {
-  GK: ["1"], RB: ["2"], LB: ["3"], CB: ["4", "5"], DM: ["6"], DMF: ["6"], CDM: ["6"],
-  RM: ["7"], RW: ["7"], CM: ["8"], ST: ["9"], CF: ["9"], CAM: ["10"],
-  AM: ["10"], OM: ["10"], OMF: ["10"], LM: ["11"], LW: ["11"], LWB: ["3"], RWB: ["2"],
-};
-
-function kpPositionMismatch(filePosition, playerPositions) {
-  const expected = FILE_POSITION_TO_APP_NUMBERS[String(filePosition || "").toUpperCase()];
-  if (!expected || !playerPositions || playerPositions.length === 0) return false;
-  return !expected.some((n) => playerPositions.includes(n));
+// positionAliases is { positionId: [alias, ...] }, straight off the /parse
+// response (itself read from the coach-editable position_settings table —
+// see Positionsopsætning under Indstillinger). The server flags a mismatch
+// at parse time, but the coach can re-match a row to a different player in
+// the review table below, so this has to be recomputed client-side on every
+// selection change rather than trusting the server's one-time flag.
+function kpPositionMismatch(filePosition, playerPositions, positionAliases) {
+  if (!filePosition || !playerPositions || playerPositions.length === 0) return false;
+  const term = String(filePosition).toUpperCase();
+  const aliasLists = Object.values(positionAliases || {});
+  const recognised = aliasLists.some((aliases) => aliases.includes(term));
+  if (!recognised) return false;
+  return !playerPositions.some((id) => (positionAliases[id] || []).includes(term));
 }
 
 // Uploads a GPS/video-tracking export (.ods/.xlsx/.csv) for this specific
@@ -6340,6 +6430,7 @@ function KpStatsUpload({ planId, players }) {
   const [existing, setExisting] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [preview, setPreview] = useState(null); // { rows, skipped } | null
+  const [positionAliases, setPositionAliases] = useState({});
   const [previewError, setPreviewError] = useState("");
   const [committing, setCommitting] = useState(false);
   const [commitError, setCommitError] = useState("");
@@ -6364,6 +6455,7 @@ function KpStatsUpload({ planId, players }) {
         rows: result.rows.map((r) => ({ ...r, playerId: r.matchedPlayerId })),
         skipped: result.skipped,
       });
+      setPositionAliases(result.positionAliases || {});
     } catch (err) {
       setPreviewError(err.message);
     } finally {
@@ -6468,7 +6560,12 @@ function KpStatsUpload({ planId, players }) {
               <tbody>
                 {preview.rows.map((r, i) => {
                   const matched = r.playerId ? players.find((p) => p.id === r.playerId) : null;
-                  const mismatch = matched ? kpPositionMismatch(r.filePosition, matched.positions) : false;
+                  const matchedPositions = matched
+                    ? [matched.primaryPosition, matched.secondaryPosition].filter(Boolean)
+                    : [];
+                  const mismatch = matched
+                    ? kpPositionMismatch(r.filePosition, matchedPositions, positionAliases)
+                    : false;
                   return (
                     <tr key={i} style={{ borderTop: "1px solid #E3E3E3" }}>
                       <td style={{ padding: "4px 8px" }}>{r.fileNumber}</td>
@@ -6539,7 +6636,7 @@ function KpStatsUpload({ planId, players }) {
                   <td style={{ padding: "4px 8px" }}>{r.position || "—"}</td>
                   <td style={{ padding: "4px 8px", textAlign: "right" }}>{r.minutes ?? "—"}</td>
                   <td style={{ padding: "4px 8px", textAlign: "right" }}>
-                    {r.distanceMi != null ? `${r.distanceMi}mi` : "—"}
+                    {r.distanceKm != null ? `${r.distanceKm}km` : "—"}
                   </td>
                   <td style={{ padding: "4px 8px", textAlign: "right" }}>{r.passes ?? "—"}</td>
                   <td style={{ padding: "4px 8px", textAlign: "right" }}>
@@ -6547,7 +6644,7 @@ function KpStatsUpload({ planId, players }) {
                   </td>
                   <td style={{ padding: "4px 8px", textAlign: "right" }}>{r.tackles ?? "—"}</td>
                   <td style={{ padding: "4px 8px", textAlign: "right" }}>
-                    {r.topSpeedMph != null ? `${r.topSpeedMph}mph` : "—"}
+                    {r.topSpeedKmh != null ? `${r.topSpeedKmh}km/t` : "—"}
                   </td>
                 </tr>
               ))}

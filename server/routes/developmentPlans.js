@@ -2,6 +2,9 @@ const express = require("express");
 const sanitizeHtml = require("sanitize-html");
 const pool = require("../db");
 const claude = require("../claude");
+const { POSITIONS: POSITION_CATALOG } = require("../positions");
+
+const POSITION_BY_ID = new Map(POSITION_CATALOG.map((p) => [p.id, p]));
 
 const router = express.Router();
 
@@ -17,7 +20,7 @@ Brug udelukkende de angivne data. Opfind aldrig konkrete tal, kampstatistik elle
 Strukturér planen med disse afsnit:
 1. En kort personlig indledning der hilser på spilleren og opsummerer, hvor hun står nu.
 2. Fokusområder — uddyb kort de mål, der allerede er sat; gengiv dem ikke som en ren liste, de vises i forvejen andetsteds i rapporten.
-3. Egentræning — et kort, generelt afsnit tilpasset spillerens niveau.
+3. Egentræning — et kort, generelt afsnit tilpasset spillerens niveau og position (brug kendetegnene for spillerens position, hvis de er angivet).
 4. Opfølgning — en kort opfordring til løbende dialog med træneren.
 
 Svar udelukkende med HTML og kun disse tags: <h3>, <p>, <ul>, <li>, <strong>, <em>. Ingen andre tags, ingen inline-styles, ingen billeder, ingen indledende forklaring uden for HTML'en.`;
@@ -27,10 +30,14 @@ Svar udelukkende med HTML og kun disse tags: <h3>, <p>, <ul>, <li>, <strong>, <e
 // plain text rather than JSON since it's read by the model, not parsed.
 async function buildPlayerContext(playerId) {
   const { rows: playerRows } = await pool.query(
-    `select p.id, p.name, p.positions, p.goal_2_3y, p.goal_1_2y, p.goal_under_1y,
-            l.name as level_name, l.expectations as level_expectations
+    `select p.id, p.name, p.primary_position, p.secondary_position, p.goal_2_3y, p.goal_1_2y, p.goal_under_1y,
+            l.name as level_name, l.expectations as level_expectations,
+            ps1.characteristics as primary_characteristics,
+            ps2.characteristics as secondary_characteristics
      from players p
      left join participation_levels l on l.id = p.participation_level_id
+     left join position_settings ps1 on ps1.id = p.primary_position
+     left join position_settings ps2 on ps2.id = p.secondary_position
      where p.id = $1`,
     [playerId]
   );
@@ -69,7 +76,7 @@ async function buildPlayerContext(playerId) {
   // /players/:id/stats returns, recomputed here rather than shared so this
   // stays a plain read with no cross-module coupling.
   const { rows: statRows } = await pool.query(
-    `select ms.minutes, ms.distance_mi, ms.avg_speed_mph, ms.top_speed_mph, ms.sprints,
+    `select ms.minutes, ms.distance_km, ms.avg_speed_kmh, ms.top_speed_kmh, ms.sprints,
             ms.high_intensity_runs, ms.passes, ms.pass_success_pct, ms.dribbles, ms.shots,
             ms.tackles, ms.interceptions, ms.loose_ball_recoveries, ms.goal_kicks, ms.fouls, ms.saves
      from match_stats ms
@@ -88,8 +95,8 @@ async function buildPlayerContext(playerId) {
     matchStats = {
       matches: statRows.length,
       minutes: sum("minutes"),
-      distanceMi: Math.round(sum("distance_mi") * 10) / 10,
-      topSpeedMph: Math.max(...statRows.map((r) => Number(r.top_speed_mph) || 0)),
+      distanceKm: Math.round(sum("distance_km") * 10) / 10,
+      topSpeedKmh: Math.max(...statRows.map((r) => Number(r.top_speed_kmh) || 0)),
       sprints: sum("sprints"),
       highIntensityRuns: sum("high_intensity_runs"),
       passes: totalPasses,
@@ -110,7 +117,20 @@ async function buildPlayerContext(playerId) {
 
 function formatPlayerContext({ player, latestPeriod, scores, goals, matchStats }) {
   const lines = [`Spiller: ${player.name}`];
-  if (player.positions?.length) lines.push(`Position(er): ${player.positions.join(", ")}`);
+  const primaryPos = POSITION_BY_ID.get(player.primary_position);
+  const secondaryPos = POSITION_BY_ID.get(player.secondary_position);
+  if (primaryPos) {
+    lines.push(
+      `Position: ${primaryPos.label} (${primaryPos.abbr})` +
+        (secondaryPos ? `, sekundært ${secondaryPos.label} (${secondaryPos.abbr})` : "")
+    );
+    if (player.primary_characteristics) {
+      lines.push(`Kendetegn for positionen: ${player.primary_characteristics}`);
+    }
+    if (secondaryPos && player.secondary_characteristics) {
+      lines.push(`Kendetegn for den sekundære position: ${player.secondary_characteristics}`);
+    }
+  }
   if (player.level_name) {
     lines.push(`Niveau: ${player.level_name}${player.level_expectations ? " — " + player.level_expectations : ""}`);
   }
@@ -144,8 +164,8 @@ function formatPlayerContext({ player, latestPeriod, scores, goals, matchStats }
   if (matchStats) {
     lines.push("", `Kampstatistik (sæsontotal, ${matchStats.matches} kamp(e) med registreret statistik):`);
     lines.push(`- Spilletid: ${matchStats.minutes} min`);
-    lines.push(`- Distance: ${matchStats.distanceMi} mi`);
-    lines.push(`- Tophastighed: ${matchStats.topSpeedMph} mph`);
+    lines.push(`- Distance: ${matchStats.distanceKm} km`);
+    lines.push(`- Tophastighed: ${matchStats.topSpeedKmh} km/t`);
     lines.push(`- Sprints: ${matchStats.sprints}`);
     lines.push(`- High intensity runs: ${matchStats.highIntensityRuns}`);
     lines.push(

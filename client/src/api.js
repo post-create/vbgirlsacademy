@@ -50,8 +50,16 @@ export function deleteTeam(id) {
   return request("DELETE", `/api/teams/${id}`);
 }
 
-export function createPlayer({ name, positions, number, email, teamId, skillGroupId }) {
-  return request("POST", "/api/players", { name, positions, number, email, teamId, skillGroupId });
+export function createPlayer({ name, primaryPosition, secondaryPosition, number, email, teamId, skillGroupId }) {
+  return request("POST", "/api/players", {
+    name,
+    primaryPosition,
+    secondaryPosition,
+    number,
+    email,
+    teamId,
+    skillGroupId,
+  });
 }
 
 export function updatePlayer(id, patch) {
@@ -251,6 +259,14 @@ export function getSettings() {
 
 export function updateSetting(key, value) {
   return request("PUT", `/api/settings/${key}`, { value });
+}
+
+export function getPositionSettings() {
+  return request("GET", "/api/position-settings");
+}
+
+export function updatePositionSetting(id, patch) {
+  return request("PATCH", `/api/position-settings/${id}`, patch);
 }
 
 export function setMatchPerformanceScore(planId, playerId, score) {

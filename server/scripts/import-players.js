@@ -76,7 +76,7 @@ async function main() {
       const id = crypto.randomUUID();
       const selfToken = makeSelfToken();
       await pool.query(
-        "insert into players (id, name, positions, number, email, team_id, self_token) values ($1, $2, '{}', '', $3, null, $4)",
+        "insert into players (id, name, number, email, team_id, self_token) values ($1, $2, '', $3, null, $4)",
         [id, name, email, selfToken]
       );
       console.log(`created: ${name}`);
