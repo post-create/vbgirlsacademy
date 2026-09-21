@@ -1762,6 +1762,7 @@ function PlayerSelfEvalApp({ player, config, periods, coachEvaluations, goals, d
             {selectedPeriod &&
               createPortal(
                 <>
+                  <CoverPagePrint player={player} config={config} />
                   <PrintableReport
                     player={player}
                     config={config}
@@ -4519,6 +4520,7 @@ function PlayerView({
           {selectedPeriod &&
             createPortal(
               <>
+                <CoverPagePrint player={player} config={config} />
                 <PrintableReport
                   player={player}
                   teamName={teams.find((t) => t.id === player.teamId)?.name}
@@ -4978,6 +4980,11 @@ function PrintStyles() {
       @media print {
         #root { display: none !important; }
         @page { size: A4 landscape; margin: 10mm; }
+        /* The Udviklingsplan page (DevelopmentPlanPrintSection) opts into this
+           named page via .print-plan so it prints upright while page one
+           (PrintableReport) stays on the default landscape @page above. */
+        @page plan-page { size: A4 portrait; margin: 16mm; }
+        .print-plan { page: plan-page; }
       }
       @media screen {
         .print-report { display: none; }
@@ -4993,11 +5000,11 @@ function PrintStyles() {
         margin: 0 0 8px; padding-left: 12px; border-left: 3px solid #D9D4C7; color: #6B6B6B;
       }
       @media print {
-        .rp-content h1, .rp-content h2, .rp-content h3, .rp-content h4 { margin: 8px 0 4px; }
-        .rp-content h1 { font-size: 10.5pt; }
-        .rp-content h2 { font-size: 9.5pt; }
-        .rp-content h3, .rp-content h4 { font-size: 8.5pt; }
-        .rp-content p, .rp-content ul, .rp-content ol { margin: 0 0 5px; }
+        .rp-content h1, .rp-content h2, .rp-content h3, .rp-content h4 { margin: 10px 0 5px; }
+        .rp-content h1 { font-size: 15pt; }
+        .rp-content h2 { font-size: 13pt; }
+        .rp-content h3, .rp-content h4 { font-size: 12pt; }
+        .rp-content p, .rp-content ul, .rp-content ol { margin: 0 0 6px; }
       }
     `}</style>
   );
@@ -5114,13 +5121,48 @@ function PositionOverviewView({ data }) {
   );
 }
 
-function PrintableReport({ player, teamName, config, goals, colA, colB }) {
+// First page of the printed report — logo, player name, and (if the player
+// has a Trin/level assigned) that level's coach-written expectations, one
+// per line in the textarea (see ParticipationLevelsView), rendered here as
+// actual bullets rather than PrintableReport's run-on inline text. Shares
+// the portrait .print-plan page with DevelopmentPlanPrintSection since a
+// cover page reads better upright than squeezed onto the landscape grid.
+function CoverPagePrint({ player, config }) {
   const level = (config.participationLevels || []).find(
     (l) => l.id === player.participationLevelId
   );
+  const expectationLines = (level?.expectations || "")
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
 
   return (
-    <div className="print-report" style={pstyles.page}>
+    <div className="print-report print-plan" style={{ ...pstyles.page, width: "178mm" }}>
+      <div style={pstyles.coverWrap}>
+        <div style={pstyles.coverHeadline}>Spillerudvikling</div>
+        <img src={LOGO_SRC} alt="Klublogo" style={pstyles.coverLogo} />
+        <div style={pstyles.coverName}>{player.name}</div>
+        {level && (
+          <div style={pstyles.coverLevelBox}>
+            <div style={pstyles.coverLevelLabel}>Trin</div>
+            <div style={pstyles.coverLevelName}>{level.name}</div>
+            {expectationLines.length > 0 && (
+              <ul style={pstyles.coverList}>
+                {expectationLines.map((line, i) => (
+                  <li key={i}>{line}</li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function PrintableReport({ player, teamName, config, goals, colA, colB }) {
+  return (
+    <div className="print-report" style={{ ...pstyles.page, pageBreakBefore: "always" }}>
       <div style={pstyles.headRow}>
         <img src={LOGO_SRC} alt="Klublogo" style={pstyles.logo} />
         <div>
@@ -5129,12 +5171,6 @@ function PrintableReport({ player, teamName, config, goals, colA, colB }) {
             {formatPlayerPositions(player) ? ` — ${formatPlayerPositions(player)}` : ""}
           </div>
           {teamName && <div style={pstyles.subtitle}>{teamName}</div>}
-          {level && (
-            <div style={pstyles.subtitle}>
-              Niveau: {level.name}
-              {level.expectations ? ` — ${level.expectations}` : ""}
-            </div>
-          )}
         </div>
       </div>
 
@@ -5356,6 +5392,42 @@ const pstyles = {
   },
   goalsTitle: { fontWeight: 700, fontSize: "8.5pt", marginBottom: 4 },
   goalLine: { marginBottom: 3, lineHeight: 1.35 },
+  coverWrap: {
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    textAlign: "center",
+    marginTop: "35mm",
+  },
+  coverHeadline: {
+    fontSize: "11pt",
+    fontWeight: 700,
+    textTransform: "uppercase",
+    letterSpacing: "0.12em",
+    color: "#6B6B6B",
+    marginBottom: 20,
+  },
+  coverLogo: { width: 64, height: 64, objectFit: "contain", marginBottom: 16 },
+  coverName: { fontSize: "22pt", fontWeight: 700 },
+  coverLevelBox: {
+    marginTop: 28,
+    width: "100%",
+    maxWidth: "140mm",
+    textAlign: "left",
+    border: "1px solid #111111",
+    borderRadius: 6,
+    padding: "16px 22px",
+  },
+  coverLevelLabel: {
+    fontSize: "9pt",
+    fontWeight: 700,
+    textTransform: "uppercase",
+    letterSpacing: "0.05em",
+    color: "#6B6B6B",
+    marginBottom: 4,
+  },
+  coverLevelName: { fontSize: "15pt", fontWeight: 700, marginBottom: 12 },
+  coverList: { margin: 0, paddingLeft: 20, fontSize: "11pt", lineHeight: 1.65 },
 };
 
 // Appended after PrintableReport in the same portal (see PlayerView and
@@ -5366,7 +5438,10 @@ const pstyles = {
 // yet doesn't get a blank trailing page.
 function DevelopmentPlanPrintSection({ player, plan }) {
   return (
-    <div className="print-report" style={{ ...pstyles.page, pageBreakBefore: "always" }}>
+    <div
+      className="print-report print-plan"
+      style={{ ...pstyles.page, width: "178mm", pageBreakBefore: "always" }}
+    >
       <div style={pstyles.headRow}>
         <img src={LOGO_SRC} alt="Klublogo" style={pstyles.logo} />
         <div>
@@ -5377,7 +5452,7 @@ function DevelopmentPlanPrintSection({ player, plan }) {
 
       <div
         className="rp-content"
-        style={{ fontSize: "8.5pt", lineHeight: 1.5 }}
+        style={{ fontSize: "11pt", lineHeight: 1.5 }}
         dangerouslySetInnerHTML={{ __html: plan.contentHtml }}
       />
     </div>
@@ -5387,8 +5462,9 @@ function DevelopmentPlanPrintSection({ player, plan }) {
 // Standalone "print for sig selv" — opens its own window, independent of any
 // period/report-panel state, matching the pattern kpPrintPlan uses for
 // kampplaner. Kept separate from DevelopmentPlanPrintSection (the samlede
-// rapport variant) because that one shares pstyles' A4-landscape sizing with
-// PrintableReport, while this one is a normal A4-portrait letter.
+// rapport variant) — that one reuses pstyles' header/layout styling and
+// opts into its own portrait @page (see .print-plan in PrintStyles) rather
+// than duplicating a full standalone document like this one.
 // plan.contentHtml is already sanitized server-side before it's stored (see
 // routes/developmentPlans.js), so it's safe to drop straight into the
 // popup document here.
