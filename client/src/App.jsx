@@ -5269,18 +5269,16 @@ function PrintableReport({ player, teamName, config, goals, colA, colB }) {
                           </tr>
                         ))}
                         <tr>
-                          <td style={{ ...pstyles.tdName, fontWeight: 700 }}>Total</td>
-                          <td style={{ ...pstyles.td, fontWeight: 700 }}>{cat.totA.total}</td>
-                          <td style={{ ...pstyles.td, fontWeight: 700 }}>{cat.totB.total}</td>
-                        </tr>
-                        <tr>
                           <td style={{ ...pstyles.tdName, fontWeight: 700 }}>Gennemsnit</td>
                           <td style={{ ...pstyles.td, fontWeight: 700 }}>
                             {cat.totA.avg.toFixed(2)}
                           </td>
-                          <td style={{ ...pstyles.td, fontWeight: 700 }}>
-                            {cat.totB.avg.toFixed(2)}
-                          </td>
+                          {/* Not a meaningful "average goal" — only a few skills in a
+                              category typically have a Mål set, so dividing the sum by
+                              every skill in the category (categoryTotal's denominator)
+                              produced a misleading fraction like 0.67 rather than an
+                              actual average of the goals that exist. */}
+                          <td style={{ ...pstyles.td, fontWeight: 700 }}></td>
                         </tr>
                       </tbody>
                     </table>
@@ -5409,6 +5407,8 @@ const pstyles = {
   },
   table: {
     flex: 1,
+    width: "100%",
+    tableLayout: "fixed",
     borderCollapse: "collapse",
   },
   th: {
@@ -5418,21 +5418,28 @@ const pstyles = {
     background: "#1A1A1A",
     fontSize: "7pt",
     textAlign: "center",
+    width: "22.5%",
     WebkitPrintColorAdjust: "exact",
     printColorAdjust: "exact",
   },
-  thName: { textAlign: "left" },
+  // table-layout:fixed sizes columns off the FIRST row's widths, so this
+  // (spread onto the header row's blank first <th>) is what actually fixes
+  // the name column — matching width also set on tdName below keeps body
+  // rows consistent, though fixed layout wouldn't need it read from there.
+  thName: { textAlign: "left", width: "55%" },
   td: {
     border: "1px solid #B0B0B0",
     padding: "2px 4px",
     textAlign: "center",
     fontSize: "7.5pt",
+    width: "22.5%",
   },
   tdName: {
     border: "1px solid #B0B0B0",
     padding: "2px 4px",
     textAlign: "left",
     fontSize: "7.5pt",
+    width: "55%",
   },
   footerRow: {
     display: "grid",
@@ -5445,7 +5452,7 @@ const pstyles = {
     padding: "6px 8px",
     fontSize: "7.5pt",
   },
-  goalsTitle: { fontWeight: 700, fontSize: "8.5pt", marginBottom: 4 },
+  goalsTitle: { fontWeight: 700, fontSize: "13pt", marginBottom: 6 },
   goalLine: { marginBottom: 3, lineHeight: 1.35 },
   coverWrap: {
     display: "flex",
