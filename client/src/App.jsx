@@ -4979,18 +4979,20 @@ function PrintStyles() {
     <style>{`
       @media print {
         #root { display: none !important; }
-        @page { size: A4 landscape; margin: 10mm; }
-        /* The cover page and Udviklingsplan opt into this named page via
-           .print-plan so they print upright on their own portrait sheet. */
+        /* Portrait by default: every page of the player report (cover,
+           score page, Udviklingsplan) wants portrait now. The named-page
+           routing below (.print-plan / .print-overview) is a Chromium-only
+           feature — Safari (and so every iOS browser, since Apple requires
+           them all to use its engine) ignores it and always falls back to
+           this unnamed @page, so the fallback needs to already be correct
+           for the common case rather than leaving it as the old landscape
+           default. Position-overview printing (see .print-overview) is the
+           one remaining page that actually wants landscape. */
+        @page { size: A4 portrait; margin: 16mm; }
         @page plan-page { size: A4 portrait; margin: 16mm; }
         .print-plan { page: plan-page; }
-        /* PrintableReport (the score page) keeps its original 277mm
-           landscape design untouched and is rotated 90° onto this portrait
-           page instead of being reflowed narrower — see PrintableReport's
-           own comment. A tight 8mm margin gives the rotated 277x190mm
-           block room inside the portrait sheet (210x297mm). */
-        @page rotate-page { size: A4 portrait; margin: 8mm; }
-        .print-rotate { page: rotate-page; }
+        @page overview-page { size: A4 landscape; margin: 10mm; }
+        .print-overview { page: overview-page; }
       }
       @media screen {
         .print-report { display: none; }
@@ -5035,7 +5037,7 @@ function PositionOverviewPrint({ data }) {
   const positionGroups = buildPositionGroups(data);
 
   return (
-    <div className="print-report" style={pstyles.page}>
+    <div className="print-report print-overview" style={pstyles.page}>
       <div style={pstyles.headRow}>
         <img src={LOGO_SRC} alt="Klublogo" style={pstyles.logo} />
         <div>
@@ -5166,38 +5168,24 @@ function CoverPagePrint({ player, config }) {
   );
 }
 
-// Keeps the exact landscape design this page always had (2x2 category
-// grid, original type sizes) rather than reflowing it for a narrower
-// portrait sheet — reflowing made every element smaller/cramped or forced
-// it across two physical pages. Instead the whole block prints at its
-// original 277mm landscape footprint and is rotated 90° onto a portrait
-// sheet via .print-rotate (see PrintStyles): tip your head — or the
-// printed page — sideways and it's identical to the original landscape
-// page one.
+// Keeps the original 2x2 category grid but reflows it to the narrower
+// portrait width (see .print-plan in PrintStyles) instead of keeping the
+// 277mm landscape footprint and rotating it onto the page. An earlier
+// version did rotate it (position:absolute + transform:rotate, anchored to
+// the page's own @page-per-section via the CSS `page` property) to avoid
+// reflowing at all — that reproduced the exact original landscape page,
+// but both the named-@page routing and the rotate-via-absolute-positioning
+// page-break both only work in Chromium. iOS (Safari's engine, which is
+// what every iOS browser — Chrome included — is built on by Apple's
+// policy) ignores the named page and doesn't break pages around absolutely
+// positioned content, so the two pages overlaid on top of each other.
+// Reflowing in normal document flow has no such engine dependency.
 function PrintableReport({ player, teamName, config, goals, colA, colB }) {
   return (
     <div
-      className="print-report print-rotate"
-      style={{ position: "relative", pageBreakBefore: "always" }}
+      className="print-report print-plan"
+      style={{ ...pstyles.page, width: "178mm", pageBreakBefore: "always" }}
     >
-      {/* Anchored via right:0 (not a hand-computed translate) so the flush-right
-          edge holds regardless of this content's rendered height, which varies
-          per player (team name, goal count, etc). transform-origin sits on that
-          same right edge, so rotating around it leaves the edge fixed; the
-          270mm translateY afterward (in the page's frame, applied after the
-          rotate) then swings the now-vertical block back down onto the page —
-          277mm is this content's own fixed width, not derived from anything
-          dynamic, so it's safe to hard-code. */}
-      <div
-        style={{
-          ...pstyles.page,
-          position: "absolute",
-          top: 0,
-          right: 0,
-          transformOrigin: "top right",
-          transform: "translateY(277mm) rotate(90deg)",
-        }}
-      >
       <div style={pstyles.headRow}>
         <img src={LOGO_SRC} alt="Klublogo" style={pstyles.logo} />
         <div>
@@ -5209,8 +5197,8 @@ function PrintableReport({ player, teamName, config, goals, colA, colB }) {
         </div>
       </div>
 
-      <div style={pstyles.grid}>
-        {CATEGORY_META.map((cat) => {
+      {(() => {
+        const categoryData = CATEGORY_META.map((cat) => {
           const skills = categorySkillsForPlayer(config, player, cat.key);
           const totA = categoryTotal(config, colA.scores, cat.key, player);
           const totB = categoryTotal(config, colB.scores, cat.key, player);
@@ -5219,66 +5207,90 @@ function PrintableReport({ player, teamName, config, goals, colA, colB }) {
             colA: colA.scores[s.id] ?? 0,
             colB: colB.scores[s.id] ?? 0,
           }));
-          return (
-            <div key={cat.key} style={pstyles.categoryCell}>
-              <div style={{ ...pstyles.categoryHead, background: cat.accent }}>{cat.label}</div>
-              <div style={pstyles.categoryBody}>
-                {skills.length > 0 && (
-                  <RadarChart width={92} height={92} data={catRadarData} outerRadius="65%">
-                    <PolarGrid stroke="#D9D4C7" />
-                    <PolarAngleAxis dataKey="subject" tick={{ fontSize: 5, fill: "#111111" }} />
-                    <PolarRadiusAxis domain={[0, 5]} tick={false} axisLine={false} />
-                    <Radar
-                      dataKey="colA"
-                      stroke={cat.accent}
-                      fill={cat.accent}
-                      fillOpacity={0.35}
-                      strokeWidth={1}
-                      isAnimationActive={false}
-                    />
-                    <Radar
-                      dataKey="colB"
-                      stroke="#1A1A1A"
-                      fill="transparent"
-                      strokeWidth={1}
-                      strokeDasharray="3 2"
-                      isAnimationActive={false}
-                    />
-                  </RadarChart>
-                )}
-                <table style={pstyles.table}>
-                  <thead>
-                    <tr>
-                      <th style={{ ...pstyles.th, ...pstyles.thName }}></th>
-                      <th style={pstyles.th}>{colA.label}</th>
-                      <th style={pstyles.th}>{colB.label}</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {skills.map((s) => (
-                      <tr key={s.id}>
-                        <td style={pstyles.tdName}>{s.name}</td>
-                        <td style={pstyles.td}>{colA.scores[s.id] ?? ""}</td>
-                        <td style={pstyles.td}>{colB.scores[s.id] ?? ""}</td>
-                      </tr>
-                    ))}
-                    <tr>
-                      <td style={{ ...pstyles.tdName, fontWeight: 700 }}>Total</td>
-                      <td style={{ ...pstyles.td, fontWeight: 700 }}>{totA.total}</td>
-                      <td style={{ ...pstyles.td, fontWeight: 700 }}>{totB.total}</td>
-                    </tr>
-                    <tr>
-                      <td style={{ ...pstyles.tdName, fontWeight: 700 }}>Gennemsnit</td>
-                      <td style={{ ...pstyles.td, fontWeight: 700 }}>{totA.avg.toFixed(2)}</td>
-                      <td style={{ ...pstyles.td, fontWeight: 700 }}>{totB.avg.toFixed(2)}</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
+          return { ...cat, skills, totA, totB, catRadarData };
+        });
+
+        return (
+          <>
+            <div style={pstyles.radarGrid}>
+              {categoryData.map((cat) => (
+                <div key={cat.key} style={pstyles.radarCell}>
+                  <div style={{ ...pstyles.categoryHead, background: cat.accent }}>
+                    {cat.label}
+                  </div>
+                  {cat.skills.length > 0 && (
+                    <RadarChart width={110} height={110} data={cat.catRadarData} outerRadius="65%">
+                      <PolarGrid stroke="#D9D4C7" />
+                      <PolarAngleAxis dataKey="subject" tick={{ fontSize: 5.5, fill: "#111111" }} />
+                      <PolarRadiusAxis domain={[0, 5]} tick={false} axisLine={false} />
+                      <Radar
+                        dataKey="colA"
+                        stroke={cat.accent}
+                        fill={cat.accent}
+                        fillOpacity={0.35}
+                        strokeWidth={1}
+                        isAnimationActive={false}
+                      />
+                      <Radar
+                        dataKey="colB"
+                        stroke="#1A1A1A"
+                        fill="transparent"
+                        strokeWidth={1}
+                        strokeDasharray="3 2"
+                        isAnimationActive={false}
+                      />
+                    </RadarChart>
+                  )}
+                </div>
+              ))}
             </div>
-          );
-        })}
-      </div>
+
+            <div style={pstyles.grid}>
+              {categoryData.map((cat) => (
+                <div key={cat.key} style={pstyles.categoryCell}>
+                  <div style={{ ...pstyles.categoryHead, background: cat.accent }}>
+                    {cat.label}
+                  </div>
+                  <div style={pstyles.categoryBody}>
+                    <table style={pstyles.table}>
+                      <thead>
+                        <tr>
+                          <th style={{ ...pstyles.th, ...pstyles.thName }}></th>
+                          <th style={pstyles.th}>{colA.label}</th>
+                          <th style={pstyles.th}>{colB.label}</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {cat.skills.map((s) => (
+                          <tr key={s.id}>
+                            <td style={pstyles.tdName}>{s.name}</td>
+                            <td style={pstyles.td}>{colA.scores[s.id] ?? ""}</td>
+                            <td style={pstyles.td}>{colB.scores[s.id] ?? ""}</td>
+                          </tr>
+                        ))}
+                        <tr>
+                          <td style={{ ...pstyles.tdName, fontWeight: 700 }}>Total</td>
+                          <td style={{ ...pstyles.td, fontWeight: 700 }}>{cat.totA.total}</td>
+                          <td style={{ ...pstyles.td, fontWeight: 700 }}>{cat.totB.total}</td>
+                        </tr>
+                        <tr>
+                          <td style={{ ...pstyles.tdName, fontWeight: 700 }}>Gennemsnit</td>
+                          <td style={{ ...pstyles.td, fontWeight: 700 }}>
+                            {cat.totA.avg.toFixed(2)}
+                          </td>
+                          <td style={{ ...pstyles.td, fontWeight: 700 }}>
+                            {cat.totB.avg.toFixed(2)}
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
+        );
+      })()}
 
       <div style={pstyles.footerRow}>
         {GOAL_HORIZON_FIELDS.some((f) => player[f.key]) && (
@@ -5320,7 +5332,6 @@ function PrintableReport({ player, teamName, config, goals, colA, colB }) {
           </div>
         )}
       </div>
-      </div>
     </div>
   );
 }
@@ -5347,11 +5358,6 @@ const pstyles = {
     display: "flex",
     flexDirection: "column",
     gap: 6,
-    // Pinned to the legend's column (rather than relying on it landing
-    // there via document order) so it stacks under Scoreinddeling even for
-    // a player with no goals set, where footerRow's second grid item
-    // (Udviklingsmål) doesn't render at all.
-    gridColumn: "1",
   },
   horizonCell: {
     flex: 1,
@@ -5364,6 +5370,19 @@ const pstyles = {
     fontSize: "7pt",
     textTransform: "uppercase",
     marginBottom: 2,
+  },
+  radarGrid: {
+    display: "grid",
+    gridTemplateColumns: "1fr 1fr",
+    gap: 8,
+    marginBottom: 8,
+  },
+  radarCell: {
+    border: "1px solid #111111",
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    padding: "3px 4px 6px",
   },
   grid: {
     display: "grid",
@@ -5417,7 +5436,7 @@ const pstyles = {
   },
   footerRow: {
     display: "grid",
-    gridTemplateColumns: "1fr 1fr",
+    gridTemplateColumns: "1fr",
     gap: 10,
     alignItems: "start",
   },
