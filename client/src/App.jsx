@@ -4980,11 +4980,17 @@ function PrintStyles() {
       @media print {
         #root { display: none !important; }
         @page { size: A4 landscape; margin: 10mm; }
-        /* The Udviklingsplan page (DevelopmentPlanPrintSection) opts into this
-           named page via .print-plan so it prints upright while page one
-           (PrintableReport) stays on the default landscape @page above. */
+        /* The cover page and Udviklingsplan opt into this named page via
+           .print-plan so they print upright on their own portrait sheet. */
         @page plan-page { size: A4 portrait; margin: 16mm; }
         .print-plan { page: plan-page; }
+        /* PrintableReport (the score page) keeps its original 277mm
+           landscape design untouched and is rotated 90° onto this portrait
+           page instead of being reflowed narrower — see PrintableReport's
+           own comment. A tight 8mm margin gives the rotated 277x190mm
+           block room inside the portrait sheet (210x297mm). */
+        @page rotate-page { size: A4 portrait; margin: 8mm; }
+        .print-rotate { page: rotate-page; }
       }
       @media screen {
         .print-report { display: none; }
@@ -5160,9 +5166,38 @@ function CoverPagePrint({ player, config }) {
   );
 }
 
+// Keeps the exact landscape design this page always had (2x2 category
+// grid, original type sizes) rather than reflowing it for a narrower
+// portrait sheet — reflowing made every element smaller/cramped or forced
+// it across two physical pages. Instead the whole block prints at its
+// original 277mm landscape footprint and is rotated 90° onto a portrait
+// sheet via .print-rotate (see PrintStyles): tip your head — or the
+// printed page — sideways and it's identical to the original landscape
+// page one.
 function PrintableReport({ player, teamName, config, goals, colA, colB }) {
   return (
-    <div className="print-report" style={{ ...pstyles.page, pageBreakBefore: "always" }}>
+    <div
+      className="print-report print-rotate"
+      style={{ position: "relative", pageBreakBefore: "always" }}
+    >
+      {/* Anchored via right:0 (not a hand-computed translate) so the flush-right
+          edge holds regardless of this content's rendered height, which varies
+          per player (team name, goal count, etc). transform-origin sits on that
+          same right edge, so rotating around it leaves the edge fixed; the
+          270mm translateY afterward (in the page's frame, applied after the
+          rotate) then swings the now-vertical block back down onto the page —
+          277mm is this content's own fixed width, not derived from anything
+          dynamic, so it's safe to hard-code. */}
+      <div
+        style={{
+          ...pstyles.page,
+          position: "absolute",
+          top: 0,
+          right: 0,
+          transformOrigin: "top right",
+          transform: "translateY(277mm) rotate(90deg)",
+        }}
+      >
       <div style={pstyles.headRow}>
         <img src={LOGO_SRC} alt="Klublogo" style={pstyles.logo} />
         <div>
@@ -5284,6 +5319,7 @@ function PrintableReport({ player, teamName, config, goals, colA, colB }) {
             })}
           </div>
         )}
+      </div>
       </div>
     </div>
   );
