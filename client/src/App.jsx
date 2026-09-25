@@ -5219,27 +5219,40 @@ function PrintableReport({ player, teamName, config, goals, colA, colB }) {
                     {cat.label}
                   </div>
                   {cat.skills.length > 0 && (
-                    <RadarChart width={110} height={110} data={cat.catRadarData} outerRadius="65%">
-                      <PolarGrid stroke="#D9D4C7" />
-                      <PolarAngleAxis dataKey="subject" tick={{ fontSize: 5.5, fill: "#111111" }} />
-                      <PolarRadiusAxis domain={[0, 5]} tick={false} axisLine={false} />
-                      <Radar
-                        dataKey="colA"
-                        stroke={cat.accent}
-                        fill={cat.accent}
-                        fillOpacity={0.35}
-                        strokeWidth={1}
-                        isAnimationActive={false}
-                      />
-                      <Radar
-                        dataKey="colB"
-                        stroke="#1A1A1A"
-                        fill="transparent"
-                        strokeWidth={1}
-                        strokeDasharray="3 2"
-                        isAnimationActive={false}
-                      />
-                    </RadarChart>
+                    <div style={pstyles.barList}>
+                      {cat.skills.map((s) => {
+                        const nu = colA.scores[s.id];
+                        const mal = colB.scores[s.id];
+                        return (
+                          <div key={s.id} style={pstyles.barRow}>
+                            <div style={{ ...pstyles.barLabel, color: cat.accent }}>
+                              {s.name}
+                            </div>
+                            <div style={pstyles.barTrack}>
+                              <div
+                                style={{
+                                  ...pstyles.barFill,
+                                  width: `${((nu || 0) / 5) * 100}%`,
+                                  background: cat.accent,
+                                }}
+                              />
+                              {mal != null && (
+                                <div
+                                  style={{
+                                    ...pstyles.barTick,
+                                    left: `${(mal / 5) * 100}%`,
+                                  }}
+                                />
+                              )}
+                            </div>
+                            <div style={pstyles.barValue}>
+                              Nu: {nu ?? "–"}
+                              {mal != null ? `  Mål: ${mal}` : ""}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
                   )}
                 </div>
               ))}
@@ -5379,8 +5392,58 @@ const pstyles = {
     border: "1px solid #111111",
     display: "flex",
     flexDirection: "column",
+    padding: "3px 6px 6px",
+  },
+  barList: {
+    display: "flex",
+    flexDirection: "column",
+    gap: 3,
+    marginTop: 2,
+  },
+  barRow: {
+    display: "flex",
     alignItems: "center",
-    padding: "3px 4px 6px",
+    gap: 6,
+  },
+  barLabel: {
+    width: "32%",
+    fontWeight: 700,
+    fontSize: "6.5pt",
+    lineHeight: 1.15,
+  },
+  barTrack: {
+    position: "relative",
+    flex: 1,
+    height: 6,
+    background: "#E5E5E5",
+    borderRadius: 3,
+  },
+  barFill: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    height: "100%",
+    borderRadius: 3,
+    WebkitPrintColorAdjust: "exact",
+    printColorAdjust: "exact",
+  },
+  // Centered on the Mål value via translateX, and taller than the track
+  // itself so it visibly pokes out above/below the bar like a target
+  // marker rather than blending into it.
+  barTick: {
+    position: "absolute",
+    top: -2,
+    width: 2,
+    height: 10,
+    background: "#111111",
+    transform: "translateX(-1px)",
+  },
+  barValue: {
+    width: "26%",
+    textAlign: "right",
+    fontSize: "6.5pt",
+    color: "#4A4A4A",
+    whiteSpace: "nowrap",
   },
   grid: {
     display: "grid",
