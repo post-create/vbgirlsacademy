@@ -6049,9 +6049,12 @@ const KP_BUILDUP_CATEGORIES = [
 const KP_FINISHING_CATEGORIES = ["Kontrangreb", "Forbi højt pres", "Gennembrud", "Afslutning af angreb"];
 const KP_EXTRAS_CATEGORIES = ["Preshøjde", "Hjørnespark højre", "Hjørnespark venstre", "Frispark"];
 
+const KAMPPLAN_DIVISIONS = ["Division", "Liga 1", "Liga 2"];
+
 function kpEmptyPlan() {
   return {
     id: null,
+    division: "",
     opponent: "",
     date: todayStr(),
     teamGoals: [""],
@@ -7060,7 +7063,22 @@ function KampplanEditor({ plan, setPlan, onBack, onSave, onPrint, saving, player
         <ChevronLeft size={16} /> Alle kampplaner
       </button>
 
-      <div style={{ ...styles.addCardCol, display: "grid", gridTemplateColumns: "2fr 1fr", gap: 14 }}>
+      <div style={{ ...styles.addCardCol, display: "grid", gridTemplateColumns: "1fr 2fr 1fr", gap: 14 }}>
+        <div>
+          <div style={styles.fieldLabel}>Række</div>
+          <select
+            style={styles.select}
+            value={plan.division}
+            onChange={(e) => setPlan({ ...plan, division: e.target.value })}
+          >
+            <option value="">Vælg række</option>
+            {KAMPPLAN_DIVISIONS.map((d) => (
+              <option key={d} value={d}>
+                {d}
+              </option>
+            ))}
+          </select>
+        </div>
         <div>
           <div style={styles.fieldLabel}>Modstander</div>
           <input
@@ -7345,7 +7363,10 @@ function KampplanList({ planIndex, onNew, onEdit, onCopy, onDelete, onPrint }) {
           {planIndex.map((p) => (
             <div key={p.id} style={styles.playerCard}>
               <div style={styles.playerName}>{p.opponent || "Uden navn"}</div>
-              <div style={styles.subtext}>{kpFmtDate(p.date)}</div>
+              <div style={styles.subtext}>
+                {kpFmtDate(p.date)}
+                {p.division ? ` · ${p.division}` : ""}
+              </div>
               <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 10 }}>
                 <button style={{ ...styles.teamFilterChip, flex: 1, textAlign: "center" }} onClick={() => onEdit(p.id)}>
                   Redigér

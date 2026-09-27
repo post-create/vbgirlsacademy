@@ -19,6 +19,7 @@ async function getPerformanceMap(matchPlanId) {
 function toOut(row, performanceScores) {
   return {
     id: row.id,
+    division: row.division || "",
     opponent: row.opponent || "",
     date: row.date,
     teamGoals: row.team_goals,
@@ -42,7 +43,7 @@ function toOut(row, performanceScores) {
 router.get("/", async (req, res, next) => {
   try {
     const { rows } = await pool.query(
-      `select id, opponent, to_char(match_date, 'YYYY-MM-DD') as date, updated_at
+      `select id, division, opponent, to_char(match_date, 'YYYY-MM-DD') as date, updated_at
        from match_plans order by match_date desc, updated_at desc`
     );
     // Performance scores now live in their own table (see schema.sql for
@@ -59,6 +60,7 @@ router.get("/", async (req, res, next) => {
     res.json(
       rows.map((r) => ({
         id: r.id,
+        division: r.division || "",
         opponent: r.opponent || "Uden navn",
         date: r.date,
         performanceScores: perfByPlan[r.id] || {},
@@ -73,7 +75,7 @@ router.get("/", async (req, res, next) => {
 router.get("/:id", async (req, res, next) => {
   try {
     const { rows } = await pool.query(
-      `select id, opponent, to_char(match_date, 'YYYY-MM-DD') as date, team_goals, defense,
+      `select id, division, opponent, to_char(match_date, 'YYYY-MM-DD') as date, team_goals, defense,
               conquest, build_up, finishing, extras, general_notes, player_goals, positions,
               formation, positions2, formation2, reserves, updated_at
        from match_plans where id = $1`,
@@ -96,14 +98,15 @@ router.post("/", async (req, res, next) => {
     // starts with zero rows in match_performance. See schema.sql.
     const { rows } = await pool.query(
       `insert into match_plans (
-         id, opponent, match_date, team_goals, defense, conquest, build_up, finishing,
+         id, division, opponent, match_date, team_goals, defense, conquest, build_up, finishing,
          extras, general_notes, player_goals, positions, formation, positions2, formation2, reserves
-       ) values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
-       returning id, opponent, to_char(match_date, 'YYYY-MM-DD') as date, team_goals, defense,
+       ) values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
+       returning id, division, opponent, to_char(match_date, 'YYYY-MM-DD') as date, team_goals, defense,
                  conquest, build_up, finishing, extras, general_notes, player_goals, positions,
                  formation, positions2, formation2, reserves, updated_at`,
       [
         id,
+        b.division || "",
         b.opponent || "",
         b.date || new Date().toISOString().slice(0, 10),
         JSON.stringify(b.teamGoals || [""]),
@@ -137,6 +140,7 @@ router.patch("/:id", async (req, res, next) => {
     const pick = (key, column, transform) =>
       b[key] !== undefined ? (transform ? transform(b[key]) : b[key]) : existing[column];
 
+    const division = pick("division", "division");
     const opponent = pick("opponent", "opponent");
     const date = pick("date", "match_date");
     const teamGoals = JSON.stringify(pick("teamGoals", "team_goals"));
@@ -157,16 +161,17 @@ router.patch("/:id", async (req, res, next) => {
 
     const { rows } = await pool.query(
       `update match_plans set
-         opponent = $2, match_date = $3, team_goals = $4, defense = $5, conquest = $6,
-         build_up = $7, finishing = $8, extras = $9, general_notes = $10, player_goals = $11,
-         positions = $12, formation = $13, positions2 = $14, formation2 = $15, reserves = $16,
+         division = $2, opponent = $3, match_date = $4, team_goals = $5, defense = $6, conquest = $7,
+         build_up = $8, finishing = $9, extras = $10, general_notes = $11, player_goals = $12,
+         positions = $13, formation = $14, positions2 = $15, formation2 = $16, reserves = $17,
          updated_at = now()
        where id = $1
-       returning id, opponent, to_char(match_date, 'YYYY-MM-DD') as date, team_goals, defense,
+       returning id, division, opponent, to_char(match_date, 'YYYY-MM-DD') as date, team_goals, defense,
                  conquest, build_up, finishing, extras, general_notes, player_goals, positions,
                  formation, positions2, formation2, reserves, updated_at`,
       [
         req.params.id,
+        division,
         opponent,
         date,
         teamGoals,

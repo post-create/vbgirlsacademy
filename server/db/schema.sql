@@ -295,6 +295,7 @@ create table if not exists followups (
 -- as jsonb rather than normalized into extra tables.
 create table if not exists match_plans (
   id text primary key,
+  division text not null default '',
   opponent text not null default '',
   match_date date not null default current_date,
   team_goals jsonb not null default '[]',
@@ -313,6 +314,8 @@ create table if not exists match_plans (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+alter table match_plans add column if not exists division text not null default '';
 
 -- A coach's 1-5 rating of how a specific player performed in a specific
 -- match, entered after the game. Deliberately its own table (not a jsonb
