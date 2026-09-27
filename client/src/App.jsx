@@ -6050,6 +6050,11 @@ const KP_FINISHING_CATEGORIES = ["Kontrangreb", "Forbi højt pres", "Gennembrud"
 const KP_EXTRAS_CATEGORIES = ["Preshøjde", "Hjørnespark højre", "Hjørnespark venstre", "Frispark"];
 
 const KAMPPLAN_DIVISIONS = ["Division", "Liga 1", "Liga 2"];
+// How much a game's kampscore counts toward a player's weighted average
+// (see KampPerformanceView) — a higher level should count for more. Plans
+// with no række set (or an older plan from before this field existed) fall
+// back to the neutral Liga 1 weight.
+const KAMPPLAN_DIVISION_WEIGHTS = { Division: 1.2, "Liga 1": 1, "Liga 2": 0.8 };
 
 function kpEmptyPlan() {
   return {
@@ -7424,19 +7429,32 @@ function KampPerformanceView({ players }) {
 
   const gamesByPlayer = {};
   plans.forEach((p) => {
+    const weight = KAMPPLAN_DIVISION_WEIGHTS[p.division] ?? 1;
     Object.entries(p.performanceScores || {}).forEach(([playerId, score]) => {
       if (typeof score !== "number") return;
       if (!gamesByPlayer[playerId]) gamesByPlayer[playerId] = [];
-      gamesByPlayer[playerId].push({ opponent: p.opponent || "Ukendt modstander", date: p.date, score });
+      gamesByPlayer[playerId].push({
+        opponent: p.opponent || "Ukendt modstander",
+        date: p.date,
+        division: p.division || "",
+        score,
+        weight,
+      });
     });
   });
   Object.values(gamesByPlayer).forEach((games) =>
     games.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0))
   );
 
+  // Weighted rather than plain average, so games at a higher level (see
+  // KAMPPLAN_DIVISION_WEIGHTS) count for more toward the player's overall
+  // kampscore.
   const rows = players.map((player) => {
     const games = gamesByPlayer[player.id] || [];
-    const avg = games.length ? games.reduce((sum, g) => sum + g.score, 0) / games.length : null;
+    const totalWeight = games.reduce((sum, g) => sum + g.weight, 0);
+    const avg = totalWeight
+      ? games.reduce((sum, g) => sum + g.score * g.weight, 0) / totalWeight
+      : null;
     return { player, games, avg };
   });
 
@@ -7451,8 +7469,9 @@ function KampPerformanceView({ players }) {
         <div>
           <h1 style={styles.h1}>Kampscore</h1>
           <p style={styles.subtext}>
-            Spillernes kampindsats over tid, bedømt 1-5 efter hver kamp på Kampplan. Bruges til at
-            vurdere hvem der er klar til at rykke op på næste niveau.
+            Spillernes kampindsats over tid, bedømt 1-5 efter hver kamp på Kampplan. Gennemsnittet
+            vægtes efter kampens række (Division ×1,2, Liga 1 ×1, Liga 2 ×0,8). Bruges til at vurdere
+            hvem der er klar til at rykke op på næste niveau.
           </p>
         </div>
       </div>
@@ -7497,7 +7516,7 @@ function KampPerformanceView({ players }) {
                   {games.map((g, i) => (
                     <span
                       key={i}
-                      title={`${formatDate(g.date)} — ${g.opponent}`}
+                      title={`${formatDate(g.date)} — ${g.opponent}${g.division ? ` (${g.division}, vægt ${g.weight})` : ""}`}
                       style={{
                         display: "inline-flex",
                         alignItems: "center",
