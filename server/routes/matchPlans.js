@@ -72,6 +72,43 @@ router.get("/", async (req, res, next) => {
   }
 });
 
+// Per-player average tracking stats across every match_stats row they have,
+// regardless of which match plan it came from — used by Kampscore (see
+// KampPerformanceView) alongside the coach rating to show who's actually
+// performing well right now. Registered before /:id so "stats-summary"
+// isn't swallowed as a plan id.
+router.get("/stats-summary", async (req, res, next) => {
+  try {
+    const { rows } = await pool.query(
+      `select player_id,
+              avg(pass_success_pct) as avg_pass_success_pct,
+              avg(high_intensity_runs) as avg_high_intensity_runs,
+              avg(distance_km) as avg_distance_km,
+              avg(dribbles) as avg_dribbles,
+              avg(tackles) as avg_tackles,
+              count(*) as games
+       from match_stats
+       group by player_id`
+    );
+    const summary = {};
+    // pg returns numeric/bigint aggregates as strings, not JS numbers.
+    rows.forEach((r) => {
+      summary[r.player_id] = {
+        avgPassSuccessPct: r.avg_pass_success_pct != null ? Number(r.avg_pass_success_pct) : null,
+        avgHighIntensityRuns:
+          r.avg_high_intensity_runs != null ? Number(r.avg_high_intensity_runs) : null,
+        avgDistanceKm: r.avg_distance_km != null ? Number(r.avg_distance_km) : null,
+        avgDribbles: r.avg_dribbles != null ? Number(r.avg_dribbles) : null,
+        avgTackles: r.avg_tackles != null ? Number(r.avg_tackles) : null,
+        games: Number(r.games),
+      };
+    });
+    res.json(summary);
+  } catch (err) {
+    next(err);
+  }
+});
+
 router.get("/:id", async (req, res, next) => {
   try {
     const { rows } = await pool.query(

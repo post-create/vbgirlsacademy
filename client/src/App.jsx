@@ -7404,20 +7404,27 @@ function KampplanList({ planIndex, onNew, onEdit, onCopy, onDelete, onPrint }) {
 }
 
 // Aggregates every match plan's per-player performance score (1-5, entered
-// on Kampplan after each game) into a per-player history over time, to help
-// spot who's ready to progress to the next level of training.
+// on Kampplan after each game) plus their average tracking stats (from
+// match_stats — see server/routes/matchPlans.js's /stats-summary) into one
+// row per player, to give a clear read on who's actually performing right
+// now rather than just who has the highest coach rating.
 function KampPerformanceView({ players }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [plans, setPlans] = useState([]);
+  const [statsSummary, setStatsSummary] = useState({});
   const [sortMode, setSortMode] = useState("avg");
 
   useEffect(() => {
     (async () => {
       setLoading(true);
       try {
-        const list = await api.getMatchPlans();
-        setPlans(list);
+        const [planList, summary] = await Promise.all([
+          api.getMatchPlans(),
+          api.getMatchStatsSummary(),
+        ]);
+        setPlans(planList);
+        setStatsSummary(summary);
         setError(false);
       } catch (e) {
         setError(true);
@@ -7429,22 +7436,14 @@ function KampPerformanceView({ players }) {
 
   const gamesByPlayer = {};
   plans.forEach((p) => {
+    const division = p.division || "Uden række";
     const weight = KAMPPLAN_DIVISION_WEIGHTS[p.division] ?? 1;
     Object.entries(p.performanceScores || {}).forEach(([playerId, score]) => {
       if (typeof score !== "number") return;
       if (!gamesByPlayer[playerId]) gamesByPlayer[playerId] = [];
-      gamesByPlayer[playerId].push({
-        opponent: p.opponent || "Ukendt modstander",
-        date: p.date,
-        division: p.division || "",
-        score,
-        weight,
-      });
+      gamesByPlayer[playerId].push({ score, weight, division });
     });
   });
-  Object.values(gamesByPlayer).forEach((games) =>
-    games.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0))
-  );
 
   // Each game's score is scaled by its række weight before averaging — the
   // divisor is the game count, not the summed weight, so the weight actually
@@ -7457,7 +7456,24 @@ function KampPerformanceView({ players }) {
     const avg = games.length
       ? games.reduce((sum, g) => sum + g.score * g.weight, 0) / games.length
       : null;
-    return { player, games, avg };
+    // Breakdown of how many of those games were at each level, always all
+    // three (even 0), in KAMPPLAN_DIVISIONS order — so a coach can see why
+    // the weighting pulled the average where it did.
+    const levelCounts = {};
+    games.forEach((g) => {
+      levelCounts[g.division] = (levelCounts[g.division] || 0) + 1;
+    });
+    const levelBreakdown = KAMPPLAN_DIVISIONS.map((d) => ({
+      division: d,
+      count: levelCounts[d] || 0,
+    }));
+    return {
+      player,
+      gameCount: games.length,
+      levelBreakdown,
+      avg,
+      stats: statsSummary[player.id] || null,
+    };
   });
 
   const sortedRows =
@@ -7471,9 +7487,10 @@ function KampPerformanceView({ players }) {
         <div>
           <h1 style={styles.h1}>Kampscore</h1>
           <p style={styles.subtext}>
-            Spillernes kampindsats over tid, bedømt 1-5 efter hver kamp på Kampplan. Gennemsnittet
-            vægtes efter kampens række (Division ×1,2, Liga 1 ×1, Liga 2 ×0,8). Bruges til at vurdere
-            hvem der er klar til at rykke op på næste niveau.
+            Spillernes kampindsats over tid, bedømt 1-5 efter hver kamp på Kampplan, sammen med
+            gennemsnitlig sporingsstatistik fra kampene. Kampscoren vægtes efter kampens række
+            (Division ×1,2, Liga 1 ×1, Liga 2 ×0,8). Bruges til at vurdere hvem der reelt præsterer
+            bedst lige nu.
           </p>
         </div>
       </div>
@@ -7497,53 +7514,65 @@ function KampPerformanceView({ players }) {
       {error && <div style={styles.errorBannerRow}>Kunne ikke hente kampplaner.</div>}
 
       {!loading && !error && (
-        <div style={styles.grid}>
-          {sortedRows.map(({ player, games, avg }) => (
-            <div key={player.id} style={styles.categoryBlock}>
-              <div style={styles.categoryHeadRow}>
-                <span style={styles.categoryLabel}>{player.name}</span>
-                <span
-                  style={{
-                    ...styles.readOnlyScorePill,
-                    // Weighting can push the average slightly outside the
-                    // raw 1-5 rating scale (e.g. a Division 5 -> 6.0);
-                    // clamp so the badge still maps to a real score color
-                    // instead of falling through to the neutral grey.
-                    background: scoreColor(
-                      avg != null ? Math.min(5, Math.max(1, Math.round(avg))) : null
-                    ),
-                  }}
-                >
-                  {avg != null ? avg.toFixed(1) : "—"}
-                </span>
-              </div>
-              {games.length === 0 ? (
-                <p style={{ ...styles.subtext, fontStyle: "italic" }}>Ingen kampscore endnu</p>
-              ) : (
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                  {games.map((g, i) => (
+        <div style={{ ...styles.categoryBlock, padding: 0, overflowX: "auto" }}>
+          <table style={styles.kpsTable}>
+            <thead>
+              <tr>
+                <th style={styles.kpsTh}>Spiller</th>
+                <th style={{ ...styles.kpsTh, textAlign: "center" }}>Kampscore</th>
+                <th style={{ ...styles.kpsTh, textAlign: "right" }}>Pasningsfuldførelse</th>
+                <th style={{ ...styles.kpsTh, textAlign: "right" }}>High intensity runs</th>
+                <th style={{ ...styles.kpsTh, textAlign: "right" }}>Km dækket</th>
+                <th style={{ ...styles.kpsTh, textAlign: "right" }}>Driblinger</th>
+                <th style={{ ...styles.kpsTh, textAlign: "right" }}>Taklinger</th>
+              </tr>
+            </thead>
+            <tbody>
+              {sortedRows.map(({ player, gameCount, levelBreakdown, avg, stats }) => (
+                <tr key={player.id} style={styles.kpsRow}>
+                  <td style={styles.kpsTd}>
+                    <div style={{ fontWeight: 600 }}>{player.name}</div>
+                    <div style={{ fontSize: 12, color: "#8A8A8A" }}>
+                      {gameCount === 0
+                        ? "Ingen kampscore endnu"
+                        : levelBreakdown.map((l) => `${l.division}: ${l.count}`).join(", ")}
+                    </div>
+                  </td>
+                  <td style={{ ...styles.kpsTd, textAlign: "center" }}>
                     <span
-                      key={i}
-                      title={`${formatDate(g.date)} — ${g.opponent}${g.division ? ` (${g.division}, vægt ${g.weight})` : ""}`}
                       style={{
-                        display: "inline-flex",
-                        alignItems: "center",
-                        gap: 4,
-                        padding: "3px 8px",
-                        borderRadius: 20,
-                        fontSize: 11,
-                        fontWeight: 700,
-                        color: "#FFFFFF",
-                        background: scoreColor(g.score),
+                        ...styles.readOnlyScorePill,
+                        // Weighting can push the average slightly outside the
+                        // raw 1-5 rating scale (e.g. a Division 5 -> 6.0);
+                        // clamp so the badge still maps to a real score
+                        // color instead of falling through to neutral grey.
+                        background: scoreColor(
+                          avg != null ? Math.min(5, Math.max(1, Math.round(avg))) : null
+                        ),
                       }}
                     >
-                      {g.opponent} {g.score}
+                      {avg != null ? avg.toFixed(1) : "—"}
                     </span>
-                  ))}
-                </div>
-              )}
-            </div>
-          ))}
+                  </td>
+                  <td style={{ ...styles.kpsTd, textAlign: "right" }}>
+                    {stats?.avgPassSuccessPct != null ? `${stats.avgPassSuccessPct.toFixed(0)}%` : "—"}
+                  </td>
+                  <td style={{ ...styles.kpsTd, textAlign: "right" }}>
+                    {stats?.avgHighIntensityRuns != null ? stats.avgHighIntensityRuns.toFixed(1) : "—"}
+                  </td>
+                  <td style={{ ...styles.kpsTd, textAlign: "right" }}>
+                    {stats?.avgDistanceKm != null ? `${stats.avgDistanceKm.toFixed(1)} km` : "—"}
+                  </td>
+                  <td style={{ ...styles.kpsTd, textAlign: "right" }}>
+                    {stats?.avgDribbles != null ? stats.avgDribbles.toFixed(1) : "—"}
+                  </td>
+                  <td style={{ ...styles.kpsTd, textAlign: "right" }}>
+                    {stats?.avgTackles != null ? stats.avgTackles.toFixed(1) : "—"}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
     </div>
@@ -8523,6 +8552,28 @@ const styles = {
     fontFamily: "'Oswald', sans-serif",
     fontSize: 18,
     fontWeight: 700,
+  },
+  kpsTable: {
+    width: "100%",
+    borderCollapse: "collapse",
+  },
+  kpsTh: {
+    textAlign: "left",
+    padding: "12px 16px",
+    fontSize: 11,
+    fontWeight: 700,
+    textTransform: "uppercase",
+    letterSpacing: 0.4,
+    color: "#8A8A8A",
+    borderBottom: "2px solid #1A1A1A",
+    whiteSpace: "nowrap",
+  },
+  kpsRow: {
+    borderBottom: "1px solid #E3E3E3",
+  },
+  kpsTd: {
+    padding: "12px 16px",
+    fontSize: 14,
   },
   skillRow: {
     display: "flex",

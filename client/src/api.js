@@ -210,6 +210,10 @@ export function deleteMatchPlan(id) {
   return request("DELETE", `/api/match-plans/${id}`);
 }
 
+export function getMatchStatsSummary() {
+  return request("GET", "/api/match-plans/stats-summary");
+}
+
 export function generateDevelopmentPlan(playerId) {
   return request("POST", `/api/development-plans/${playerId}/generate`);
 }
