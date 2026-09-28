@@ -7446,14 +7446,16 @@ function KampPerformanceView({ players }) {
     games.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0))
   );
 
-  // Weighted rather than plain average, so games at a higher level (see
-  // KAMPPLAN_DIVISION_WEIGHTS) count for more toward the player's overall
-  // kampscore.
+  // Each game's score is scaled by its række weight before averaging — the
+  // divisor is the game count, not the summed weight, so the weight actually
+  // shows up in the result even for a player who has only played at one
+  // level (dividing by summed weight instead would cancel it right back
+  // out, e.g. every Liga 2 score / 0.8 total weight = the unweighted
+  // average again, defeating the point).
   const rows = players.map((player) => {
     const games = gamesByPlayer[player.id] || [];
-    const totalWeight = games.reduce((sum, g) => sum + g.weight, 0);
-    const avg = totalWeight
-      ? games.reduce((sum, g) => sum + g.score * g.weight, 0) / totalWeight
+    const avg = games.length
+      ? games.reduce((sum, g) => sum + g.score * g.weight, 0) / games.length
       : null;
     return { player, games, avg };
   });
@@ -7503,7 +7505,13 @@ function KampPerformanceView({ players }) {
                 <span
                   style={{
                     ...styles.readOnlyScorePill,
-                    background: scoreColor(avg != null ? Math.round(avg) : null),
+                    // Weighting can push the average slightly outside the
+                    // raw 1-5 rating scale (e.g. a Division 5 -> 6.0);
+                    // clamp so the badge still maps to a real score color
+                    // instead of falling through to the neutral grey.
+                    background: scoreColor(
+                      avg != null ? Math.min(5, Math.max(1, Math.round(avg))) : null
+                    ),
                   }}
                 >
                   {avg != null ? avg.toFixed(1) : "—"}
