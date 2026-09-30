@@ -6102,12 +6102,12 @@ function kpLinkify(text) {
 }
 
 const KP_PRINT_CSS = `
-.pp-page{ font-family:var(--font-body);color:#111;font-size:13.5px;line-height:1.4; }
+.pp-page{ font-family:var(--font-body);color:#111;font-size:13.5px;line-height:1.32; }
 .pp-head{
-  font-family:var(--font-display);font-weight:600;font-size:22px;border-bottom:2px solid #111;
-  padding-bottom:6px;margin-bottom:9px;display:flex;justify-content:space-between;align-items:baseline;
+  font-family:var(--font-display);font-weight:600;font-size:19px;border-bottom:2px solid #111;
+  padding-bottom:5px;margin-bottom:7px;display:flex;justify-content:space-between;align-items:baseline;
 }
-.pp-head span.small{font-family:var(--font-body);font-weight:600;font-size:16px;}
+.pp-head span.small{font-family:var(--font-body);font-weight:600;font-size:14px;}
 .pp-grid{
   display:grid;
   grid-template-columns:1fr 1fr 1fr;
@@ -6133,28 +6133,28 @@ const KP_PRINT_CSS = `
 .pp-lineup2{grid-area:lineup2;border-top:1px solid #ccc;margin-top:8px;padding-top:6px;}
 .pp-goalhead{grid-area:goalhead;}
 .pp-goalhead h4{
-  font-family:var(--font-display);font-size:14px;text-transform:uppercase;letter-spacing:.03em;
+  font-family:var(--font-display);font-size:12.5px;text-transform:uppercase;letter-spacing:.03em;
   margin:0 0 3px;padding-bottom:0;border:none;
 }
-.pp-goalA{grid-area:goalA;border-right:1px solid #ccc;padding-right:14px;border-bottom:1px solid #ccc;padding-bottom:6px;margin-bottom:16px;}
-.pp-goalB{grid-area:goalB;border-right:1px solid #ccc;padding-right:14px;border-bottom:1px solid #ccc;padding-bottom:6px;margin-bottom:16px;}
-.pp-goalC{grid-area:goalC;border-bottom:1px solid #ccc;padding-bottom:6px;margin-bottom:16px;}
+.pp-goalA{grid-area:goalA;border-right:1px solid #ccc;padding-right:14px;border-bottom:1px solid #ccc;padding-bottom:5px;margin-bottom:12px;}
+.pp-goalB{grid-area:goalB;border-right:1px solid #ccc;padding-right:14px;border-bottom:1px solid #ccc;padding-bottom:5px;margin-bottom:12px;}
+.pp-goalC{grid-area:goalC;border-bottom:1px solid #ccc;padding-bottom:5px;margin-bottom:12px;}
 .pp-goal-list{margin:0;padding:0;list-style:none;}
 .pp-goal-list li{margin:0 0 2px;}
-.pp-block{margin-bottom:6px;}
+.pp-block{margin-bottom:5px;}
 .pp-block h4{
-  font-family:var(--font-display);font-size:14px;text-transform:uppercase;letter-spacing:.03em;
+  font-family:var(--font-display);font-size:12.5px;text-transform:uppercase;letter-spacing:.03em;
   margin:0 0 3px;border-bottom:1px solid #999;padding-bottom:2px;
 }
 .pp-phase-header{
-  font-family:var(--font-display);font-weight:700;font-size:14px;text-transform:uppercase;letter-spacing:.05em;
-  background:#eee;border:1px solid #bbb;border-radius:3px;padding:3px 7px;margin-bottom:5px;
+  font-family:var(--font-display);font-weight:700;font-size:12.5px;text-transform:uppercase;letter-spacing:.05em;
+  background:#eee;border:1px solid #bbb;border-radius:3px;padding:3px 6px;margin-bottom:4px;
 }
 .pp-block p, .pp-goalA p, .pp-goalB p, .pp-goalC p{margin:0 0 2px;white-space:pre-line;}
 .pp-block p b{font-weight:700;}
 .pp-notes-text{white-space:pre-line;margin:0;}
-.pp-table{width:100%;border-collapse:collapse;margin-bottom:5px;}
-.pp-table th, .pp-table td{border:1px solid #bbb;padding:2px 6px;text-align:left;font-size:14px;line-height:1.3;}
+.pp-table{width:100%;border-collapse:collapse;margin-bottom:4px;}
+.pp-table th, .pp-table td{border:1px solid #bbb;padding:2px 5px;text-align:left;font-size:12.5px;line-height:1.25;}
 .pp-table th{background:#eee;font-weight:700;}
 `;
 
@@ -6384,171 +6384,123 @@ function kpSetStringAt(list, index, value) {
   return list.map((v, i) => (i === index ? value : v));
 }
 
+// Starts collapsed, same as the category blocks on Spillertrup (see
+// PlayerView's expandedCats) — the count on the right (visible whether
+// collapsed or not) is what lets a coach see how much is already filled in
+// without opening it.
 function KpCategorySection({ title, items, categories, defaultCategory, onAdd, onUpdate, onRemove }) {
+  const [expanded, setExpanded] = useState(false);
   return (
     <div style={styles.categoryBlock}>
-      <div style={styles.categoryHeadRow}>
-        <span style={styles.categoryLabel}>{title}</span>
+      <div
+        className="category-head-row-collapsible"
+        style={styles.categoryHeadRow}
+        onClick={() => setExpanded((v) => !v)}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <button
+            type="button"
+            style={styles.iconBtnGhost}
+            onClick={(e) => {
+              e.stopPropagation();
+              setExpanded((v) => !v);
+            }}
+            title={expanded ? "Skjul" : "Vis"}
+          >
+            {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+          </button>
+          <span style={styles.categoryLabel}>{title}</span>
+        </div>
+        <span style={styles.categoryAvg}>{items.length}</span>
       </div>
-      {items.map((item, i) => (
-        <div key={i} style={{ border: "1px solid #E3E3E3", borderRadius: 8, padding: 12, marginBottom: 10 }}>
-          <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 8 }}>
-            <select
-              style={{ ...styles.select, flex: 1 }}
-              value={item.category}
-              onChange={(e) => onUpdate(i, { category: e.target.value })}
-            >
-              {categories.map((c) => (
-                <option key={c} value={c}>
-                  {c}
-                </option>
-              ))}
-            </select>
-            <button style={styles.iconBtnGhost} onClick={() => onRemove(i)} title="Fjern">
-              <X size={14} />
-            </button>
+      <div className={`category-skills${expanded ? " category-skills-open" : ""}`}>
+        {items.map((item, i) => (
+          <div key={i} style={{ border: "1px solid #E3E3E3", borderRadius: 8, padding: 12, marginBottom: 10 }}>
+            <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 8 }}>
+              <select
+                style={{ ...styles.select, flex: 1 }}
+                value={item.category}
+                onChange={(e) => onUpdate(i, { category: e.target.value })}
+              >
+                {categories.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
+              </select>
+              <button style={styles.iconBtnGhost} onClick={() => onRemove(i)} title="Fjern">
+                <X size={14} />
+              </button>
+            </div>
+            <textarea
+              style={styles.textarea}
+              rows={4}
+              value={item.text}
+              onChange={(e) => onUpdate(i, { text: e.target.value })}
+            />
           </div>
-          <textarea
-            style={styles.textarea}
-            rows={4}
-            value={item.text}
-            onChange={(e) => onUpdate(i, { text: e.target.value })}
+        ))}
+        <button
+          style={{ ...styles.ghostBtn, borderStyle: "dashed", padding: "8px 14px", fontSize: 13 }}
+          onClick={() => onAdd(defaultCategory)}
+        >
+          <Plus size={14} /> Tilføj afsnit
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// Same collapsed-by-default pattern as KpCategorySection — see that
+// component's comment.
+function KpPositionTable({ title, positions, formation, onFormationChange, onUpdate, onAdd, onRemove, playerNames }) {
+  const [expanded, setExpanded] = useState(false);
+  const th = {
+    textAlign: "left",
+    fontSize: 11,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+    color: "#6B6B6B",
+    padding: "0 8px 6px 0",
+    fontWeight: 700,
+  };
+  return (
+    <div style={styles.categoryBlock}>
+      <div
+        className="category-head-row-collapsible"
+        style={styles.categoryHeadRow}
+        onClick={() => setExpanded((v) => !v)}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <button
+            type="button"
+            style={styles.iconBtnGhost}
+            onClick={(e) => {
+              e.stopPropagation();
+              setExpanded((v) => !v);
+            }}
+            title={expanded ? "Skjul" : "Vis"}
+          >
+            {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+          </button>
+          <span style={styles.categoryLabel}>{title}</span>
+        </div>
+        <span style={styles.categoryAvg}>{positions.length}</span>
+      </div>
+      <div className={`category-skills${expanded ? " category-skills-open" : ""}`}>
+        <div style={{ maxWidth: 220, marginBottom: 14 }}>
+          <div style={styles.fieldLabel}>Formation</div>
+          <input
+            style={styles.input}
+            type="text"
+            value={formation}
+            onChange={(e) => onFormationChange(e.target.value)}
           />
         </div>
-      ))}
-      <button
-        style={{ ...styles.ghostBtn, borderStyle: "dashed", padding: "8px 14px", fontSize: 13 }}
-        onClick={() => onAdd(defaultCategory)}
-      >
-        <Plus size={14} /> Tilføj afsnit
-      </button>
-    </div>
-  );
-}
-
-function KpPositionTable({ title, positions, formation, onFormationChange, onUpdate, onAdd, onRemove, playerNames }) {
-  const th = {
-    textAlign: "left",
-    fontSize: 11,
-    textTransform: "uppercase",
-    letterSpacing: 0.5,
-    color: "#6B6B6B",
-    padding: "0 8px 6px 0",
-    fontWeight: 700,
-  };
-  return (
-    <div style={styles.categoryBlock}>
-      <div style={styles.categoryHeadRow}>
-        <span style={styles.categoryLabel}>{title}</span>
-      </div>
-      <div style={{ maxWidth: 220, marginBottom: 14 }}>
-        <div style={styles.fieldLabel}>Formation</div>
-        <input
-          style={styles.input}
-          type="text"
-          value={formation}
-          onChange={(e) => onFormationChange(e.target.value)}
-        />
-      </div>
-      <table style={{ width: "100%", borderCollapse: "collapse" }}>
-        <thead>
-          <tr>
-            <th style={{ ...th, width: 70 }}>Position</th>
-            <th style={th}>Spillernavn</th>
-            <th style={{ ...th, width: 60, textAlign: "center" }} title="Vælg fra spillerlisten frem for at skrive navnet frit">
-              Liste
-            </th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody>
-          {positions.map((r, i) => {
-            const useList = r.useList !== false;
-            return (
-              <tr key={i}>
-                <td style={{ width: 70, padding: "4px 8px 4px 0" }}>
-                  <select
-                    style={styles.select}
-                    value={r.position}
-                    onChange={(e) => onUpdate(i, { position: e.target.value })}
-                  >
-                    {Array.from({ length: 11 }, (_, n) => n + 1).map((n) => (
-                      <option key={n} value={String(n)}>
-                        {n}
-                      </option>
-                    ))}
-                  </select>
-                </td>
-                <td style={{ padding: "4px 8px 4px 0" }}>
-                  {useList ? (
-                    <select
-                      style={styles.select}
-                      value={r.name}
-                      onChange={(e) => onUpdate(i, { name: e.target.value })}
-                    >
-                      <option value="">Vælg spiller</option>
-                      {playerNames.map((n) => (
-                        <option key={n} value={n}>
-                          {n}
-                        </option>
-                      ))}
-                    </select>
-                  ) : (
-                    <input
-                      style={styles.input}
-                      value={r.name}
-                      placeholder="Spillernavn"
-                      onChange={(e) => onUpdate(i, { name: e.target.value })}
-                    />
-                  )}
-                </td>
-                <td style={{ width: 60, padding: "4px 8px 4px 0", textAlign: "center" }}>
-                  <input
-                    type="checkbox"
-                    checked={useList}
-                    onChange={(e) => onUpdate(i, { useList: e.target.checked })}
-                    title="Vælg fra spillerlisten frem for at skrive navnet frit"
-                  />
-                </td>
-                <td style={{ width: 26, padding: "4px 0" }}>
-                  <button style={styles.iconBtnGhost} onClick={() => onRemove(i)} title="Fjern">
-                    <X size={14} />
-                  </button>
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-      <button
-        style={{ ...styles.ghostBtn, borderStyle: "dashed", padding: "8px 14px", fontSize: 13, marginTop: 10 }}
-        onClick={onAdd}
-      >
-        <Plus size={14} /> Tilføj position
-      </button>
-    </div>
-  );
-}
-
-function KpReserveTable({ reserves, onUpdate, onAdd, onRemove, playerNames }) {
-  const th = {
-    textAlign: "left",
-    fontSize: 11,
-    textTransform: "uppercase",
-    letterSpacing: 0.5,
-    color: "#6B6B6B",
-    padding: "0 8px 6px 0",
-    fontWeight: 700,
-  };
-  return (
-    <div style={styles.categoryBlock}>
-      <div style={styles.categoryHeadRow}>
-        <span style={styles.categoryLabel}>Reserver</span>
-      </div>
-      {reserves.length > 0 && (
         <table style={{ width: "100%", borderCollapse: "collapse" }}>
           <thead>
             <tr>
+              <th style={{ ...th, width: 70 }}>Position</th>
               <th style={th}>Spillernavn</th>
               <th style={{ ...th, width: 60, textAlign: "center" }} title="Vælg fra spillerlisten frem for at skrive navnet frit">
                 Liste
@@ -6557,10 +6509,23 @@ function KpReserveTable({ reserves, onUpdate, onAdd, onRemove, playerNames }) {
             </tr>
           </thead>
           <tbody>
-            {reserves.map((r, i) => {
+            {positions.map((r, i) => {
               const useList = r.useList !== false;
               return (
                 <tr key={i}>
+                  <td style={{ width: 70, padding: "4px 8px 4px 0" }}>
+                    <select
+                      style={styles.select}
+                      value={r.position}
+                      onChange={(e) => onUpdate(i, { position: e.target.value })}
+                    >
+                      {Array.from({ length: 11 }, (_, n) => n + 1).map((n) => (
+                        <option key={n} value={String(n)}>
+                          {n}
+                        </option>
+                      ))}
+                    </select>
+                  </td>
                   <td style={{ padding: "4px 8px 4px 0" }}>
                     {useList ? (
                       <select
@@ -6602,13 +6567,119 @@ function KpReserveTable({ reserves, onUpdate, onAdd, onRemove, playerNames }) {
             })}
           </tbody>
         </table>
-      )}
-      <button
-        style={{ ...styles.ghostBtn, borderStyle: "dashed", padding: "8px 14px", fontSize: 13, marginTop: 10 }}
-        onClick={onAdd}
+        <button
+          style={{ ...styles.ghostBtn, borderStyle: "dashed", padding: "8px 14px", fontSize: 13, marginTop: 10 }}
+          onClick={onAdd}
+        >
+          <Plus size={14} /> Tilføj position
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// Same collapsed-by-default pattern as KpCategorySection — see that
+// component's comment.
+function KpReserveTable({ reserves, onUpdate, onAdd, onRemove, playerNames }) {
+  const [expanded, setExpanded] = useState(false);
+  const th = {
+    textAlign: "left",
+    fontSize: 11,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+    color: "#6B6B6B",
+    padding: "0 8px 6px 0",
+    fontWeight: 700,
+  };
+  return (
+    <div style={styles.categoryBlock}>
+      <div
+        className="category-head-row-collapsible"
+        style={styles.categoryHeadRow}
+        onClick={() => setExpanded((v) => !v)}
       >
-        <Plus size={14} /> Tilføj reserve
-      </button>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <button
+            type="button"
+            style={styles.iconBtnGhost}
+            onClick={(e) => {
+              e.stopPropagation();
+              setExpanded((v) => !v);
+            }}
+            title={expanded ? "Skjul" : "Vis"}
+          >
+            {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+          </button>
+          <span style={styles.categoryLabel}>Reserver</span>
+        </div>
+        <span style={styles.categoryAvg}>{reserves.length}</span>
+      </div>
+      <div className={`category-skills${expanded ? " category-skills-open" : ""}`}>
+        {reserves.length > 0 && (
+          <table style={{ width: "100%", borderCollapse: "collapse" }}>
+            <thead>
+              <tr>
+                <th style={th}>Spillernavn</th>
+                <th style={{ ...th, width: 60, textAlign: "center" }} title="Vælg fra spillerlisten frem for at skrive navnet frit">
+                  Liste
+                </th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {reserves.map((r, i) => {
+                const useList = r.useList !== false;
+                return (
+                  <tr key={i}>
+                    <td style={{ padding: "4px 8px 4px 0" }}>
+                      {useList ? (
+                        <select
+                          style={styles.select}
+                          value={r.name}
+                          onChange={(e) => onUpdate(i, { name: e.target.value })}
+                        >
+                          <option value="">Vælg spiller</option>
+                          {playerNames.map((n) => (
+                            <option key={n} value={n}>
+                              {n}
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        <input
+                          style={styles.input}
+                          value={r.name}
+                          placeholder="Spillernavn"
+                          onChange={(e) => onUpdate(i, { name: e.target.value })}
+                        />
+                      )}
+                    </td>
+                    <td style={{ width: 60, padding: "4px 8px 4px 0", textAlign: "center" }}>
+                      <input
+                        type="checkbox"
+                        checked={useList}
+                        onChange={(e) => onUpdate(i, { useList: e.target.checked })}
+                        title="Vælg fra spillerlisten frem for at skrive navnet frit"
+                      />
+                    </td>
+                    <td style={{ width: 26, padding: "4px 0" }}>
+                      <button style={styles.iconBtnGhost} onClick={() => onRemove(i)} title="Fjern">
+                        <X size={14} />
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        )}
+        <button
+          style={{ ...styles.ghostBtn, borderStyle: "dashed", padding: "8px 14px", fontSize: 13, marginTop: 10 }}
+          onClick={onAdd}
+        >
+          <Plus size={14} /> Tilføj reserve
+        </button>
+      </div>
     </div>
   );
 }
@@ -6636,6 +6707,10 @@ function kpPositionMismatch(filePosition, playerPositions, positionAliases) {
 // anything is actually saved to development_plans... to match_stats,
 // rather.
 function KpStatsUpload({ planId, players }) {
+  // Same collapsed-by-default pattern as KpCategorySection — see that
+  // component's comment. Clicking "Upload statistik" also expands, since
+  // the upload UI it opens lives inside the collapsible area.
+  const [expanded, setExpanded] = useState(false);
   const [existing, setExisting] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [preview, setPreview] = useState(null); // { rows, skipped } | null
@@ -6717,11 +6792,36 @@ function KpStatsUpload({ planId, players }) {
 
   return (
     <div style={styles.categoryBlock}>
-      <div style={styles.categoryHeadRow}>
-        <span style={styles.categoryLabel}>Kampstatistik</span>
-        <div style={{ display: "flex", gap: 8 }}>
+      <div
+        className="category-head-row-collapsible"
+        style={styles.categoryHeadRow}
+        onClick={() => setExpanded((v) => !v)}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <button
+            type="button"
+            style={styles.iconBtnGhost}
+            onClick={(e) => {
+              e.stopPropagation();
+              setExpanded((v) => !v);
+            }}
+            title={expanded ? "Skjul" : "Vis"}
+          >
+            {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+          </button>
+          <span style={styles.categoryLabel}>Kampstatistik</span>
+          <span style={styles.categoryAvg}>{existing ? existing.length : 0}</span>
+        </div>
+        <div style={{ display: "flex", gap: 8 }} onClick={(e) => e.stopPropagation()}>
           {planId && (
-            <button style={styles.linkBtn} onClick={() => fileInputRef.current?.click()} disabled={uploading}>
+            <button
+              style={styles.linkBtn}
+              onClick={() => {
+                setExpanded(true);
+                fileInputRef.current?.click();
+              }}
+              disabled={uploading}
+            >
               <Upload size={12} /> {uploading ? "Læser fil…" : "Upload statistik"}
             </button>
           )}
@@ -6740,6 +6840,7 @@ function KpStatsUpload({ planId, players }) {
         />
       </div>
 
+      <div className={`category-skills${expanded ? " category-skills-open" : ""}`}>
       {!planId && (
         <p style={styles.noSkills}>Gem kampplanen først — så kan du uploade statistik bagefter.</p>
       )}
@@ -6863,6 +6964,7 @@ function KpStatsUpload({ planId, players }) {
       ) : (
         planId && <p style={styles.noSkills}>Ingen statistik uploadet endnu for denne kamp.</p>
       )}
+      </div>
     </div>
   );
 }
@@ -6872,64 +6974,93 @@ function KpStatsUpload({ planId, players }) {
 // deliberately never read by kpPrintPlan — used to build a per-player
 // performance-over-time report (KampPerformanceView) to help spot who's
 // ready to progress to the next level of training.
+// Same collapsed-by-default pattern as KpCategorySection — see that
+// component's comment. The count is ratings given so far (not roster size),
+// since that's the more useful "how much of this is done" signal here.
 function KpPerformanceScores({ planId, players, scores, onSetScore }) {
+  const [expanded, setExpanded] = useState(false);
   return (
     <div style={styles.categoryBlock}>
-      <div style={styles.categoryHeadRow}>
-        <span style={styles.categoryLabel}>Spillerbedømmelse</span>
+      <div
+        className="category-head-row-collapsible"
+        style={styles.categoryHeadRow}
+        onClick={() => setExpanded((v) => !v)}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <button
+            type="button"
+            style={styles.iconBtnGhost}
+            onClick={(e) => {
+              e.stopPropagation();
+              setExpanded((v) => !v);
+            }}
+            title={expanded ? "Skjul" : "Vis"}
+          >
+            {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+          </button>
+          <span style={styles.categoryLabel}>Spillerbedømmelse</span>
+        </div>
+        <span style={styles.categoryAvg}>{Object.keys(scores).length}</span>
       </div>
-      <p style={styles.subtext}>
-        Vurdér hver spillers indsats i denne kamp på en skala fra 1-5. Vises kun her — kommer ikke
-        med på den udskrevne kampplan.
-      </p>
-      {!planId ? (
-        <p style={styles.noSkills}>
-          Gem kampplanen først — så kan du bedømme spillernes indsats bagefter.
+      <div className={`category-skills${expanded ? " category-skills-open" : ""}`}>
+        <p style={styles.subtext}>
+          Vurdér hver spillers indsats i denne kamp på en skala fra 1-5. Vises kun her — kommer ikke
+          med på den udskrevne kampplan.
         </p>
-      ) : players.length === 0 ? (
-        <p style={styles.noSkills}>
-          Tilføj spillere under "Position &amp; opstilling" for at bedømme deres indsats.
-        </p>
-      ) : (
-        players.map(({ id, name }) => {
-          const value = scores[id];
-          return (
-            <div key={id} style={styles.skillRow}>
-              <span style={styles.skillName}>{name}</span>
-              <div style={styles.scoreButtons}>
-                {[1, 2, 3, 4, 5].map((v) => {
-                  const active = value === v;
-                  return (
-                    <button
-                      key={v}
-                      onClick={() => onSetScore(id, value === v ? null : v)}
-                      style={{
-                        ...styles.scoreBtn,
-                        background: active ? scoreColor(v) : "#FFFFFF",
-                        color: active ? "#FFFFFF" : "#1A1A1A",
-                        borderColor: active ? scoreColor(v) : "#D9D4C7",
-                      }}
-                    >
-                      {v}
-                    </button>
-                  );
-                })}
+        {!planId ? (
+          <p style={styles.noSkills}>
+            Gem kampplanen først — så kan du bedømme spillernes indsats bagefter.
+          </p>
+        ) : players.length === 0 ? (
+          <p style={styles.noSkills}>
+            Tilføj spillere under "Position &amp; opstilling" for at bedømme deres indsats.
+          </p>
+        ) : (
+          players.map(({ id, name }) => {
+            const value = scores[id];
+            return (
+              <div key={id} style={styles.skillRow}>
+                <span style={styles.skillName}>{name}</span>
+                <div style={styles.scoreButtons}>
+                  {[1, 2, 3, 4, 5].map((v) => {
+                    const active = value === v;
+                    return (
+                      <button
+                        key={v}
+                        onClick={() => onSetScore(id, value === v ? null : v)}
+                        style={{
+                          ...styles.scoreBtn,
+                          background: active ? scoreColor(v) : "#FFFFFF",
+                          color: active ? "#FFFFFF" : "#1A1A1A",
+                          borderColor: active ? scoreColor(v) : "#D9D4C7",
+                        }}
+                      >
+                        {v}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
-            </div>
-          );
-        })
-      )}
+            );
+          })
+        )}
+      </div>
     </div>
   );
 }
 
+// Same collapsed-by-default pattern as KpCategorySection — see that
+// component's comment. "Rediger" also expands, since editing needs the
+// textarea visible.
 function KpNotesField({ value, onChange }) {
+  const [expanded, setExpanded] = useState(false);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(value || "");
 
   const startEdit = () => {
     setDraft(value || "");
     setEditing(true);
+    setExpanded(true);
   };
   const save = () => {
     onChange(draft);
@@ -6938,39 +7069,64 @@ function KpNotesField({ value, onChange }) {
 
   return (
     <div style={styles.categoryBlock}>
-      <div style={styles.categoryHeadRow}>
-        <span style={styles.categoryLabel}>Noter generelt før kamp</span>
+      <div
+        className="category-head-row-collapsible"
+        style={styles.categoryHeadRow}
+        onClick={() => setExpanded((v) => !v)}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <button
+            type="button"
+            style={styles.iconBtnGhost}
+            onClick={(e) => {
+              e.stopPropagation();
+              setExpanded((v) => !v);
+            }}
+            title={expanded ? "Skjul" : "Vis"}
+          >
+            {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+          </button>
+          <span style={styles.categoryLabel}>Noter generelt før kamp</span>
+        </div>
         {!editing && (
-          <button style={styles.linkBtn} onClick={startEdit}>
+          <button
+            style={styles.linkBtn}
+            onClick={(e) => {
+              e.stopPropagation();
+              startEdit();
+            }}
+          >
             <Pencil size={12} /> Rediger
           </button>
         )}
       </div>
-      {editing ? (
-        <div>
-          <textarea
-            style={{ ...styles.textarea, minHeight: 120 }}
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            autoFocus
-          />
-          <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-            <button style={styles.primaryBtnSm} onClick={save}>
-              Gem
-            </button>
-            <button style={styles.ghostBtn} onClick={() => setEditing(false)}>
-              Annuller
-            </button>
+      <div className={`category-skills${expanded ? " category-skills-open" : ""}`}>
+        {editing ? (
+          <div>
+            <textarea
+              style={{ ...styles.textarea, minHeight: 120 }}
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              autoFocus
+            />
+            <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+              <button style={styles.primaryBtnSm} onClick={save}>
+                Gem
+              </button>
+              <button style={styles.ghostBtn} onClick={() => setEditing(false)}>
+                Annuller
+              </button>
+            </div>
           </div>
-        </div>
-      ) : value ? (
-        <div
-          style={{ fontSize: 14, lineHeight: 1.6 }}
-          dangerouslySetInnerHTML={{ __html: kpLinkify(value) }}
-        />
-      ) : (
-        <p style={styles.noSkills}>Ingen noter endnu. Klik Rediger for at tilføje noter — links indsat her kan klikkes.</p>
-      )}
+        ) : value ? (
+          <div
+            style={{ fontSize: 14, lineHeight: 1.6 }}
+            dangerouslySetInnerHTML={{ __html: kpLinkify(value) }}
+          />
+        ) : (
+          <p style={styles.noSkills}>Ingen noter endnu. Klik Rediger for at tilføje noter — links indsat her kan klikkes.</p>
+        )}
+      </div>
     </div>
   );
 }
@@ -6998,7 +7154,7 @@ function kpGoalOptionsForPlayer(data, playerId) {
       const meta = findSkillMeta(data.config, skillId);
       const goal = goals[skillId];
       if (!meta || !goal.focusAreas) return null;
-      return { skillId, label: `${meta.skill.name} — Fokusområder: ${goal.focusAreas}` };
+      return { skillId, label: `${meta.skill.name} — ${goal.focusAreas}` };
     })
     .filter(Boolean);
 }
@@ -7017,6 +7173,13 @@ function KampplanEditor({ plan, setPlan, onBack, onSave, onPrint, saving, player
   // focus state), matching the same "list or free text" convenience the
   // position/reserve rows already have via their `useList` flag.
   const [goalUseList, setGoalUseList] = useState({});
+  // Starts collapsed, same as every other category block on this page (see
+  // KpCategorySection) — this one is built inline rather than through that
+  // component since it edits a plain string array, not {category, text}.
+  const [teamGoalsExpanded, setTeamGoalsExpanded] = useState(false);
+  // Same for the "Individuelle mål" table — also built inline since it
+  // joins roster/reserve names with each player's own defined goals.
+  const [individualGoalsExpanded, setIndividualGoalsExpanded] = useState(false);
   // Older plans stored reserves as plain name strings; normalize those to
   // the { name, useList } shape used going forward before any edit touches
   // them, so a merge patch never spreads onto a raw string.
@@ -7064,6 +7227,11 @@ function KampplanEditor({ plan, setPlan, onBack, onSave, onPrint, saving, player
 
   return (
     <div>
+      <style>{`
+        .category-skills { display: none; }
+        .category-skills.category-skills-open { display: block; }
+        .category-head-row-collapsible { cursor: pointer; }
+      `}</style>
       <button style={styles.backBtn} onClick={onBack}>
         <ChevronLeft size={16} /> Alle kampplaner
       </button>
@@ -7105,31 +7273,51 @@ function KampplanEditor({ plan, setPlan, onBack, onSave, onPrint, saving, player
       </div>
 
       <div style={styles.categoryBlock}>
-        <div style={styles.categoryHeadRow}>
-          <span style={styles.categoryLabel}>Målsætning for holdet</span>
-        </div>
-        {plan.teamGoals.map((g, i) => (
-          <div key={i} style={{ display: "grid", gridTemplateColumns: "1fr 26px", gap: 8, alignItems: "start", marginBottom: 8 }}>
-            <textarea
-              style={{ ...styles.textarea, minHeight: 44 }}
-              value={g}
-              onChange={(e) => setPlan({ ...plan, teamGoals: kpSetStringAt(plan.teamGoals, i, e.target.value) })}
-            />
-            <button
-              style={{ ...styles.iconBtnGhost, marginTop: 6 }}
-              onClick={() => setPlan({ ...plan, teamGoals: kpRemoveAt(plan.teamGoals, i) })}
-              title="Fjern"
-            >
-              <X size={14} />
-            </button>
-          </div>
-        ))}
-        <button
-          style={{ ...styles.ghostBtn, borderStyle: "dashed", padding: "8px 14px", fontSize: 13 }}
-          onClick={() => setPlan({ ...plan, teamGoals: [...plan.teamGoals, ""] })}
+        <div
+          className="category-head-row-collapsible"
+          style={styles.categoryHeadRow}
+          onClick={() => setTeamGoalsExpanded((v) => !v)}
         >
-          <Plus size={14} /> Tilføj målsætning
-        </button>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <button
+              type="button"
+              style={styles.iconBtnGhost}
+              onClick={(e) => {
+                e.stopPropagation();
+                setTeamGoalsExpanded((v) => !v);
+              }}
+              title={teamGoalsExpanded ? "Skjul" : "Vis"}
+            >
+              {teamGoalsExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+            </button>
+            <span style={styles.categoryLabel}>Målsætning for holdet</span>
+          </div>
+          <span style={styles.categoryAvg}>{plan.teamGoals.length}</span>
+        </div>
+        <div className={`category-skills${teamGoalsExpanded ? " category-skills-open" : ""}`}>
+          {plan.teamGoals.map((g, i) => (
+            <div key={i} style={{ display: "grid", gridTemplateColumns: "1fr 26px", gap: 8, alignItems: "start", marginBottom: 8 }}>
+              <textarea
+                style={{ ...styles.textarea, minHeight: 44 }}
+                value={g}
+                onChange={(e) => setPlan({ ...plan, teamGoals: kpSetStringAt(plan.teamGoals, i, e.target.value) })}
+              />
+              <button
+                style={{ ...styles.iconBtnGhost, marginTop: 6 }}
+                onClick={() => setPlan({ ...plan, teamGoals: kpRemoveAt(plan.teamGoals, i) })}
+                title="Fjern"
+              >
+                <X size={14} />
+              </button>
+            </div>
+          ))}
+          <button
+            style={{ ...styles.ghostBtn, borderStyle: "dashed", padding: "8px 14px", fontSize: 13 }}
+            onClick={() => setPlan({ ...plan, teamGoals: [...plan.teamGoals, ""] })}
+          >
+            <Plus size={14} /> Tilføj målsætning
+          </button>
+        </div>
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 16 }}>
@@ -7205,6 +7393,14 @@ function KampplanEditor({ plan, setPlan, onBack, onSave, onPrint, saving, player
         onRemove={(i) => setPlan({ ...plan, positions: kpRemoveAt(plan.positions, i) })}
       />
 
+      <KpReserveTable
+        reserves={reserves}
+        playerNames={playerNames}
+        onUpdate={(i, patch) => setPlan({ ...plan, reserves: kpSetAt(reserves, i, patch) })}
+        onAdd={() => setPlan({ ...plan, reserves: [...reserves, { name: "", useList: true }] })}
+        onRemove={(i) => setPlan({ ...plan, reserves: kpRemoveAt(reserves, i) })}
+      />
+
       <KpPositionTable
         title="Position & opstilling 2"
         positions={plan.positions2}
@@ -7219,9 +7415,28 @@ function KampplanEditor({ plan, setPlan, onBack, onSave, onPrint, saving, player
       />
 
       <div style={styles.categoryBlock}>
-        <div style={styles.categoryHeadRow}>
-          <span style={styles.categoryLabel}>Individuelle mål</span>
+        <div
+          className="category-head-row-collapsible"
+          style={styles.categoryHeadRow}
+          onClick={() => setIndividualGoalsExpanded((v) => !v)}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <button
+              type="button"
+              style={styles.iconBtnGhost}
+              onClick={(e) => {
+                e.stopPropagation();
+                setIndividualGoalsExpanded((v) => !v);
+              }}
+              title={individualGoalsExpanded ? "Skjul" : "Vis"}
+            >
+              {individualGoalsExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+            </button>
+            <span style={styles.categoryLabel}>Individuelle mål</span>
+          </div>
+          <span style={styles.categoryAvg}>{individualGoalNames.length}</span>
         </div>
+        <div className={`category-skills${individualGoalsExpanded ? " category-skills-open" : ""}`}>
         {individualGoalNames.length === 0 ? (
           <p style={styles.noSkills}>
             Tilføj spillere under "Position &amp; opstilling" eller "Reserver" for at sætte individuelle mål.
@@ -7309,15 +7524,8 @@ function KampplanEditor({ plan, setPlan, onBack, onSave, onPrint, saving, player
             </tbody>
           </table>
         )}
+        </div>
       </div>
-
-      <KpReserveTable
-        reserves={reserves}
-        playerNames={playerNames}
-        onUpdate={(i, patch) => setPlan({ ...plan, reserves: kpSetAt(reserves, i, patch) })}
-        onAdd={() => setPlan({ ...plan, reserves: [...reserves, { name: "", useList: true }] })}
-        onRemove={(i) => setPlan({ ...plan, reserves: kpRemoveAt(reserves, i) })}
-      />
 
       <KpPerformanceScores
         planId={plan.id}
