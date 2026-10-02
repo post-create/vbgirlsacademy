@@ -317,6 +317,16 @@ create table if not exists match_plans (
 
 alter table match_plans add column if not exists division text not null default '';
 
+-- Set once, on demand, via POST /:id/share (see server/routes/matchPlans.js)
+-- — null until a coach actually clicks "generér spillerlink", and stable
+-- after that (repeat clicks return the same token rather than minting a
+-- new one, so an already-shared link keeps working). Looked up by the
+-- public, unauthenticated server/routes/matchPlanShare.js, which also
+-- enforces the "valid through the day after the match" cutoff — the token
+-- itself never expires or gets revoked, since that's not something a
+-- coach can do today.
+alter table match_plans add column if not exists share_token text unique;
+
 -- A coach's 1-5 rating of how a specific player performed in a specific
 -- match, entered after the game. Deliberately its own table (not a jsonb
 -- field on match_plans) — an earlier version stored this as jsonb on the

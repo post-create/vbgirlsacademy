@@ -3,6 +3,14 @@ async function request(method, url, body) {
     method,
     headers: body !== undefined ? { "Content-Type": "application/json" } : undefined,
     body: body !== undefined ? JSON.stringify(body) : undefined,
+    // Browsers will happily cache a GET response — including an error
+    // status like 404/410 — and keep serving it from cache on an
+    // identical later request even once the underlying data has changed
+    // (found via the kampplan share link: a token that briefly 410'd
+    // during testing kept 410'ing from cache long after the plan was
+    // valid again). Every response here reflects live server state, so
+    // none of it should ever be served from the browser's HTTP cache.
+    cache: "no-store",
   });
   if (!res.ok) {
     let message = `${method} ${url} failed with ${res.status}`;
@@ -212,6 +220,14 @@ export function deleteMatchPlan(id) {
 
 export function getMatchStatsSummary() {
   return request("GET", "/api/match-plans/stats-summary");
+}
+
+export function generateMatchPlanShareLink(id) {
+  return request("POST", `/api/match-plans/${id}/share`);
+}
+
+export function getMatchPlanShare(token) {
+  return request("GET", `/api/kampplan-share/${token}`);
 }
 
 export function generateDevelopmentPlan(playerId) {

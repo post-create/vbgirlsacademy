@@ -223,6 +223,18 @@ function getUrlToken() {
   return null;
 }
 
+// Same ?kampplan=<token> pattern as getUrlToken's ?player=<token>, for the
+// public kampplan share link (see KpShareLinkCard / KampplanShareView).
+function getKampplanShareToken() {
+  try {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("kampplan")) return params.get("kampplan");
+  } catch (e) {
+    /* ignore */
+  }
+  return null;
+}
+
 function CategoryAxisTick({ x, y, cx, cy, payload, index, onSelect }) {
   const cat = CATEGORY_META[index];
   if (!cat) return null;
@@ -746,6 +758,8 @@ export default function AcademyApp() {
   const [data, setData] = useState(null);
   const [selfData, setSelfData] = useState(null);
   const [selfInvalid, setSelfInvalid] = useState(false);
+  const [kampplanShareData, setKampplanShareData] = useState(null);
+  const [kampplanShareInvalid, setKampplanShareInvalid] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saveError, setSaveError] = useState(false);
   const [view, setView] = useState("roster");
@@ -783,15 +797,22 @@ export default function AcademyApp() {
   const [newSkillGroupId, setNewSkillGroupId] = useState("");
   const [confirmDelete, setConfirmDelete] = useState(null);
   const [urlToken] = useState(getUrlToken);
+  const [kampplanToken] = useState(getKampplanShareToken);
   // null while checking; otherwise { setupNeeded, coach } — coach is null
-  // when logged out. Only relevant off the self-eval link: a player never
-  // sees or triggers any of this, urlToken skips straight to api.getSelf.
+  // when logged out. Only relevant off the self-eval/kampplan-share links:
+  // neither player-facing link touches this, skipping straight to
+  // api.getSelf / api.getMatchPlanShare.
   const [authStatus, setAuthStatus] = useState(null);
 
   useEffect(() => {
     (async () => {
       try {
-        if (urlToken) {
+        if (kampplanToken) {
+          // Kampplan share link: one plan's player-facing fields only, no
+          // login, no roster — see server/routes/matchPlanShare.js.
+          const result = await api.getMatchPlanShare(kampplanToken);
+          setKampplanShareData(result);
+        } else if (urlToken) {
           // Self-eval link: fetch only this one player's scoped data, never
           // the full roster, and never touches coach auth — the server
           // enforces the token match on its own, with no login involved.
@@ -806,18 +827,20 @@ export default function AcademyApp() {
           }
         }
       } catch (e) {
-        if (urlToken) {
+        if (kampplanToken) {
+          setKampplanShareInvalid(true);
+        } else if (urlToken) {
           setSelfInvalid(true);
         }
-        // Off the self-eval link, leaving authStatus/data unset here is
-        // deliberate: a failed status check (server unreachable) falls
+        // Off either player-facing link, leaving authStatus/data unset here
+        // is deliberate: a failed status check (server unreachable) falls
         // through to the login screen's own error state on next attempt
         // rather than a silently empty roster.
       } finally {
         setLoading(false);
       }
     })();
-  }, [urlToken]);
+  }, [urlToken, kampplanToken]);
 
   // Called by LoginScreen/SetupScreen once the server confirms a session;
   // loads the real roster right after, so the coach lands in the app
@@ -909,6 +932,32 @@ export default function AcademyApp() {
   // Player self-evaluation via private link — restricted to a single player, no roster access.
   // The server scopes /api/self/:token to this one player only, so no other
   // player's data is ever fetched into this browser.
+  if (kampplanToken) {
+    if (kampplanShareInvalid || !kampplanShareData) {
+      return (
+        <div style={styles.app}>
+          <div style={styles.headerTopBar}>
+            <div style={styles.headerTopRow}>
+              <div style={styles.brand}>
+                <span style={styles.brandText}>VB PIGE AKADEMI</span>
+              </div>
+              <img src={LOGO_SRC} alt="Klublogo" style={styles.logoImg} />
+            </div>
+          </div>
+          <div style={{ ...styles.main, textAlign: "center", paddingTop: 60 }}>
+            <Lock size={32} color="#B9B2A0" />
+            <div style={{ marginTop: 12, fontWeight: 700, fontSize: 18 }}>Ugyldigt link</div>
+            <p style={styles.subtext}>
+              Dette link er ugyldigt eller ikke længere aktivt. Kontakt din træner for at få et
+              nyt link.
+            </p>
+          </div>
+        </div>
+      );
+    }
+    return <KampplanShareView plan={kampplanShareData} />;
+  }
+
   if (urlToken) {
     if (selfInvalid || !selfData) {
       return (
@@ -1936,6 +1985,102 @@ function SelfEvalLinkCard({ token }) {
       <p style={styles.subtext}>
         Del dette link med spilleren. Alle med linket kan kun evaluere denne ene spiller — ingen
         andre spillere eller trænerfunktioner er tilgængelige.
+      </p>
+      <div style={styles.linkRow}>
+        <input style={styles.linkInput} value={link} readOnly onFocus={(e) => e.target.select()} />
+        <button style={styles.primaryBtnSm} onClick={copy}>
+          {copied ? <Check size={14} /> : <Copy size={14} />} {copied ? "Kopieret" : "Kopiér"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/* ---------- Kampplan share link card (shown to coaches in the kampplan editor) ---------- */
+// Mints the token on first click (see POST /api/match-plans/:id/share) and
+// shows the resulting link afterward — same shape as SelfEvalLinkCard, but
+// the token has to be generated on demand rather than existing from the
+// moment the plan was created, so there's a third "not generated yet"
+// state this one has and SelfEvalLinkCard doesn't.
+function KpShareLinkCard({ plan, onGenerated }) {
+  const [copied, setCopied] = useState(false);
+  const [generating, setGenerating] = useState(false);
+  const [error, setError] = useState(false);
+
+  if (!plan.id) {
+    return (
+      <div style={styles.linkCard}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+          <Link2 size={15} color="#1A1A1A" />
+          <span style={styles.categoryLabel}>Spillerlink</span>
+        </div>
+        <p style={styles.subtext}>Gem kampplanen først — så kan du generere et link til spillerne.</p>
+      </div>
+    );
+  }
+
+  if (!plan.shareToken) {
+    const generate = async () => {
+      setGenerating(true);
+      setError(false);
+      try {
+        const { shareToken } = await api.generateMatchPlanShareLink(plan.id);
+        onGenerated(shareToken);
+      } catch (e) {
+        setError(true);
+      } finally {
+        setGenerating(false);
+      }
+    };
+    return (
+      <div style={styles.linkCard}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+          <Link2 size={15} color="#1A1A1A" />
+          <span style={styles.categoryLabel}>Spillerlink</span>
+        </div>
+        <p style={styles.subtext}>
+          Generér et link spillerne selv kan åbne — uden login. Det viser deres individuelle mål,
+          startopstilling, målsætning og det taktiske. Linket er aktivt til og med dagen efter
+          kampen.
+        </p>
+        {error && <div style={styles.errorBannerRow}>Kunne ikke generere link — prøv igen.</div>}
+        <button style={styles.primaryBtnSm} onClick={generate} disabled={generating}>
+          <Link2 size={14} /> {generating ? "Genererer…" : "Generér spillerlink"}
+        </button>
+      </div>
+    );
+  }
+
+  const link = (() => {
+    try {
+      const url = new URL(window.location.href);
+      url.search = "";
+      url.hash = "";
+      return `${url.toString()}${url.toString().includes("?") ? "&" : "?"}kampplan=${plan.shareToken}`;
+    } catch (e) {
+      return `?kampplan=${plan.shareToken}`;
+    }
+  })();
+
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(link);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (e) {
+      /* clipboard not available */
+    }
+  };
+
+  return (
+    <div style={styles.linkCard}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+        <Link2 size={15} color="#1A1A1A" />
+        <span style={styles.categoryLabel}>Spillerlink</span>
+      </div>
+      <p style={styles.subtext}>
+        Del dette link med spillerne — uden login viser det deres individuelle mål, startopstilling,
+        målsætning og det taktiske. Aktivt til og med {kpFmtDate(kpAddDays(plan.date, 1))}.
       </p>
       <div style={styles.linkRow}>
         <input style={styles.linkInput} value={link} readOnly onFocus={(e) => e.target.select()} />
@@ -6076,6 +6221,7 @@ function kpEmptyPlan() {
     formation2: "",
     reserves: [],
     performanceScores: {},
+    shareToken: null,
   };
 }
 
@@ -6083,6 +6229,15 @@ function kpFmtDate(iso) {
   if (!iso) return "";
   const [y, m, d] = iso.split("-");
   return `${d}/${m}/${y}`;
+}
+
+// For the share-link card's "aktivt til og med" note — matches the
+// expiry server/routes/matchPlanShare.js actually enforces (through the
+// day after match_date).
+function kpAddDays(iso, days) {
+  const d = new Date(`${iso}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
 }
 
 function kpEscapeHtml(str) {
@@ -7159,6 +7314,215 @@ function kpGoalOptionsForPlayer(data, playerId) {
     .filter(Boolean);
 }
 
+// A collapsed-by-default category card — the read-only share-view
+// equivalent of the chrome KpCategorySection/KpPositionTable/etc. all use
+// in the editor (chevron toggle, count badge, same categoryBlock/
+// categoryHeadRow styling). Takes raw content as children rather than an
+// items list, since what goes inside varies a lot more here (plain text,
+// a table, nothing to edit) than it does in the editor's own sections.
+function KpShareSection({ title, count, children }) {
+  const [expanded, setExpanded] = useState(false);
+  return (
+    <div style={styles.categoryBlock}>
+      <div
+        className="category-head-row-collapsible"
+        style={styles.categoryHeadRow}
+        onClick={() => setExpanded((v) => !v)}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <button
+            type="button"
+            style={styles.iconBtnGhost}
+            onClick={(e) => {
+              e.stopPropagation();
+              setExpanded((v) => !v);
+            }}
+            title={expanded ? "Skjul" : "Vis"}
+          >
+            {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+          </button>
+          <span style={styles.categoryLabel}>{title}</span>
+        </div>
+        <span style={styles.categoryAvg}>{count}</span>
+      </div>
+      <div className={`category-skills${expanded ? " category-skills-open" : ""}`}>{children}</div>
+    </div>
+  );
+}
+
+// Read-only twin of KpCategorySection — same per-item bordered-box markup
+// (border/radius/padding/margin all match), just a static category label
+// and text instead of a select + textarea.
+function KpShareCategoryBlock({ title, items }) {
+  const filled = (items || []).filter((x) => x.text);
+  return (
+    <KpShareSection title={title} count={filled.length}>
+      {filled.length === 0 ? (
+        <p style={styles.noSkills}>Ingen afsnit endnu.</p>
+      ) : (
+        filled.map((item, i) => (
+          <div key={i} style={{ border: "1px solid #E3E3E3", borderRadius: 8, padding: 12, marginBottom: 10 }}>
+            <div style={{ fontWeight: 700, marginBottom: 6, fontSize: 13 }}>{item.category}</div>
+            <div style={{ fontSize: 14, whiteSpace: "pre-wrap" }}>{item.text}</div>
+          </div>
+        ))
+      )}
+    </KpShareSection>
+  );
+}
+
+// Public, read-only, no login — what a player sees after opening a
+// kampplan share link (see KpShareLinkCard for how the link is minted,
+// server/routes/matchPlanShare.js for the token lookup and expiry check).
+// Every section mirrors the coach editor's own layout exactly (same
+// tables, same category cards, same collapsed-by-default chrome via
+// KpShareSection/KpShareCategoryBlock above) — just nothing is editable,
+// and the order/subset is player-relevant only: individuelle mål first,
+// then lineup 1 (never lineup 2, reserves, notes, or coach-only things
+// like performance ratings).
+function KampplanShareView({ plan }) {
+  const positionsSorted = [...(plan.positions || [])]
+    .filter((r) => r.name && r.name.trim())
+    .sort((a, b) => Number(a.position) - Number(b.position));
+  const rosterNamesUnique = [...new Set(positionsSorted.map((r) => r.name.trim()))];
+  const reserveNamesUnique = [
+    ...new Set(
+      (plan.reserves || [])
+        .map((r) => (typeof r === "string" ? r : r.name))
+        .map((n) => n && n.trim())
+        .filter(Boolean)
+    ),
+  ];
+  const goalNames = [...rosterNamesUnique, ...reserveNamesUnique.filter((n) => !rosterNamesUnique.includes(n))];
+  const filledTeamGoals = (plan.teamGoals || []).filter(Boolean);
+  // Bordered, unlike the editor's own (borderless) versions of these two
+  // tables — on the share link there's no adjacent input to anchor each
+  // row to, so gridlines are what keep Pos/Navn/Individuelt mål (or
+  // Position/Spillernavn) readable as columns rather than a run-on list.
+  const th = {
+    textAlign: "left",
+    fontSize: 11,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+    color: "#6B6B6B",
+    padding: "5px 8px",
+    fontWeight: 700,
+    border: "1px solid #D9D4C7",
+    background: "#F6F3EC",
+  };
+  const td = {
+    padding: "6px 8px",
+    border: "1px solid #D9D4C7",
+  };
+
+  return (
+    <div style={styles.app}>
+      <style>{`
+        .category-skills { display: none; }
+        .category-skills.category-skills-open { display: block; }
+        .category-head-row-collapsible { cursor: pointer; }
+      `}</style>
+      <div style={styles.headerTopBar}>
+        <div style={styles.headerTopRow}>
+          <div style={styles.brand}>
+            <span style={styles.brandText}>VB PIGE AKADEMI</span>
+          </div>
+          <img src={LOGO_SRC} alt="Klublogo" style={styles.logoImg} />
+        </div>
+      </div>
+      <main style={styles.main}>
+        <h1 style={styles.h1}>{plan.opponent || "Kampplan"}</h1>
+        <p style={styles.subtext}>{kpFmtDate(plan.date)}</p>
+
+        <KpShareSection title="Individuelle mål" count={goalNames.length}>
+          {goalNames.length === 0 ? (
+            <p style={styles.noSkills}>
+              Ingen spillere under "Position &amp; opstilling" eller reserver endnu.
+            </p>
+          ) : (
+            <table style={{ width: "100%", borderCollapse: "collapse" }}>
+              <thead>
+                <tr>
+                  <th style={th}>Pos</th>
+                  <th style={th}>Navn</th>
+                  <th style={th}>Individuelt mål</th>
+                </tr>
+              </thead>
+              <tbody>
+                {goalNames.map((name) => {
+                  const pos = positionsSorted.find((r) => r.name.trim() === name);
+                  const goal = (plan.playerGoals || {})[name];
+                  return (
+                    <tr key={name}>
+                      <td style={{ ...td, width: 60 }}>{pos ? pos.position : "Res."}</td>
+                      <td style={{ ...td, width: 110 }}>{name}</td>
+                      <td style={td}>{goal || ""}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          )}
+        </KpShareSection>
+
+        <KpShareSection title="Position & opstilling" count={positionsSorted.length}>
+          <div style={{ maxWidth: 220, marginBottom: 14 }}>
+            <div style={styles.fieldLabel}>Formation</div>
+            <div style={{ fontSize: 14, fontWeight: 600 }}>{plan.formation || "–"}</div>
+          </div>
+          {positionsSorted.length === 0 ? (
+            <p style={styles.noSkills}>Ikke sat endnu.</p>
+          ) : (
+            <table style={{ width: "100%", borderCollapse: "collapse" }}>
+              <thead>
+                <tr>
+                  <th style={{ ...th, width: 70 }}>Position</th>
+                  <th style={th}>Spillernavn</th>
+                </tr>
+              </thead>
+              <tbody>
+                {positionsSorted.map((r, i) => (
+                  <tr key={i}>
+                    <td style={{ ...td, width: 70 }}>{r.position}</td>
+                    <td style={td}>{r.name}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </KpShareSection>
+
+        <KpShareSection title="Målsætning for holdet" count={filledTeamGoals.length}>
+          {filledTeamGoals.length === 0 ? (
+            <p style={styles.noSkills}>–</p>
+          ) : (
+            filledTeamGoals.map((g, i) => (
+              <p key={i} style={{ margin: "0 0 8px" }}>
+                {g}
+              </p>
+            ))
+          )}
+        </KpShareSection>
+
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 16 }}>
+          <div>
+            <div style={{ ...styles.fieldLabel, fontSize: 13, marginBottom: 10 }}>Vi har bolden</div>
+            <KpShareCategoryBlock title="Opbygningsspil" items={plan.buildUp} />
+            <KpShareCategoryBlock title="Afslutningsspil" items={plan.finishing} />
+          </div>
+          <div>
+            <div style={{ ...styles.fieldLabel, fontSize: 13, marginBottom: 10 }}>Når de har bolden</div>
+            <KpShareCategoryBlock title="Forsvarsspil" items={plan.defense} />
+            <KpShareCategoryBlock title="Erobringsspil" items={plan.conquest} />
+          </div>
+        </div>
+
+        <KpShareCategoryBlock title="Yderligere aftaler" items={plan.extras} />
+      </main>
+    </div>
+  );
+}
+
 function KampplanEditor({ plan, setPlan, onBack, onSave, onPrint, saving, players, data }) {
   const roster = [...plan.positions]
     .filter((r) => r.name && r.name.trim())
@@ -7271,6 +7635,8 @@ function KampplanEditor({ plan, setPlan, onBack, onSave, onPrint, saving, player
           />
         </div>
       </div>
+
+      <KpShareLinkCard plan={plan} onGenerated={(token) => setPlan({ ...plan, shareToken: token })} />
 
       <div style={styles.categoryBlock}>
         <div
@@ -7836,8 +8202,12 @@ function KampplanView({ data }) {
       // performance ratings — those belong to the match they were entered
       // for, not to the plan's other fields. (The server won't persist
       // performanceScores from this body either way; this just keeps the
-      // local draft honest before it's even saved.)
-      setPlan({ ...full, id: null, opponent: "", date: todayStr(), performanceScores: {} });
+      // local draft honest before it's even saved.) Same for shareToken:
+      // it belongs to the original plan's link, not this draft — carrying
+      // it over would make KpShareLinkCard show a link that actually still
+      // points at the original match until this copy is saved and a fresh
+      // token is generated for it.
+      setPlan({ ...full, id: null, opponent: "", date: todayStr(), performanceScores: {}, shareToken: null });
       setSubView("editor");
     } catch (e) {
       setError(true);

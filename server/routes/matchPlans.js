@@ -36,6 +36,7 @@ function toOut(row, performanceScores) {
     formation2: row.formation2 || "",
     reserves: row.reserves,
     performanceScores: performanceScores || {},
+    shareToken: row.share_token || null,
     updatedAt: row.updated_at,
   };
 }
@@ -114,13 +115,39 @@ router.get("/:id", async (req, res, next) => {
     const { rows } = await pool.query(
       `select id, division, opponent, to_char(match_date, 'YYYY-MM-DD') as date, team_goals, defense,
               conquest, build_up, finishing, extras, general_notes, player_goals, positions,
-              formation, positions2, formation2, reserves, updated_at
+              formation, positions2, formation2, reserves, share_token, updated_at
        from match_plans where id = $1`,
       [req.params.id]
     );
     if (!rows[0]) return res.status(404).json({ error: "Match plan not found" });
     const performanceScores = await getPerformanceMap(req.params.id);
     res.json(toOut(rows[0], performanceScores));
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Mints (or returns the existing) share token for this plan — the public,
+// unauthenticated link a coach sends players (see server/routes/
+// matchPlanShare.js, which looks tokens up and enforces the "through the
+// day after the match" cutoff). Idempotent: repeat clicks on "generér
+// spillerlink" just return the same token rather than invalidating an
+// already-shared link.
+router.post("/:id/share", async (req, res, next) => {
+  try {
+    const { rows } = await pool.query("select share_token from match_plans where id = $1", [
+      req.params.id,
+    ]);
+    if (!rows[0]) return res.status(404).json({ error: "Match plan not found" });
+    let token = rows[0].share_token;
+    if (!token) {
+      token = crypto.randomBytes(24).toString("hex");
+      await pool.query("update match_plans set share_token = $2 where id = $1", [
+        req.params.id,
+        token,
+      ]);
+    }
+    res.json({ shareToken: token });
   } catch (err) {
     next(err);
   }

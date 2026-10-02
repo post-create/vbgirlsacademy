@@ -25,6 +25,7 @@ const followupsRouter = require("./routes/followups");
 const notificationsRouter = require("./routes/notifications");
 const participationLevelsRouter = require("./routes/participationLevels");
 const matchPlansRouter = require("./routes/matchPlans");
+const matchPlanShareRouter = require("./routes/matchPlanShare");
 const matchStatsRouter = require("./routes/matchStats");
 const developmentPlansRouter = require("./routes/developmentPlans");
 const settingsRouter = require("./routes/settings");
@@ -55,12 +56,13 @@ app.use(
   })
 );
 
-// /api/auth (login/setup can't require a session) and /api/self (the
-// player link — token-scoped, never behind coach login) are the only two
-// mounts without requireAuth. Every other API route needs a logged-in
-// coach.
+// /api/auth (login/setup can't require a session), /api/self (the player
+// link), and /api/kampplan-share (the match-plan link) are the mounts
+// without requireAuth — both links are token-scoped, never behind coach
+// login. Every other API route needs a logged-in coach.
 app.use("/api/auth", authRouter);
 app.use("/api/self", selfRouter);
+app.use("/api/kampplan-share", matchPlanShareRouter);
 
 app.use("/api/bootstrap", requireAuth, bootstrapRouter);
 app.use("/api/teams", requireAuth, teamsRouter);
