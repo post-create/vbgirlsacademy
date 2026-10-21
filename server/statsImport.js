@@ -30,6 +30,49 @@ const PERCENT_FIELDS = new Set(["passSuccessPct", "conversionRate"]);
 
 const HEADER_HINTS = ["player", "matches", "shots"];
 
+// When the file has a header row, columns are mapped by name, not position
+// — the export's column order is not stable (a newer file put "Total
+// attempts" and "Goals" right after "Matches" and added "Duels", which
+// shifted every positional guess and put e.g. average speed in the integer
+// minutes column, so the commit failed). Headers we don't recognise land in
+// `extra` under their own header text, so a new export column is kept
+// rather than dropped. Headerless files (the older per-match export) still
+// use COLUMNS order.
+const HEADER_TO_KEY = {
+  "matches": "matches",
+  "shots": "shots",
+  "total events": "totalEvents",
+  "distance tracked": "distanceKm",
+  "average speed": "avgSpeedKmh",
+  "sprints": "sprints",
+  "minutes tracked": "minutes",
+  "high-intensity runs": "highIntensityRuns",
+  "passes": "passes",
+  "passes success rate": "passSuccessPct",
+  "dribbles": "dribbles",
+  "tackles": "tackles",
+  "loose ball recoveries": "looseBallRecoveries",
+  "interceptions": "interceptions",
+  "goal kicks": "goalKicks",
+  "fouls": "fouls",
+  "saves": "saves",
+  "top speed": "topSpeedKmh",
+  "assists": "assists",
+  "conversion rate": "conversionRate",
+  "passes successful": "passesSuccessful",
+  "passes unsuccessful": "passesUnsuccessful",
+  "goals": "goals",
+  "goal involvements": "goalInvolvements",
+  "total attempts": "totalAttempts",
+  "corners": "corners",
+  "penalty kicks": "penaltyKicks",
+  "free kicks": "freeKicks",
+  "throw-ins": "throwIns",
+  "starts": "starts",
+  "captaincies": "captaincies",
+  "player of the match": "playerOfTheMatch",
+};
+
 function isHeaderRow(row) {
   const first = String(row[0] || "").trim().toLowerCase();
   return HEADER_HINTS.includes(first);
@@ -111,7 +154,12 @@ function parseStatsFile(buffer, filename) {
   const raw = XLSX.utils.sheet_to_json(ws, { header: 1, defval: null, blankrows: false });
   if (!raw.length) throw new Error("Filen ser tom ud.");
 
-  const dataRows = isHeaderRow(raw[0]) ? raw.slice(1) : raw;
+  const hasHeader = isHeaderRow(raw[0]);
+  const dataRows = hasHeader ? raw.slice(1) : raw;
+  // column index -> stat key (null for a header we don't recognise)
+  const headerKeys = hasHeader
+    ? raw[0].map((h) => HEADER_TO_KEY[String(h || "").trim().toLowerCase()] || null)
+    : null;
 
   const rows = [];
   let skipped = 0;
@@ -124,16 +172,31 @@ function parseStatsFile(buffer, filename) {
     }
 
     const stats = {};
-    COLUMNS.forEach((key, i) => {
-      const cellIndex = i + 1; // cells[0] is the player cell
-      stats[key] = DISTANCE_SPEED_FIELDS.has(key)
-        ? parseDistanceOrSpeedCell(cells[cellIndex])
-        : parseNumberCell(cells[cellIndex], { percent: PERCENT_FIELDS.has(key) });
-    });
-
     const extra = {};
-    for (let i = COLUMNS.length + 1; i < cells.length; i++) {
-      if (cells[i] !== null && cells[i] !== "") extra[`col${i}`] = cells[i];
+    const readCell = (key, cell) =>
+      DISTANCE_SPEED_FIELDS.has(key)
+        ? parseDistanceOrSpeedCell(cell)
+        : parseNumberCell(cell, { percent: PERCENT_FIELDS.has(key) });
+
+    if (hasHeader) {
+      COLUMNS.forEach((key) => {
+        stats[key] = null;
+      });
+      headerKeys.forEach((key, i) => {
+        if (i === 0) return; // the player cell
+        if (key) {
+          stats[key] = readCell(key, cells[i]);
+        } else if (cells[i] !== null && cells[i] !== undefined && cells[i] !== "") {
+          extra[String(raw[0][i] || `col${i}`).trim()] = cells[i];
+        }
+      });
+    } else {
+      COLUMNS.forEach((key, i) => {
+        stats[key] = readCell(key, cells[i + 1]); // cells[0] is the player cell
+      });
+      for (let i = COLUMNS.length + 1; i < cells.length; i++) {
+        if (cells[i] !== null && cells[i] !== "") extra[`col${i}`] = cells[i];
+      }
     }
 
     rows.push({
