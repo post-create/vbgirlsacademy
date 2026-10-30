@@ -184,6 +184,7 @@ router.post("/", async (req, res, next) => {
       teamId: teamId || null,
       selfToken,
       skillGroupId,
+      active: true,
     });
   } catch (err) {
     next(err);
@@ -194,7 +195,7 @@ router.patch("/:id", async (req, res, next) => {
   try {
     const current = await pool.query(
       `select id, name, primary_position, secondary_position, number, email, team_id, self_token, skill_group_id,
-              participation_level_id, goal_2_3y, goal_1_2y, goal_under_1y
+              participation_level_id, goal_2_3y, goal_1_2y, goal_under_1y, active
        from players where id = $1`,
       [req.params.id]
     );
@@ -219,6 +220,7 @@ router.patch("/:id", async (req, res, next) => {
     const goal1to2y = req.body.goal1to2y !== undefined ? req.body.goal1to2y : existing.goal_1_2y;
     const goalUnder1y =
       req.body.goalUnder1y !== undefined ? req.body.goalUnder1y : existing.goal_under_1y;
+    const active = req.body.active !== undefined ? Boolean(req.body.active) : existing.active;
 
     let skillGroupId = existing.skill_group_id;
     if (req.body.skillGroupId !== undefined) {
@@ -235,10 +237,10 @@ router.patch("/:id", async (req, res, next) => {
     const { rows } = await pool.query(
       `update players set name = $2, primary_position = $3, secondary_position = $4, number = $5, email = $6,
               team_id = $7, participation_level_id = $8, goal_2_3y = $9, goal_1_2y = $10, goal_under_1y = $11,
-              skill_group_id = $12
+              skill_group_id = $12, active = $13
        where id = $1
        returning id, name, primary_position, secondary_position, number, email, team_id, self_token, skill_group_id,
-                 participation_level_id, goal_2_3y, goal_1_2y, goal_under_1y`,
+                 participation_level_id, goal_2_3y, goal_1_2y, goal_under_1y, active`,
       [
         req.params.id,
         name,
@@ -252,6 +254,7 @@ router.patch("/:id", async (req, res, next) => {
         goal1to2y,
         goalUnder1y,
         skillGroupId,
+        active,
       ]
     );
     const p = rows[0];
@@ -269,6 +272,7 @@ router.patch("/:id", async (req, res, next) => {
       goal2to3y: p.goal_2_3y || "",
       goal1to2y: p.goal_1_2y || "",
       goalUnder1y: p.goal_under_1y || "",
+      active: p.active !== false,
     });
   } catch (err) {
     next(err);

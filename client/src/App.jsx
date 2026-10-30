@@ -1057,6 +1057,13 @@ export default function AcademyApp() {
       setData({ ...data, players });
     });
 
+  const updatePlayerActive = (playerId, active) =>
+    runMutation(async () => {
+      await api.updatePlayer(playerId, { active });
+      const players = data.players.map((p) => (p.id === playerId ? { ...p, active } : p));
+      setData({ ...data, players });
+    });
+
   const updatePlayerEmail = (playerId, email) =>
     runMutation(async () => {
       await api.updatePlayer(playerId, { email });
@@ -1366,6 +1373,10 @@ export default function AcademyApp() {
 
   const selectedPlayer = data.players.find((p) => p.id === selectedId);
   const periods = sortedPeriods(data.periods);
+  // Inactive players only exist in the squad list (RosterView) and on their
+  // own page; every other view gets this copy so they can't be picked there.
+  // Their evaluations, goals and followups stay in `data`, untouched.
+  const activeData = { ...data, players: data.players.filter((p) => p.active !== false) };
 
   return (
     <div style={styles.app}>
@@ -1418,7 +1429,7 @@ export default function AcademyApp() {
 
         {view === "coaches" && (
           <CoachesOverviewView
-            data={data}
+            data={activeData}
             onSetGoalProgress={setGoalProgress}
             onOpenPlayer={(id) => {
               scrollPositionsRef.current.coaches = window.scrollY;
@@ -1446,16 +1457,16 @@ export default function AcademyApp() {
           <FollowupsLogView data={data} onRemoveFollowup={removeFollowup} />
         )}
 
-        {view === "matchPlans" && <KampplanView data={data} />}
+        {view === "matchPlans" && <KampplanView data={activeData} />}
 
-        {view === "kampScore" && <KampPerformanceView players={data.players} />}
+        {view === "kampScore" && <KampPerformanceView players={activeData.players} />}
 
-        {view === "positionOverview" && <PositionOverviewView data={data} />}
+        {view === "positionOverview" && <PositionOverviewView data={activeData} />}
 
         {view === "teams" && (
           <TeamsView
             teams={data.teams}
-            players={data.players}
+            players={activeData.players}
             onCreate={createTeam}
             onRename={renameTeam}
             onDelete={deleteTeam}
@@ -1522,6 +1533,7 @@ export default function AcademyApp() {
               setScore(selectedPlayer.id, periodId, subskillId, value)
             }
             onDelete={() => setConfirmDelete(selectedPlayer.id)}
+            onSetActive={(active) => updatePlayerActive(selectedPlayer.id, active)}
             onUpdatePositions={(patch) => updatePlayerPositions(selectedPlayer.id, patch)}
             onUpdateTeam={(teamId) => updatePlayerTeam(selectedPlayer.id, teamId)}
             onUpdateEmail={(email) => updatePlayerEmail(selectedPlayer.id, email)}
@@ -3512,7 +3524,7 @@ function FollowupsLogView({ data, onRemoveFollowup }) {
             onChange={(e) => setPlayerFilter(e.target.value)}
           >
             <option value="all">Alle spillere</option>
-            {data.players.map((p) => (
+            {data.players.filter((p) => p.active !== false).map((p) => (
               <option key={p.id} value={p.id}>
                 {p.name}
               </option>
@@ -3780,12 +3792,12 @@ function RosterView({
   };
 
   const selectAllWithEmail = () => {
-    setSelectedIds(visiblePlayers.filter((p) => p.email).map((p) => p.id));
+    setSelectedIds(visiblePlayers.filter((p) => p.email && p.active !== false).map((p) => p.id));
   };
 
   const copySelectedEmails = async () => {
     const emails = data.players
-      .filter((p) => selectedIds.includes(p.id) && p.email)
+      .filter((p) => selectedIds.includes(p.id) && p.email && p.active !== false)
       .map((p) => p.email);
     if (emails.length === 0) return;
     try {
@@ -3857,7 +3869,7 @@ function RosterView({
 
   // Best score (or highest participation level) on top; players with no
   // value at all sort to the bottom.
-  const sortedPlayers =
+  const sortedByMode =
     sortMode === "score"
       ? [...playersWithStats].sort((a, b) => (b.overall ?? -Infinity) - (a.overall ?? -Infinity))
       : sortMode === "level"
@@ -3865,6 +3877,11 @@ function RosterView({
           (a, b) => (b.level?.numericValue ?? -Infinity) - (a.level?.numericValue ?? -Infinity)
         )
       : playersWithStats;
+  // Inactive players go last whatever the sort, keeping that order among them.
+  const sortedPlayers = [
+    ...sortedByMode.filter((x) => x.player.active !== false),
+    ...sortedByMode.filter((x) => x.player.active === false),
+  ];
 
   return (
     <div>
@@ -4063,13 +4080,15 @@ function RosterView({
       <div style={styles.grid}>
         {sortedPlayers.map(({ player: p, scores, overall, goals, goalIds, goalsMet, latestPeriod, level, latestSelfEval }) => {
           const isSelected = selectedIds.includes(p.id);
-          const selectableDisabled = selectMode && !p.email;
+          const inactive = p.active === false;
+          const selectableDisabled = selectMode && (!p.email || inactive);
           return (
             <div
               key={p.id}
               style={{
                 ...styles.playerCard,
                 ...(selectMode && isSelected ? styles.playerCardSelected : {}),
+                ...(inactive && !selectMode ? { opacity: 0.55 } : {}),
                 ...(selectableDisabled ? styles.playerCardDisabled : {}),
               }}
               onClick={() => {
@@ -4089,7 +4108,7 @@ function RosterView({
                       disabled={selectableDisabled}
                       onClick={(e) => e.stopPropagation()}
                       onChange={() => toggleSelected(p.id)}
-                      title={p.email ? "" : "Spilleren mangler en e-mailadresse"}
+                      title={inactive ? "Spilleren er inaktiv" : p.email ? "" : "Spilleren mangler en e-mailadresse"}
                     />
                   )}
                   <div style={styles.numberBadge}>{p.number || "—"}</div>
@@ -4105,6 +4124,7 @@ function RosterView({
               </div>
               <div style={styles.playerName}>{p.name}</div>
               <div style={styles.playerPos}>{formatPlayerPositions(p) || "Position ikke angivet"}</div>
+              {inactive && <div style={styles.teamBadge}>Inaktiv</div>}
               {teamName(p.teamId) && (
                 <div style={styles.teamBadge}>
                   <Layers size={10} /> {teamName(p.teamId)}
@@ -4174,6 +4194,7 @@ function PlayerView({
   onBack,
   onScore,
   onDelete,
+  onSetActive,
   onUpdatePositions,
   onUpdateTeam,
   onUpdateEmail,
@@ -4291,6 +4312,7 @@ function PlayerView({
         <div style={styles.numberBadgeLg}>{player.number || "—"}</div>
         <div style={{ flex: 1 }}>
           <h1 style={styles.h1}>{player.name}</h1>
+          {player.active === false && <div style={{ ...styles.teamBadge, marginBottom: 6 }}>Inaktiv</div>}
           {!editingPositions && (
             <div style={styles.positionRow}>
               <span style={styles.subtext}>{formatPlayerPositions(player) || "Position ikke angivet"}</span>
@@ -4300,6 +4322,17 @@ function PlayerView({
             </div>
           )}
         </div>
+        <button
+          style={{ ...styles.ghostBtn, padding: "6px 12px", fontSize: 13 }}
+          onClick={() => onSetActive(player.active === false)}
+          title={
+            player.active === false
+              ? "Gør spilleren aktiv igen, så hun kan vælges i kampplanen m.m."
+              : "Inaktive spillere står nederst i spillertruppen og kan ikke vælges andre steder"
+          }
+        >
+          {player.active === false ? "Sæt aktiv" : "Sæt inaktiv"}
+        </button>
         <button style={styles.iconDangerBtn} onClick={onDelete} title="Fjern spiller">
           <Trash2 size={16} />
         </button>
@@ -6219,6 +6252,7 @@ function kpEmptyPlan() {
     extras: [],
     generalNotes: "",
     playerGoals: {},
+    playerGoalNotes: {},
     positions: [],
     formation: "",
     positions2: [],
@@ -6349,7 +6383,11 @@ function kpPrintPlan(p) {
         const posForName = rosterSorted.find((r) => r.name.trim() === name);
         return `<tr><td>${kpEscapeHtml(posForName ? posForName.position : "Res.")}</td><td>${kpEscapeHtml(
           name
-        )}</td><td>${kpEscapeHtml(p.playerGoals[name] || "")}</td></tr>`;
+        )}</td><td>${kpEscapeHtml(p.playerGoals[name] || "")}${
+          p.playerGoals[name] && (p.playerGoalNotes || {})[name]
+            ? "<br>" + kpEscapeHtml(p.playerGoalNotes[name]).replace(/\n/g, "<br>")
+            : ""
+        }</td></tr>`;
       })
       .join("") || '<tr><td colspan="3">–</td></tr>';
   const posRows =
@@ -7527,11 +7565,20 @@ function KampplanShareView({ plan }) {
                 {goalNames.map((name) => {
                   const pos = positionsSorted.find((r) => r.name.trim() === name);
                   const goal = (plan.playerGoals || {})[name];
+                  const goalNote = (plan.playerGoalNotes || {})[name];
                   return (
                     <tr key={name}>
                       <td style={{ ...td, width: 60 }}>{pos ? pos.position : "Res."}</td>
                       <td style={{ ...td, width: 110 }}>{name}</td>
-                      <td style={td}>{goal || ""}</td>
+                      <td style={{ ...td, whiteSpace: "pre-wrap" }}>
+                        {goal || ""}
+                        {goal && goalNote ? (
+                          <>
+                            <br />
+                            {goalNote}
+                          </>
+                        ) : null}
+                      </td>
                     </tr>
                   );
                 })}
@@ -7929,6 +7976,19 @@ function KampplanEditor({ plan, setPlan, onBack, onSave, onPrint, saving, player
                             setPlan({
                               ...plan,
                               playerGoals: { ...plan.playerGoals, [name]: e.target.value },
+                            })
+                          }
+                        />
+                      )}
+                      {(plan.playerGoals[name] || "").trim() && (
+                        <textarea
+                          style={{ ...styles.textarea, minHeight: 38, marginTop: 6 }}
+                          placeholder="Note til målet"
+                          value={(plan.playerGoalNotes || {})[name] || ""}
+                          onChange={(e) =>
+                            setPlan({
+                              ...plan,
+                              playerGoalNotes: { ...(plan.playerGoalNotes || {}), [name]: e.target.value },
                             })
                           }
                         />

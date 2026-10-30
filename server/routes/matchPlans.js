@@ -30,6 +30,7 @@ function toOut(row, performanceScores) {
     extras: row.extras,
     generalNotes: row.general_notes || "",
     playerGoals: row.player_goals,
+    playerGoalNotes: row.player_goal_notes || {},
     positions: row.positions,
     formation: row.formation || "",
     positions2: row.positions2,
@@ -114,8 +115,8 @@ router.get("/:id", async (req, res, next) => {
   try {
     const { rows } = await pool.query(
       `select id, division, opponent, to_char(match_date, 'YYYY-MM-DD') as date, team_goals, defense,
-              conquest, build_up, finishing, extras, general_notes, player_goals, positions,
-              formation, positions2, formation2, reserves, share_token, updated_at
+              conquest, build_up, finishing, extras, general_notes, player_goals, player_goal_notes,
+              positions, formation, positions2, formation2, reserves, share_token, updated_at
        from match_plans where id = $1`,
       [req.params.id]
     );
@@ -163,11 +164,12 @@ router.post("/", async (req, res, next) => {
     const { rows } = await pool.query(
       `insert into match_plans (
          id, division, opponent, match_date, team_goals, defense, conquest, build_up, finishing,
-         extras, general_notes, player_goals, positions, formation, positions2, formation2, reserves
-       ) values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
+         extras, general_notes, player_goals, player_goal_notes, positions, formation, positions2, formation2,
+         reserves
+       ) values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
        returning id, division, opponent, to_char(match_date, 'YYYY-MM-DD') as date, team_goals, defense,
-                 conquest, build_up, finishing, extras, general_notes, player_goals, positions,
-                 formation, positions2, formation2, reserves, updated_at`,
+                 conquest, build_up, finishing, extras, general_notes, player_goals, player_goal_notes,
+                 positions, formation, positions2, formation2, reserves, updated_at`,
       [
         id,
         b.division || "",
@@ -181,6 +183,7 @@ router.post("/", async (req, res, next) => {
         JSON.stringify(b.extras || []),
         b.generalNotes || "",
         JSON.stringify(b.playerGoals || {}),
+        JSON.stringify(b.playerGoalNotes || {}),
         JSON.stringify(b.positions || []),
         b.formation || "",
         JSON.stringify(b.positions2 || []),
@@ -215,6 +218,7 @@ router.patch("/:id", async (req, res, next) => {
     const extras = JSON.stringify(pick("extras", "extras"));
     const generalNotes = pick("generalNotes", "general_notes");
     const playerGoals = JSON.stringify(pick("playerGoals", "player_goals"));
+    const playerGoalNotes = JSON.stringify(pick("playerGoalNotes", "player_goal_notes"));
     const positions = JSON.stringify(pick("positions", "positions"));
     const formation = pick("formation", "formation");
     const positions2 = JSON.stringify(pick("positions2", "positions2"));
@@ -228,11 +232,11 @@ router.patch("/:id", async (req, res, next) => {
          division = $2, opponent = $3, match_date = $4, team_goals = $5, defense = $6, conquest = $7,
          build_up = $8, finishing = $9, extras = $10, general_notes = $11, player_goals = $12,
          positions = $13, formation = $14, positions2 = $15, formation2 = $16, reserves = $17,
-         updated_at = now()
+         player_goal_notes = $18, updated_at = now()
        where id = $1
        returning id, division, opponent, to_char(match_date, 'YYYY-MM-DD') as date, team_goals, defense,
-                 conquest, build_up, finishing, extras, general_notes, player_goals, positions,
-                 formation, positions2, formation2, reserves, updated_at`,
+                 conquest, build_up, finishing, extras, general_notes, player_goals, player_goal_notes,
+                 positions, formation, positions2, formation2, reserves, updated_at`,
       [
         req.params.id,
         division,
@@ -251,6 +255,7 @@ router.patch("/:id", async (req, res, next) => {
         positions2,
         formation2,
         reserves,
+        playerGoalNotes,
       ]
     );
     const performanceScores = await getPerformanceMap(req.params.id);

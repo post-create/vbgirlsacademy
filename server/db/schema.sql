@@ -571,3 +571,14 @@ create table if not exists formations (
   sort_order int not null default 0,
   created_at timestamptz not null default now()
 );
+
+-- A player who has left (or is injured for the season) can be set inactive
+-- rather than deleted, which would throw away their evaluations and goals.
+-- Inactive players stay in the squad list (at the bottom) but are left out
+-- of every picker elsewhere in the app. See RosterView / App's activeData.
+alter table players add column if not exists active boolean not null default true;
+
+-- A coach's free-text note under each player's individual goal in a Kampplan,
+-- keyed by player name like player_goals. Kept apart from player_goals so
+-- the goal stays a plain string everywhere that already reads it.
+alter table match_plans add column if not exists player_goal_notes jsonb not null default '{}';

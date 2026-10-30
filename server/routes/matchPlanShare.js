@@ -13,7 +13,7 @@ router.get("/:token", async (req, res, next) => {
   try {
     const { rows } = await pool.query(
       `select opponent, to_char(match_date, 'YYYY-MM-DD') as date, team_goals, defense, conquest,
-              build_up, finishing, extras, player_goals, positions, formation, positions2, formation2, reserves
+              build_up, finishing, extras, player_goals, player_goal_notes, positions, formation, positions2, formation2, reserves
        from match_plans where share_token = $1`,
       [req.params.token]
     );
@@ -47,6 +47,7 @@ router.get("/:token", async (req, res, next) => {
       finishing: plan.finishing,
       extras: plan.extras,
       playerGoals: plan.player_goals,
+      playerGoalNotes: plan.player_goal_notes || {},
       positions: plan.positions,
       formation: plan.formation || "",
       formationSlots: layoutFor(plan.formation),

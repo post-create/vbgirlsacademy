@@ -24,7 +24,7 @@ router.get("/", async (req, res, next) => {
       pool.query("select id, name from teams order by name"),
       pool.query(
         `select id, name, primary_position, secondary_position, number, email, team_id, self_token, skill_group_id,
-                participation_level_id, goal_2_3y, goal_1_2y, goal_under_1y
+                participation_level_id, goal_2_3y, goal_1_2y, goal_under_1y, active
          from players order by name`
       ),
       pool.query(
@@ -62,6 +62,7 @@ router.get("/", async (req, res, next) => {
       goal2to3y: p.goal_2_3y || "",
       goal1to2y: p.goal_1_2y || "",
       goalUnder1y: p.goal_under_1y || "",
+      active: p.active !== false,
     }));
 
     const evaluationsOut = {};
