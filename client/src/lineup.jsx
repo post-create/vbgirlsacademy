@@ -378,7 +378,6 @@ function Zone({ label, hint, dropId, hover, onClick, children, maxHeight }) {
       data-drop={dropId}
       onClick={onClick}
       style={{
-        marginTop: 12,
         padding: 10,
         borderRadius: 10,
         border: hover ? "2px dashed #F5C518" : "1px dashed #C9C3B3",
@@ -394,12 +393,32 @@ function Zone({ label, hint, dropId, hover, onClick, children, maxHeight }) {
   );
 }
 
-// The pitch for one lineup. Read-only when `onChange` is omitted (the
-// player share link); otherwise players can be dragged between slots, the
-// reserves and the rest of the squad — or tapped: tap a player, then tap
-// where they should go, which is the reliable path on a phone.
+// Phone-width screens only get to *see* the pitch: dragging on a small
+// screen fights page scrolling, and there's no room for the player list
+// beside it, so lineup edits there go through the table instead.
+const PHONE_QUERY = "(max-width: 700px)";
+
+function useIsPhone() {
+  const query = () => typeof window !== "undefined" && window.matchMedia(PHONE_QUERY).matches;
+  const [phone, setPhone] = useState(query);
+  useEffect(() => {
+    const mq = window.matchMedia(PHONE_QUERY);
+    const onChangeQuery = () => setPhone(mq.matches);
+    onChangeQuery();
+    mq.addEventListener("change", onChangeQuery);
+    return () => mq.removeEventListener("change", onChangeQuery);
+  }, []);
+  return phone;
+}
+
+// The pitch for one lineup, with the player list beside it. Read-only when
+// `onChange` is omitted (the player share link) or on a phone; otherwise
+// players can be dragged between slots, the reserves and the rest of the
+// squad — or tapped: tap a player, then tap where they should go, which
+// keeps it usable on a tablet.
 export function LineupPitch({ formation, positions, reserves, playerNames, onChange }) {
-  const readOnly = !onChange;
+  const isPhone = useIsPhone();
+  const readOnly = !onChange || isPhone;
   const slots = formation.slots;
   const model = buildModel(slots, positions, reserves);
 
@@ -500,6 +519,8 @@ export function LineupPitch({ formation, positions, reserves, playerNames, onCha
 
   return (
     <div>
+      <div style={readOnly ? undefined : { display: "flex", flexWrap: "wrap", gap: 20, alignItems: "flex-start" }}>
+      <div style={readOnly ? undefined : { flex: "0 1 420px", minWidth: 280 }}>
       <PitchSurface>
         {slots.map((slot, i) => {
           const name = model.slotNames[i];
@@ -544,11 +565,14 @@ export function LineupPitch({ formation, positions, reserves, playerNames, onCha
       </PitchSurface>
 
       {!readOnly && (
-        <>
-          <p style={{ ...ui.sub, fontSize: 12, textAlign: "center", marginTop: 8 }}>
-            Træk en spiller til en plads — eller tryk på en spiller og så på pladsen.
-          </p>
+        <p style={{ ...ui.sub, fontSize: 12, textAlign: "center", marginTop: 8 }}>
+          Træk en spiller til en plads — eller tryk på en spiller og så på pladsen.
+        </p>
+      )}
+      </div>
 
+      {!readOnly && (
+        <div style={{ flex: "1 1 220px", minWidth: 220, display: "flex", flexDirection: "column", gap: 12 }}>
           <Zone
             label="Reserver"
             hint="Træk spillere hertil"
@@ -571,7 +595,7 @@ export function LineupPitch({ formation, positions, reserves, playerNames, onCha
           </Zone>
 
           {model.leftover.length > 0 && (
-            <div style={{ marginTop: 12 }}>
+            <div>
               <div style={{ ...ui.label, marginBottom: 6 }}>I opstillingen, men uden plads på banen</div>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
                 {model.leftover.map((r) => {
@@ -596,7 +620,7 @@ export function LineupPitch({ formation, positions, reserves, playerNames, onCha
             dropId="other"
             hover={hover === "other"}
             onClick={() => tapTarget({ kind: "other" })}
-            maxHeight={150}
+            maxHeight={320}
           >
             {others.map((name) => {
               const src = { kind: "other", name };
@@ -611,8 +635,9 @@ export function LineupPitch({ formation, positions, reserves, playerNames, onCha
               );
             })}
           </Zone>
-        </>
+        </div>
       )}
+      </div>
 
       {drag && (
         <div
