@@ -300,3 +300,19 @@ export function saveDevelopmentPlan(playerId, plan) {
 export function deleteDevelopmentPlan(playerId) {
   return request("DELETE", `/api/development-plans/${playerId}`);
 }
+
+export function getFormations() {
+  return request("GET", "/api/formations");
+}
+
+export function createFormation({ name, slots }) {
+  return request("POST", "/api/formations", { name, slots });
+}
+
+export function updateFormation(id, { name, slots }) {
+  return request("PUT", `/api/formations/${id}`, { name, slots });
+}
+
+export function deleteFormation(id) {
+  return request("DELETE", `/api/formations/${id}`);
+}

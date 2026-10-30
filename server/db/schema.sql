@@ -554,3 +554,20 @@ create index if not exists idx_players_participation_level on players(participat
 create index if not exists idx_skill_group_members_skill on skill_group_members(skill_id);
 create index if not exists idx_players_skill_group on players(skill_group_id);
 create index if not exists idx_match_plans_date on match_plans(match_date);
+
+-- Pitch layouts for the Kampplan lineup view. Each slot is one of the 11
+-- formation numbers (see server/positions.js) at an x/y spot on the pitch,
+-- both 0-100 (x: left -> right, y: top = opponent's goal -> bottom = own
+-- goal). The same number can appear in more than one slot (two 9s, two 8s),
+-- so a slot is identified by its index in the array, not its number.
+-- A Kampplan stores the formation's *name* in match_plans.formation (the
+-- column predates this table and was free text), so renaming a formation
+-- here unlinks plans that used the old name — they still show their table,
+-- just no pitch. Seeded in server/db/seed.js, only while the table is empty.
+create table if not exists formations (
+  id text primary key,
+  name text not null,
+  slots jsonb not null default '[]',
+  sort_order int not null default 0,
+  created_at timestamptz not null default now()
+);

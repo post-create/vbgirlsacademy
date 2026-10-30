@@ -29,6 +29,7 @@ const matchPlanShareRouter = require("./routes/matchPlanShare");
 const matchStatsRouter = require("./routes/matchStats");
 const developmentPlansRouter = require("./routes/developmentPlans");
 const settingsRouter = require("./routes/settings");
+const formationsRouter = require("./routes/formations");
 const positionSettingsRouter = require("./routes/positionSettings");
 
 if (!process.env.SESSION_SECRET) {
@@ -81,6 +82,7 @@ app.use("/api/match-plans/:matchPlanId/stats", requireAuth, matchStatsRouter);
 app.use("/api/development-plans", requireAuth, developmentPlansRouter);
 app.use("/api/settings", requireAuth, settingsRouter);
 app.use("/api/position-settings", requireAuth, positionSettingsRouter);
+app.use("/api/formations", requireAuth, formationsRouter);
 
 if (process.env.NODE_ENV === "production") {
   const clientDist = path.join(__dirname, "..", "client", "dist");

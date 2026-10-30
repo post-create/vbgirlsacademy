@@ -1,5 +1,6 @@
 const express = require("express");
 const pool = require("../db");
+const { normalizeFormationName } = require("./formations");
 
 // Public, unauthenticated — a coach shares this link directly with players
 // (see KpShareLinkCard / POST /api/match-plans/:id/share for how the token
@@ -27,6 +28,12 @@ router.get("/:token", async (req, res, next) => {
       return res.status(410).json({ error: "Dette link er udløbet." });
     }
 
+    // The pitch layout for this plan's formation name, resolved here so the
+    // public page needs no second (authenticated) request for the catalog.
+    const { rows: formations } = await pool.query("select name, slots from formations");
+    const wanted = normalizeFormationName(plan.formation);
+    const layout = wanted ? formations.find((f) => normalizeFormationName(f.name) === wanted) : null;
+
     res.json({
       opponent: plan.opponent || "",
       date: plan.date,
@@ -39,6 +46,7 @@ router.get("/:token", async (req, res, next) => {
       playerGoals: plan.player_goals,
       positions: plan.positions,
       formation: plan.formation || "",
+      formationSlots: layout ? layout.slots : null,
       reserves: plan.reserves,
     });
   } catch (err) {
