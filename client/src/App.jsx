@@ -7422,6 +7422,9 @@ function KampplanShareView({ plan }) {
   const positionsSorted = [...(plan.positions || [])]
     .filter((r) => r.name && r.name.trim())
     .sort((a, b) => Number(a.position) - Number(b.position));
+  const lineup2Sorted = [...(plan.positions2 || [])]
+    .filter((r) => r.name && r.name.trim())
+    .sort((a, b) => Number(a.position) - Number(b.position));
   const rosterNamesUnique = [...new Set(positionsSorted.map((r) => r.name.trim()))];
   const reserveNamesUnique = [
     ...new Set(
@@ -7452,6 +7455,40 @@ function KampplanShareView({ plan }) {
     padding: "6px 8px",
     border: "1px solid #D9D4C7",
   };
+
+  // The pitch replaces the position table when the plan's formation has a
+  // layout; a formation without one (or since deleted) falls back to the
+  // table so players still see who plays where.
+  const lineupSection = (title, sorted, rawPositions, formation, slots) => (
+    <KpShareSection title={title} count={sorted.length}>
+      <div style={{ maxWidth: 220, marginBottom: 14 }}>
+        <div style={styles.fieldLabel}>Formation</div>
+        <div style={{ fontSize: 14, fontWeight: 600 }}>{formation || "–"}</div>
+      </div>
+      {slots && sorted.length > 0 ? (
+        <LineupPitch formation={{ slots }} positions={rawPositions} reserves={plan.reserves} />
+      ) : sorted.length === 0 ? (
+        <p style={styles.noSkills}>Ikke sat endnu.</p>
+      ) : (
+        <table style={{ width: "100%", borderCollapse: "collapse" }}>
+          <thead>
+            <tr>
+              <th style={{ ...th, width: 70 }}>Position</th>
+              <th style={th}>Spillernavn</th>
+            </tr>
+          </thead>
+          <tbody>
+            {sorted.map((r, i) => (
+              <tr key={i}>
+                <td style={{ ...td, width: 70 }}>{r.position}</td>
+                <td style={td}>{r.name}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </KpShareSection>
+  );
 
   return (
     <div style={styles.app}>
@@ -7503,38 +7540,10 @@ function KampplanShareView({ plan }) {
           )}
         </KpShareSection>
 
-        <KpShareSection title="Position & opstilling" count={positionsSorted.length}>
-          <div style={{ maxWidth: 220, marginBottom: 14 }}>
-            <div style={styles.fieldLabel}>Formation</div>
-            <div style={{ fontSize: 14, fontWeight: 600 }}>{plan.formation || "–"}</div>
-          </div>
-          {plan.formationSlots && positionsSorted.length > 0 ? (
-            <LineupPitch
-              formation={{ slots: plan.formationSlots }}
-              positions={plan.positions}
-              reserves={plan.reserves}
-            />
-          ) : positionsSorted.length === 0 ? (
-            <p style={styles.noSkills}>Ikke sat endnu.</p>
-          ) : (
-            <table style={{ width: "100%", borderCollapse: "collapse" }}>
-              <thead>
-                <tr>
-                  <th style={{ ...th, width: 70 }}>Position</th>
-                  <th style={th}>Spillernavn</th>
-                </tr>
-              </thead>
-              <tbody>
-                {positionsSorted.map((r, i) => (
-                  <tr key={i}>
-                    <td style={{ ...td, width: 70 }}>{r.position}</td>
-                    <td style={td}>{r.name}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </KpShareSection>
+        {lineupSection("Position & opstilling", positionsSorted, plan.positions, plan.formation, plan.formationSlots)}
+
+        {lineup2Sorted.length > 0 &&
+          lineupSection("Position & opstilling 2", lineup2Sorted, plan.positions2, plan.formation2, plan.formationSlots2)}
 
         <KpShareSection title="Målsætning for holdet" count={filledTeamGoals.length}>
           {filledTeamGoals.length === 0 ? (

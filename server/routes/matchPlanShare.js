@@ -13,7 +13,7 @@ router.get("/:token", async (req, res, next) => {
   try {
     const { rows } = await pool.query(
       `select opponent, to_char(match_date, 'YYYY-MM-DD') as date, team_goals, defense, conquest,
-              build_up, finishing, extras, player_goals, positions, formation, reserves
+              build_up, finishing, extras, player_goals, positions, formation, positions2, formation2, reserves
        from match_plans where share_token = $1`,
       [req.params.token]
     );
@@ -31,8 +31,11 @@ router.get("/:token", async (req, res, next) => {
     // The pitch layout for this plan's formation name, resolved here so the
     // public page needs no second (authenticated) request for the catalog.
     const { rows: formations } = await pool.query("select name, slots from formations");
-    const wanted = normalizeFormationName(plan.formation);
-    const layout = wanted ? formations.find((f) => normalizeFormationName(f.name) === wanted) : null;
+    const layoutFor = (name) => {
+      const wanted = normalizeFormationName(name);
+      const found = wanted ? formations.find((f) => normalizeFormationName(f.name) === wanted) : null;
+      return found ? found.slots : null;
+    };
 
     res.json({
       opponent: plan.opponent || "",
@@ -46,7 +49,10 @@ router.get("/:token", async (req, res, next) => {
       playerGoals: plan.player_goals,
       positions: plan.positions,
       formation: plan.formation || "",
-      formationSlots: layout ? layout.slots : null,
+      formationSlots: layoutFor(plan.formation),
+      positions2: plan.positions2,
+      formation2: plan.formation2 || "",
+      formationSlots2: layoutFor(plan.formation2),
       reserves: plan.reserves,
     });
   } catch (err) {
