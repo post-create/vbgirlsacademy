@@ -19,7 +19,7 @@ export const CHANGELOG = [
       },
       {
         kind: "forbedret",
-        text: "Spillerne skal trykke Gem for at sende deres selvevaluering. Før blev værdien gemt hver gang de klikkede, så historikken fik svar, de aldrig mente at give.",
+        text: "Spillerne skal vurdere alle deres udviklingsmål og trykke Gem én gang for at sende selvevalueringen. Før blev værdien gemt hver gang de klikkede, og de kunne nøjes med ét mål, så historikken fik svar, de aldrig mente at give.",
       },
       {
         kind: "nyt",

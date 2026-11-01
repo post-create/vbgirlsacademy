@@ -108,47 +108,86 @@ router.get("/:token", async (req, res, next) => {
   }
 });
 
-router.patch("/:token/periods/:periodId/goals/:skillId/progress", async (req, res, next) => {
+// The player's self-evaluation of her goals in one period, submitted as one
+// set: every goal in the period needs a value (1-10), otherwise nothing is
+// saved. Each value becomes the goal's current progress and a row in
+// goal_progress_log (the history the coach sees), all in one transaction so
+// a failure can't leave half the goals saved — which a retry would then log
+// twice.
+router.post("/:token/periods/:periodId/self-eval", async (req, res, next) => {
   try {
     const player = await loadPlayerByToken(req.params.token);
     if (!player) return res.status(404).json({ error: "Invalid link" });
 
-    const { progress } = req.body;
-    const { rows } = await pool.query(
-      `update goals set progress = $4 where player_id = $1 and period_id = $2 and skill_id = $3
-       returning target, note, focus_areas, progress, to_char(created_date, 'YYYY-MM-DD') as created_date`,
-      [player.id, req.params.periodId, req.params.skillId, progress]
-    );
-    if (!rows[0]) return res.status(404).json({ error: "Goal not found" });
-
-    // Log every real submission (not a "clear", which sends null) so the
-    // full self-evaluation history survives even though goals.progress
-    // itself only ever holds the latest value.
-    let progressLog = [];
-    if (typeof progress === "number") {
-      await pool.query(
-        `insert into goal_progress_log (id, player_id, period_id, skill_id, progress)
-         values ($1, $2, $3, $4, $5)`,
-        [crypto.randomUUID(), player.id, req.params.periodId, req.params.skillId, progress]
-      );
+    const values = req.body && req.body.progress;
+    if (!values || typeof values !== "object" || Array.isArray(values)) {
+      return res.status(400).json({ error: "Mangler vurderinger." });
     }
-    const log = await pool.query(
-      `select progress, created_at from goal_progress_log
-       where player_id = $1 and period_id = $2 and skill_id = $3
-       order by created_at`,
-      [player.id, req.params.periodId, req.params.skillId]
-    );
-    progressLog = log.rows.map((r) => ({ progress: r.progress, createdAt: r.created_at }));
 
-    const g = rows[0];
-    res.json({
-      target: g.target,
-      note: g.note || "",
-      focusAreas: g.focus_areas || "",
-      progress: g.progress,
-      createdDate: g.created_date,
-      progressLog,
+    const { rows: goalRows } = await pool.query(
+      "select skill_id from goals where player_id = $1 and period_id = $2",
+      [player.id, req.params.periodId]
+    );
+    if (goalRows.length === 0) return res.status(404).json({ error: "Der er ingen mål i perioden." });
+
+    const skillIds = goalRows.map((g) => g.skill_id);
+    const valid = (v) => Number.isInteger(v) && v >= 1 && v <= 10;
+    if (!skillIds.every((id) => valid(values[id]))) {
+      return res.status(400).json({ error: "Du skal vurdere alle dine udviklingsmål, før du kan gemme." });
+    }
+    if (Object.keys(values).some((id) => !skillIds.includes(id))) {
+      return res.status(400).json({ error: "Ukendt mål i vurderingen." });
+    }
+
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+      for (const skillId of skillIds) {
+        await client.query(
+          "update goals set progress = $4 where player_id = $1 and period_id = $2 and skill_id = $3",
+          [player.id, req.params.periodId, skillId, values[skillId]]
+        );
+        await client.query(
+          `insert into goal_progress_log (id, player_id, period_id, skill_id, progress)
+           values ($1, $2, $3, $4, $5)`,
+          [crypto.randomUUID(), player.id, req.params.periodId, skillId, values[skillId]]
+        );
+      }
+      await client.query("COMMIT");
+    } catch (err) {
+      await client.query("ROLLBACK");
+      throw err;
+    } finally {
+      client.release();
+    }
+
+    const [goals, log] = await Promise.all([
+      pool.query(
+        `select skill_id, target, note, focus_areas, progress, to_char(created_date, 'YYYY-MM-DD') as created_date
+         from goals where player_id = $1 and period_id = $2`,
+        [player.id, req.params.periodId]
+      ),
+      pool.query(
+        `select skill_id, progress, created_at from goal_progress_log
+         where player_id = $1 and period_id = $2 order by created_at`,
+        [player.id, req.params.periodId]
+      ),
+    ]);
+    const out = {};
+    goals.rows.forEach((g) => {
+      out[g.skill_id] = {
+        target: g.target,
+        note: g.note || "",
+        focusAreas: g.focus_areas || "",
+        progress: g.progress,
+        createdDate: g.created_date,
+        progressLog: [],
+      };
     });
+    log.rows.forEach((r) => {
+      if (out[r.skill_id]) out[r.skill_id].progressLog.push({ progress: r.progress, createdAt: r.created_at });
+    });
+    res.json({ goals: out });
   } catch (err) {
     next(err);
   }

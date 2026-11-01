@@ -166,12 +166,9 @@ export function getSelf(token) {
   return request("GET", `/api/self/${token}`);
 }
 
-export function setSelfGoalProgress(token, periodId, skillId, progress) {
-  return request(
-    "PATCH",
-    `/api/self/${token}/periods/${periodId}/goals/${skillId}/progress`,
-    { progress }
-  );
+// One submission for every goal in the period: { [skillId]: 1-10 }.
+export function submitSelfEval(token, periodId, progress) {
+  return request("POST", `/api/self/${token}/periods/${periodId}/self-eval`, { progress });
 }
 
 export function createCoach({ name, email, teamId, password }) {

@@ -924,19 +924,17 @@ export default function AcademyApp() {
     }
   }, []);
 
-  const setSelfGoalProgress = (periodId, subskillId, progress) =>
+  // values: { [skillId]: 1-10 } for every goal in the period (the server
+  // refuses anything less). Resolves true/false for whether it was saved.
+  const submitSelfEval = (periodId, values) =>
     runMutation(async () => {
+      const { goals: updated } = await api.submitSelfEval(urlToken, periodId, values);
       const existingPeriod = selfData.goals[periodId] || {};
-      const existing = existingPeriod[subskillId];
-      if (!existing) return;
-      const updated = await api.setSelfGoalProgress(urlToken, periodId, subskillId, progress);
-      setSelfData({
-        ...selfData,
-        goals: {
-          ...selfData.goals,
-          [periodId]: { ...existingPeriod, [subskillId]: { ...existing, ...updated } },
-        },
+      const merged = { ...existingPeriod };
+      Object.keys(updated).forEach((skillId) => {
+        merged[skillId] = { ...existingPeriod[skillId], ...updated[skillId] };
       });
+      setSelfData({ ...selfData, goals: { ...selfData.goals, [periodId]: merged } });
     });
 
   const setGoalProgress = (playerId, periodId, subskillId, progress) =>
@@ -1027,7 +1025,7 @@ export default function AcademyApp() {
         coachEvaluations={selfData.evaluations}
         goals={selfData.goals}
         developmentPlan={selfData.developmentPlan}
-        onSetGoalProgress={setSelfGoalProgress}
+        onSubmitSelfEval={submitSelfEval}
       />
     );
   }
@@ -1616,58 +1614,7 @@ export default function AcademyApp() {
 }
 
 /* ---------- Player self-evaluation (accessed only via a private link) ---------- */
-// The player's self-evaluation of one goal. Picking a value only changes the
-// draft here; it is written to the database (and logged as a self-evaluation)
-// when she presses Gem, so trying a few values before settling doesn't fill
-// the history with answers she never meant to give.
-function SelfProgressEditor({ goal, onSave }) {
-  const saved = typeof goal.progress === "number" ? goal.progress : null;
-  const [draft, setDraft] = useState(saved);
-  const [dirty, setDirty] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [justSaved, setJustSaved] = useState(false);
-  const log = goal.progressLog || [];
-  const last = log[log.length - 1]; // oldest first
-
-  const choose = (v) => {
-    setDraft(v);
-    setDirty(true);
-    setJustSaved(false);
-  };
-  const save = async () => {
-    setSaving(true);
-    const ok = await onSave(draft);
-    setSaving(false);
-    if (ok !== false) {
-      setDirty(false);
-      setJustSaved(true);
-    }
-  };
-
-  return (
-    <div>
-      <ProgressTracker value={draft} onChange={choose} />
-      <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginTop: 8 }}>
-        <button
-          style={{ ...styles.primaryBtnSm, opacity: dirty && !saving ? 1 : 0.45, cursor: dirty && !saving ? "pointer" : "default" }}
-          disabled={!dirty || saving}
-          onClick={save}
-        >
-          {saving ? "Gemmer…" : "Gem"}
-        </button>
-        {dirty && <span style={styles.subtext}>Ikke gemt endnu — tryk Gem for at sende din vurdering</span>}
-        {!dirty && justSaved && <span style={{ ...styles.subtext, color: "#4D7B4D" }}>Gemt.</span>}
-        {!dirty && !justSaved && last && (
-          <span style={styles.subtext}>
-            Sidst gemt: {last.progress}/10 · {formatDate(String(last.createdAt).slice(0, 10))}
-          </span>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function PlayerSelfEvalApp({ player, config, periods, coachEvaluations, goals, developmentPlan, onSetGoalProgress }) {
+function PlayerSelfEvalApp({ player, config, periods, coachEvaluations, goals, developmentPlan, onSubmitSelfEval }) {
   const [selectedPeriodId, setSelectedPeriodId] = useState(
     periods.length ? periods[periods.length - 1].id : null
   );
@@ -1676,6 +1623,13 @@ function PlayerSelfEvalApp({ player, config, periods, coachEvaluations, goals, d
   const [printColBMode, setPrintColBMode] = useState("goal");
   const [printColBPeriodId, setPrintColBPeriodId] = useState(null);
   const [planExpanded, setPlanExpanded] = useState(false);
+  // Self-evaluation drafts, per period: { [periodId]: { [skillId]: 1-10 } }.
+  // Nothing is sent until Gem, and Gem needs a value for every goal in the
+  // period. status is "dirty" (changed since last save) or "saved" per period.
+  const [drafts, setDrafts] = useState({});
+  const [draftStatus, setDraftStatus] = useState({});
+  const [selfSaving, setSelfSaving] = useState(false);
+  const [selfSaveFailed, setSelfSaveFailed] = useState(false);
 
   useEffect(() => {
     if (!selectedPeriodId && periods.length) {
@@ -1693,6 +1647,19 @@ function PlayerSelfEvalApp({ player, config, periods, coachEvaluations, goals, d
     goal: categoryGoalAverage(config, periodGoals, c.key, player) || 0,
   }));
 
+  const periodId = selectedPeriod ? selectedPeriod.id : null;
+  const periodDraft = (periodId && drafts[periodId]) || {};
+  const periodStatus = periodId ? draftStatus[periodId] : undefined;
+  const lastSelfEval = (goal) => {
+    const log = goal.progressLog || []; // oldest first
+    return log[log.length - 1] || null;
+  };
+  const setDraftValue = (skillId, v) => {
+    if (!periodId) return;
+    setDrafts((d) => ({ ...d, [periodId]: { ...(d[periodId] || {}), [skillId]: v } }));
+    setDraftStatus((st) => ({ ...st, [periodId]: "dirty" }));
+    setSelfSaveFailed(false);
+  };
   const hasGoals = Object.keys(periodGoals).length > 0;
   const goalEntries = Object.keys(periodGoals)
     .map((skillId) => {
@@ -1705,6 +1672,23 @@ function PlayerSelfEvalApp({ player, config, periods, coachEvaluations, goals, d
       (a, b) =>
         a.category.label.localeCompare(b.category.label) || a.skill.name.localeCompare(b.skill.name)
     );
+
+  const ratedCount = goalEntries.filter((e) => typeof periodDraft[e.skillId] === "number").length;
+  const allRated = goalEntries.length > 0 && ratedCount === goalEntries.length;
+  const canSaveSelfEval = allRated && periodStatus === "dirty" && !selfSaving;
+  const saveSelfEval = async () => {
+    if (!canSaveSelfEval || !periodId) return;
+    setSelfSaving(true);
+    setSelfSaveFailed(false);
+    const values = {};
+    goalEntries.forEach((e) => {
+      values[e.skillId] = periodDraft[e.skillId];
+    });
+    const ok = await onSubmitSelfEval(periodId, values);
+    setSelfSaving(false);
+    if (ok === false) setSelfSaveFailed(true);
+    else setDraftStatus((st) => ({ ...st, [periodId]: "saved" }));
+  };
 
   return (
     <div style={styles.app}>
@@ -1779,14 +1763,40 @@ function PlayerSelfEvalApp({ player, config, periods, coachEvaluations, goals, d
                       {achieved ? " ✓" : ""}
                     </span>
                   </div>
-                  <SelfProgressEditor
-                    key={`${selectedPeriod ? selectedPeriod.id : ""}-${skillId}`}
-                    goal={goal}
-                    onSave={(v) => selectedPeriod && onSetGoalProgress(selectedPeriod.id, skillId, v)}
+                  <ProgressTracker
+                    value={typeof periodDraft[skillId] === "number" ? periodDraft[skillId] : null}
+                    onChange={(v) => setDraftValue(skillId, v)}
                   />
+                  {lastSelfEval(goal) && (
+                    <div style={{ ...styles.subtext, fontSize: 12, marginTop: 4 }}>
+                      Sidst gemt: {lastSelfEval(goal).progress}/10 ·{" "}
+                      {formatDate(String(lastSelfEval(goal).createdAt).slice(0, 10))}
+                    </div>
+                  )}
                 </div>
               );
             })}
+            <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", marginTop: 16 }}>
+              <button
+                style={{ ...styles.primaryBtn, opacity: canSaveSelfEval ? 1 : 0.45, cursor: canSaveSelfEval ? "pointer" : "default" }}
+                disabled={!canSaveSelfEval}
+                onClick={saveSelfEval}
+              >
+                {selfSaving ? "Gemmer…" : "Gem"}
+              </button>
+              {selfSaveFailed ? (
+                <span style={{ ...styles.subtext, color: "#B3261E" }}>Kunne ikke gemme — prøv igen.</span>
+              ) : periodStatus === "saved" ? (
+                <span style={{ ...styles.subtext, color: "#4D7B4D" }}>Gemt.</span>
+              ) : !allRated ? (
+                <span style={styles.subtext}>
+                  Du skal vurdere alle {goalEntries.length} mål, før du kan gemme ({ratedCount} af {goalEntries.length}{" "}
+                  vurderet).
+                </span>
+              ) : (
+                <span style={styles.subtext}>Klar — tryk Gem for at sende din vurdering.</span>
+              )}
+            </div>
           </div>
         )}
 
