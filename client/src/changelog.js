@@ -19,6 +19,10 @@ export const CHANGELOG = [
       },
       {
         kind: "nyt",
+        text: "Under Udviklingsmål på spillerens side står spillerens seneste egenvurdering (værdi, dato og tid) lige under trænerens fremskridt. Afviger den med mere end 2, markeres det.",
+      },
+      {
+        kind: "nyt",
         text: "I Spillertrup markeres spillerens kort med en gul advarsel, når trænerens aktuelle vurdering af et mål og spillerens seneste selvevaluering er mere end 2 fra hinanden. Kortet viser, hvilke mål det gælder.",
       },
       {

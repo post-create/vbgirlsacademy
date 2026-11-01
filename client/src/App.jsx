@@ -2944,6 +2944,46 @@ function ProgressTracker({ value, onChange, compact }) {
   );
 }
 
+// The player's own latest answer for a goal, shown under the coach's
+// Fremskridt row — highlighted when the two are further apart than the
+// Spillertrup warning allows (SELF_EVAL_GAP_LIMIT).
+function LatestSelfEval({ goal }) {
+  const log = goal.progressLog || [];
+  const last = log[log.length - 1]; // oldest first
+  const apart =
+    last && typeof goal.progress === "number" && Math.abs(goal.progress - last.progress) > SELF_EVAL_GAP_LIMIT;
+  return (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "baseline",
+        gap: 8,
+        flexWrap: "wrap",
+        marginTop: 6,
+        fontSize: 12,
+        color: apart ? "#7A4B00" : "#4A4A4A",
+      }}
+    >
+      <span style={{ fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5, fontSize: 11, color: "#6B6B6B" }}>
+        Spillerens egenvurdering
+      </span>
+      {last ? (
+        <>
+          <strong style={{ fontSize: 13 }}>{last.progress}/10</strong>
+          <span style={{ color: "#6B6B6B" }}>{formatSelfEvalTime(last.createdAt)}</span>
+          {apart && (
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontWeight: 600 }}>
+              <AlertTriangle size={12} /> Afviger fra din vurdering ({goal.progress}/10)
+            </span>
+          )}
+        </>
+      ) : (
+        <span style={{ color: "#6B6B6B" }}>Ingen egenvurdering endnu</span>
+      )}
+    </div>
+  );
+}
+
 function formatSelfEvalTime(createdAt) {
   const dt = new Date(createdAt);
   if (isNaN(dt.getTime())) return String(createdAt);
@@ -5416,6 +5456,7 @@ function GoalsOverview({
                 compact
               />
             )}
+            {!isEditing && <LatestSelfEval goal={goal} />}
           </div>
         );
       })}
