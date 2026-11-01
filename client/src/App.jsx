@@ -6581,6 +6581,38 @@ function kpSetStringAt(list, index, value) {
   return list.map((v, i) => (i === index ? value : v));
 }
 
+// A textarea that grows to show all of its text, so a coach never has to
+// scroll inside the box to read what they wrote. The Kampplan sections start
+// collapsed (display: none, where scrollHeight is 0), and the width changes
+// on rotate/resize — both change how the text wraps — so it re-fits from a
+// ResizeObserver as well as on every edit.
+function AutoTextarea({ value, style, ...rest }) {
+  const ref = React.useRef(null);
+  const fit = React.useCallback(() => {
+    const el = ref.current;
+    if (!el || el.clientWidth === 0) return;
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight + (el.offsetHeight - el.clientHeight)}px`;
+  }, []);
+  React.useLayoutEffect(fit, [value, fit]);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || typeof ResizeObserver === "undefined") return undefined;
+    let lastWidth = el.clientWidth;
+    const ro = new ResizeObserver(() => {
+      // Only a width change re-wraps the text; reacting to our own height
+      // change would loop.
+      if (el.clientWidth !== lastWidth) {
+        lastWidth = el.clientWidth;
+        fit();
+      }
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [fit]);
+  return <textarea ref={ref} value={value} style={{ ...style, resize: "none", overflow: "hidden" }} {...rest} />;
+}
+
 // Starts collapsed, same as the category blocks on Spillertrup (see
 // PlayerView's expandedCats) — the count on the right (visible whether
 // collapsed or not) is what lets a coach see how much is already filled in
@@ -6629,7 +6661,7 @@ function KpCategorySection({ title, items, categories, defaultCategory, onAdd, o
                 <X size={14} />
               </button>
             </div>
-            <textarea
+            <AutoTextarea
               style={styles.textarea}
               rows={4}
               value={item.text}
@@ -7334,7 +7366,7 @@ function KpNotesField({ value, onChange }) {
       <div className={`category-skills${expanded ? " category-skills-open" : ""}`}>
         {editing ? (
           <div>
-            <textarea
+            <AutoTextarea
               style={{ ...styles.textarea, minHeight: 120 }}
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
@@ -7763,7 +7795,7 @@ function KampplanEditor({ plan, setPlan, onBack, onSave, onPrint, saving, player
         <div className={`category-skills${teamGoalsExpanded ? " category-skills-open" : ""}`}>
           {plan.teamGoals.map((g, i) => (
             <div key={i} style={{ display: "grid", gridTemplateColumns: "1fr 26px", gap: 8, alignItems: "start", marginBottom: 8 }}>
-              <textarea
+              <AutoTextarea
                 style={{ ...styles.textarea, minHeight: 44 }}
                 value={g}
                 onChange={(e) => setPlan({ ...plan, teamGoals: kpSetStringAt(plan.teamGoals, i, e.target.value) })}
@@ -7968,7 +8000,7 @@ function KampplanEditor({ plan, setPlan, onBack, onSave, onPrint, saving, player
                           ))}
                         </select>
                       ) : (
-                        <textarea
+                        <AutoTextarea
                           style={{ ...styles.textarea, minHeight: 38 }}
                           placeholder="Individuelt mål"
                           value={plan.playerGoals[name] || ""}
@@ -7981,7 +8013,7 @@ function KampplanEditor({ plan, setPlan, onBack, onSave, onPrint, saving, player
                         />
                       )}
                       {(plan.playerGoals[name] || "").trim() && (
-                        <textarea
+                        <AutoTextarea
                           style={{ ...styles.textarea, minHeight: 38, marginTop: 6 }}
                           placeholder="Note til målet"
                           value={(plan.playerGoalNotes || {})[name] || ""}
