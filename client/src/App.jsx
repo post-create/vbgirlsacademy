@@ -8548,6 +8548,11 @@ function MatchTrendChart({ title, unit = "", decimals = 0, domain, ticks, points
           <span style={{ fontSize: 12, color: "#8A8A8A" }}>Ingen data</span>
         )}
       </div>
+      {points.length === 0 ? (
+        <div style={{ height: 150, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, color: "#8A8A8A" }}>
+          Ingen kampe med denne statistik
+        </div>
+      ) : (
       <div style={{ width: "100%", height: 150, marginTop: 6 }}>
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={points} margin={{ top: 18, right: 14, bottom: 0, left: 0 }}>
@@ -8617,6 +8622,7 @@ function MatchTrendChart({ title, unit = "", decimals = 0, domain, ticks, points
           </LineChart>
         </ResponsiveContainer>
       </div>
+      )}
     </div>
   );
 }
@@ -8766,6 +8772,8 @@ function KampPerformanceView({ players }) {
         distanceKm: m.distanceKm,
         dribbles: m.dribbles,
         tackles: m.tackles,
+        passes: m.passes,
+        teamMax: m.teamMax || {},
       };
     });
     plans.forEach((pl) => {
@@ -8776,6 +8784,19 @@ function KampPerformanceView({ players }) {
     });
     return Object.values(byId).sort((a, b) => String(a.date).localeCompare(String(b.date)));
   })();
+  // The value to chart for one match, or null when the match has nothing
+  // real to show for it: the stat is empty, or it is a 0 that really means
+  // "not recorded" — 0 for the whole squad in that match, a pass percentage
+  // with no passes behind it, or 0 km although the player was on the pitch.
+  const trendValue = (m, key) => {
+    const raw = m[key];
+    if (raw == null || raw === "" || isNaN(Number(raw))) return null;
+    const v = Number(raw);
+    if (key === "passSuccessPct") return Number(m.passes) > 0 ? v : null;
+    if (key === "distanceKm" && v === 0) return null;
+    if (key in (m.teamMax || {}) && v === 0 && Number(m.teamMax[key]) === 0) return null;
+    return v;
+  };
   const trendSpansYears = new Set(trendMatches.map((m) => String(m.date).slice(0, 4))).size > 1;
   const trendLabel = (iso) => {
     const dt = new Date(`${iso}T00:00:00`);
@@ -8860,14 +8881,17 @@ function KampPerformanceView({ players }) {
                   decimals={c.decimals || 0}
                   domain={c.domain}
                   ticks={c.ticks}
-                  points={trendMatches.map((m, i) => ({
-                    i,
-                    label: trendLabel(m.date),
-                    value: m[c.key] == null || m[c.key] === "" || isNaN(Number(m[c.key])) ? null : Number(m[c.key]),
-                    date: m.date,
-                    opponent: m.opponent,
-                    division: m.division,
-                  }))}
+                  points={trendMatches
+                    .map((m) => ({ m, value: trendValue(m, c.key) }))
+                    .filter((x) => x.value !== null)
+                    .map((x, i) => ({
+                      i,
+                      label: trendLabel(x.m.date),
+                      value: x.value,
+                      date: x.m.date,
+                      opponent: x.m.opponent,
+                      division: x.m.division,
+                    }))}
                 />
               ))}
             </div>

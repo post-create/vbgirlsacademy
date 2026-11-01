@@ -35,8 +35,16 @@ function validatePositions(primaryPosition, secondaryPosition) {
 router.get("/:id/stats", async (req, res, next) => {
   try {
     const { rows } = await pool.query(
-      `select ms.*, mp.opponent, to_char(mp.match_date, 'YYYY-MM-DD') as match_date
-       from match_stats ms join match_plans mp on mp.id = ms.match_plan_id
+      `select ms.*, mp.opponent, to_char(mp.match_date, 'YYYY-MM-DD') as match_date,
+              t.max_hir, t.max_dribbles, t.max_tackles, t.max_distance_km, t.max_passes
+       from match_stats ms
+       join match_plans mp on mp.id = ms.match_plan_id
+       join (
+         select match_plan_id,
+                max(high_intensity_runs) as max_hir, max(dribbles) as max_dribbles,
+                max(tackles) as max_tackles, max(distance_km) as max_distance_km, max(passes) as max_passes
+         from match_stats group by match_plan_id
+       ) t on t.match_plan_id = ms.match_plan_id
        where ms.player_id = $1
        order by mp.match_date desc`,
       [req.params.id]
@@ -78,6 +86,18 @@ router.get("/:id/stats", async (req, res, next) => {
       starts: r.starts,
       captaincies: r.captaincies,
       playerOfTheMatch: r.player_of_the_match,
+      // The highest value anyone in the squad has for this stat in this
+      // match. A tracking export that didn't include a stat leaves it as 0
+      // for every player, so a team-wide 0 means "not recorded" rather than
+      // "nobody did any" — the Kampscore charts use this to leave such a
+      // match out instead of drawing a zero.
+      teamMax: {
+        highIntensityRuns: r.max_hir,
+        dribbles: r.max_dribbles,
+        tackles: r.max_tackles,
+        distanceKm: r.max_distance_km == null ? null : Number(r.max_distance_km),
+        passes: r.max_passes,
+      },
     }));
 
     // Sums for counting stats, a passes-weighted average for the success
