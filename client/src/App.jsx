@@ -8682,6 +8682,26 @@ function KampPerformanceView({ players }) {
   const [statsError, setStatsError] = useState(false);
   const requestedRef = React.useRef(new Set());
   const panelRef = React.useRef(null);
+  // The "Vælg spillere" dropdown inside the details panel.
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [pickerQuery, setPickerQuery] = useState("");
+  const pickerRef = React.useRef(null);
+
+  useEffect(() => {
+    if (!pickerOpen) return undefined;
+    const onDown = (e) => {
+      if (pickerRef.current && !pickerRef.current.contains(e.target)) setPickerOpen(false);
+    };
+    const onKey = (e) => {
+      if (e.key === "Escape") setPickerOpen(false);
+    };
+    document.addEventListener("pointerdown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("pointerdown", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [pickerOpen]);
 
   // Fetch each ticked player's per-match stats once; later ticks reuse it.
   useEffect(() => {
@@ -8724,6 +8744,18 @@ function KampPerformanceView({ players }) {
     setSelectedIds([]);
     setOnlySelected(false);
     setLimitHint(false);
+    setPickerOpen(false);
+    setPickerQuery("");
+  };
+  // A click on a table row opens the details for just that player; more
+  // players are added from the dropdown inside the panel.
+  const openPlayer = (playerId) => {
+    setStatsError(false);
+    setLimitHint(false);
+    setSelectedIds([playerId]);
+    setTimeout(() => {
+      if (panelRef.current) panelRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 50);
   };
 
   useEffect(() => {
@@ -8893,6 +8925,9 @@ function KampPerformanceView({ players }) {
     sortMode === "avg"
       ? [...rows].sort((a, b) => (b.avg ?? -Infinity) - (a.avg ?? -Infinity))
       : [...rows].sort((a, b) => a.player.name.localeCompare(b.player.name, "da"));
+  const pickerPlayers = [...players]
+    .filter((pl) => pl.name.toLowerCase().includes(pickerQuery.trim().toLowerCase()))
+    .sort((a, b) => a.name.localeCompare(b.name, "da"));
   const visibleRows =
     onlySelected && selectedIds.length > 0
       ? sortedRows.filter((r) => selectedIds.includes(r.player.id))
@@ -8907,8 +8942,8 @@ function KampPerformanceView({ players }) {
             Spillernes kampindsats over tid, bedømt 1-5 efter hver kamp på Kampplan, sammen med
             gennemsnitlig sporingsstatistik fra kampene. Kampscoren vægtes efter kampens række
             (Division ×1,2, Liga 1 ×1, Liga 2 ×0,8). Bruges til at vurdere hvem der reelt præsterer
-            bedst lige nu. Sæt kryds ved en eller flere spillere for at se udviklingen fra kamp til
-            kamp og sammenligne dem.
+            bedst lige nu. Klik på en spiller for at se udviklingen fra kamp til kamp. I detaljerne kan du
+            tilføje flere spillere og sammenligne dem.
           </p>
         </div>
       </div>
@@ -8941,24 +8976,93 @@ function KampPerformanceView({ players }) {
 
       {!loading && !error && selectedIds.length > 0 && (
         <div ref={panelRef} style={{ ...styles.categoryBlock, scrollMarginTop: 110 }}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
             <span style={styles.categoryLabel}>
               {selectedIds.length === 1 ? "Udvikling kamp for kamp" : "Sammenligning kamp for kamp"}
             </span>
-            <div style={{ display: "flex", gap: 8 }}>
-              {selectedIds.length > 1 && (
-                <button style={{ ...styles.ghostBtn, padding: "6px 12px", fontSize: 13 }} onClick={() => setSelectedIds([selectedIds[0]])}>
-                  Behold kun første
-                </button>
-              )}
+            <div ref={pickerRef} style={{ position: "relative" }}>
               <button
-                style={{ ...styles.ghostBtn, padding: "6px 12px", fontSize: 13, display: "inline-flex", alignItems: "center", gap: 4 }}
-                onClick={closePanel}
-                title="Luk og fjern alle valg"
+                type="button"
+                style={{
+                  ...styles.select,
+                  width: "auto",
+                  minWidth: 210,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  gap: 10,
+                  textAlign: "left",
+                  cursor: "pointer",
+                }}
+                onClick={() => setPickerOpen((v) => !v)}
+                aria-haspopup="listbox"
+                aria-expanded={pickerOpen}
               >
-                <X size={14} /> Luk
+                <span>Vælg spillere ({selectedIds.length} valgt)</span>
+                <ChevronDown size={14} />
               </button>
+              {pickerOpen && (
+                <div
+                  style={{
+                    position: "absolute",
+                    left: 0,
+                    top: "calc(100% + 4px)",
+                    zIndex: 50,
+                    width: 280,
+                    maxWidth: "calc(100vw - 48px)",
+                    background: "#FFFFFF",
+                    border: "1px solid #D9D4C7",
+                    borderRadius: 10,
+                    boxShadow: "0 8px 24px rgba(0,0,0,0.15)",
+                    padding: 8,
+                  }}
+                >
+                  <input
+                    style={{ ...styles.input, marginBottom: 6 }}
+                    placeholder="Søg spiller"
+                    value={pickerQuery}
+                    onChange={(e) => setPickerQuery(e.target.value)}
+                  />
+                  <div role="listbox" aria-multiselectable="true" style={{ maxHeight: 280, overflowY: "auto" }}>
+                    {pickerPlayers.map((pl) => {
+                      const idx = selectedIds.indexOf(pl.id);
+                      const on = idx >= 0;
+                      return (
+                        <label
+                          key={pl.id}
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 8,
+                            padding: "6px",
+                            borderRadius: 6,
+                            cursor: "pointer",
+                            fontSize: 14,
+                            background: on ? "#F6F3EC" : "transparent",
+                          }}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={on}
+                            onChange={() => toggleSelected(pl.id)}
+                            style={on ? { accentColor: KAMP_COMPARE_COLORS[idx % KAMP_COMPARE_COLORS.length] } : undefined}
+                          />
+                          <span>{pl.name}</span>
+                        </label>
+                      );
+                    })}
+                    {pickerPlayers.length === 0 && <div style={{ ...styles.subtext, padding: 6 }}>Ingen spillere</div>}
+                  </div>
+                </div>
+              )}
             </div>
+            <button
+              style={{ ...styles.ghostBtn, padding: "8px 14px", fontSize: 13, display: "inline-flex", alignItems: "center", gap: 4 }}
+              onClick={closePanel}
+              title="Luk og fjern alle valg"
+            >
+              <X size={14} /> Luk
+            </button>
           </div>
           <div style={{ display: "flex", gap: 6, flexWrap: "wrap", margin: "10px 0" }}>
             {compare.map((c) => (
@@ -9039,7 +9143,6 @@ function KampPerformanceView({ players }) {
           <table style={styles.kpsTable}>
             <thead>
               <tr>
-                <th style={{ ...styles.kpsTh, width: 34 }}></th>
                 <th style={styles.kpsTh}>Spiller</th>
                 <th style={{ ...styles.kpsTh, textAlign: "center" }}>Kampscore</th>
                 <th style={{ ...styles.kpsTh, textAlign: "right" }}>Pasningsfuldførelse</th>
@@ -9052,7 +9155,6 @@ function KampPerformanceView({ players }) {
             <tbody>
               {visibleRows.map(({ player, gameCount, levelBreakdown, avg, stats }) => {
                 const picked = selectedIds.includes(player.id);
-                const colorIdx = selectedIds.indexOf(player.id);
                 return (
                   <tr
                     key={player.id}
@@ -9061,18 +9163,9 @@ function KampPerformanceView({ players }) {
                       cursor: "pointer",
                       ...(picked ? { background: "#F6F3EC" } : {}),
                     }}
-                    onClick={() => toggleSelected(player.id)}
-                    title={picked ? "Klik for at fjerne fra sammenligningen" : "Klik for at se udviklingen kamp for kamp"}
+                    onClick={() => openPlayer(player.id)}
+                    title="Klik for at se udviklingen kamp for kamp"
                   >
-                    <td style={{ ...styles.kpsTd, width: 34, paddingRight: 0 }} onClick={(e) => e.stopPropagation()}>
-                      <input
-                        type="checkbox"
-                        checked={picked}
-                        onChange={() => toggleSelected(player.id)}
-                        aria-label={`Vælg ${player.name}`}
-                        style={picked ? { accentColor: KAMP_COMPARE_COLORS[colorIdx % KAMP_COMPARE_COLORS.length] } : undefined}
-                      />
-                    </td>
                     <td style={styles.kpsTd}>
                       <div style={{ fontWeight: 600 }}>{player.name}</div>
                       <div style={{ fontSize: 12, color: "#8A8A8A" }}>
