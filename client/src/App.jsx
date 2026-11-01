@@ -8,6 +8,12 @@ import {
   Radar,
   ResponsiveContainer,
   Legend,
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip as ChartTooltip,
 } from "recharts";
 import {
   Users,
@@ -2924,6 +2930,75 @@ function formatSelfEvalTime(createdAt) {
   });
 }
 
+// One goal's self-evaluations over time. Points are evenly spaced in the
+// order they were submitted (not to scale in time) so close-together dates
+// stay readable, and each carries its date underneath and its value above;
+// hovering/tapping a point also shows the exact time. `entries` is oldest first.
+function SelfEvalChart({ entries }) {
+  const data = entries.map((e, i) => ({ i, progress: e.progress, createdAt: e.createdAt }));
+  const shortDate = (i) => {
+    const dt = new Date(entries[i] ? entries[i].createdAt : NaN);
+    if (isNaN(dt.getTime())) return "";
+    return dt.toLocaleDateString("da-DK", { day: "numeric", month: "short", year: "2-digit" });
+  };
+  return (
+    <div style={{ width: "100%", height: 170, marginTop: 8 }}>
+      <ResponsiveContainer width="100%" height="100%">
+        <LineChart data={data} margin={{ top: 20, right: 16, bottom: 0, left: 0 }}>
+          <CartesianGrid stroke="#EEEBE3" vertical={false} />
+          <XAxis
+            dataKey="i"
+            interval={0}
+            padding={{ left: 18, right: 18 }}
+            tickFormatter={shortDate}
+            tick={{ fontSize: 11, fill: "#6B6B6B" }}
+            tickLine={false}
+            axisLine={{ stroke: "#D9D4C7" }}
+          />
+          <YAxis
+            domain={[0, 10]}
+            ticks={[0, 5, 10]}
+            width={28}
+            tick={{ fontSize: 11, fill: "#6B6B6B" }}
+            tickLine={false}
+            axisLine={false}
+          />
+          <ChartTooltip
+            isAnimationActive={false}
+            cursor={{ stroke: "#D9D4C7" }}
+            content={({ active, payload }) =>
+              active && payload && payload.length ? (
+                <div
+                  style={{
+                    background: "#FFFFFF",
+                    border: "1px solid #D9D4C7",
+                    borderRadius: 8,
+                    padding: "6px 10px",
+                    fontSize: 12,
+                  }}
+                >
+                  <div style={{ color: "#6B6B6B" }}>{formatSelfEvalTime(payload[0].payload.createdAt)}</div>
+                  <div style={{ fontWeight: 700 }}>{payload[0].payload.progress}/10</div>
+                </div>
+              ) : null
+            }
+          />
+          <Line
+            type="linear"
+            dataKey="progress"
+            stroke="#1A1A1A"
+            strokeWidth={2}
+            dot={{ r: 4, fill: "#1A1A1A", stroke: "#FFFFFF", strokeWidth: 1.5 }}
+            activeDot={{ r: 6 }}
+            isAnimationActive={false}
+            label={{ position: "top", fontSize: 12, fontWeight: 700, fill: "#1A1A1A" }}
+          />
+        </LineChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
+
 // Everything the player has answered through her self-evaluation link, per
 // goal and per period (newest period and newest answer first). The log is
 // append-only on the server (goal_progress_log), so this is the whole
@@ -3005,40 +3080,7 @@ function SelfEvalHistory({ config, goals, periods }) {
                     {log.length === 0 ? (
                       <div style={{ ...styles.subtext, marginTop: 6 }}>Ingen selvevaluering indsendt endnu.</div>
                     ) : (
-                      <div style={{ marginTop: 8 }}>
-                        {log.map((entry, i) => {
-                          const prev = log[i + 1];
-                          const delta = prev ? entry.progress - prev.progress : null;
-                          return (
-                            <div
-                              key={`${entry.createdAt}-${i}`}
-                              style={{ display: "flex", alignItems: "center", gap: 10, padding: "3px 0", flexWrap: "wrap" }}
-                            >
-                              <span style={{ fontSize: 12, color: "#6B6B6B", flex: "0 0 190px" }}>
-                                {formatSelfEvalTime(entry.createdAt)}
-                                {i === 0 ? " · seneste" : ""}
-                              </span>
-                              {/* Bar, value and change stay together: on a phone they drop under the date as one line. */}
-                              <div style={{ flex: "1 1 150px", display: "flex", alignItems: "center", gap: 10, maxWidth: 320 }}>
-                                <div style={{ flex: 1, minWidth: 60, height: 8, background: "#EEEBE3", borderRadius: 4 }}>
-                                  <div
-                                    style={{
-                                      width: `${(entry.progress / 10) * 100}%`,
-                                      height: "100%",
-                                      background: i === 0 ? "#1A1A1A" : "#8A8A8A",
-                                      borderRadius: 4,
-                                    }}
-                                  />
-                                </div>
-                                <span style={{ fontSize: 13, fontWeight: 700, minWidth: 44 }}>{entry.progress}/10</span>
-                                <span style={{ fontSize: 12, minWidth: 20, color: delta > 0 ? "#4D7B4D" : "#B3261E" }}>
-                                  {delta !== null && delta !== 0 ? `${delta > 0 ? "+" : ""}${delta}` : ""}
-                                </span>
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
+                      <SelfEvalChart entries={goal.progressLog} />
                     )}
                     {currentDiffers && (
                       <div style={{ ...styles.subtext, marginTop: 6, fontSize: 12 }}>
