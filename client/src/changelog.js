@@ -11,7 +11,7 @@ export const CHANGELOG = [
     items: [
       {
         kind: "nyt",
-        text: "Kampscore: klik på en spiller for at se udviklingen fra kamp til kamp. Der er en graf for kampscoren (din 1-5 vurdering) og for hver af de fem statistikker: pasningsfuldførelse, high intensity runs, km dækket, driblinger og taklinger. Datoen står under hvert punkt, og modstander og række ses ved at pege på punktet. Mangler en statistik fra en kamp, vises der ikke et nul, og datoen udelades i den graf.",
+        text: "Kampscore: sæt kryds ved en eller flere spillere for at se udviklingen fra kamp til kamp. Der er en graf for kampscoren (din 1-5 vurdering) og for hver af de fem statistikker: pasningsfuldførelse, high intensity runs, km dækket, driblinger og taklinger. Vælger du flere spillere, tegnes de i hver sin farve, så de kan sammenlignes. Datoen står under hvert punkt, og modstander og række ses ved at pege på punktet. Mangler en statistik fra en kamp, vises der ikke et nul, og datoen udelades i den graf. Knappen Luk lukker detaljerne igen, og Vis kun valgte begrænser tabellen til de valgte spillere.",
       },
       {
         kind: "nyt",
