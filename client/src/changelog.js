@@ -10,6 +10,10 @@ export const CHANGELOG = [
     date: "2026-11-01",
     items: [
       {
+        kind: "forbedret",
+        text: "Kampscoren i graferne under Kampscore er nu vægtet efter kampens række (Division ×1,2, Liga 1 ×1, Liga 2 ×0,8), ligesom gennemsnittet i tabellen. Skalaen går derfor fra 0 til 6.",
+      },
+      {
         kind: "nyt",
         text: "Kampscore: klik på en spiller for at se udviklingen fra kamp til kamp. Der er en graf for kampscoren (din 1-5 vurdering) og for hver af de fem statistikker: pasningsfuldførelse, high intensity runs, km dækket, driblinger og taklinger. I rullemenuen Vælg spillere kan du sætte flere spillere ved, og de tegnes i hver sin farve, så de kan sammenlignes. Datoen står under hvert punkt, og modstander og række ses ved at pege på punktet. Mangler en statistik fra en kamp, vises der ikke et nul, og datoen udelades i den graf. Knappen Luk ved siden af lukker detaljerne igen, og Vis kun valgte begrænser tabellen til de valgte spillere.",
       },

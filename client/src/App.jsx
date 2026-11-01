@@ -8523,7 +8523,7 @@ const KAMP_COMPARE_MAX = KAMP_COMPARE_COLORS.length;
 // value for that match (plus opponent and level).
 // series: [{ id, name, color }]; points (oldest first):
 // { i, label, date, opponent, division, [`v_${id}`]: number | null }.
-function MatchTrendChart({ title, unit = "", decimals = 0, domain, ticks, points, series }) {
+function MatchTrendChart({ title, unit = "", decimals = 0, domain, ticks, points, series, weighted = false }) {
   const fmt = (v) => `${v.toFixed(decimals).replace(".", ",")}${unit}`;
   const single = series.length === 1;
   const own = single ? points.map((pt) => pt[`v_${series[0].id}`]).filter((v) => typeof v === "number") : [];
@@ -8607,6 +8607,11 @@ function MatchTrendChart({ title, unit = "", decimals = 0, domain, ticks, points
                         {pt.opponent ? ` · ${pt.opponent}` : ""}
                         {pt.division ? ` · ${pt.division}` : ""}
                       </div>
+                      {weighted && (
+                        <div style={{ color: "#6B6B6B", marginBottom: 2 }}>
+                          Vægtet ×{String(pt.weight ?? 1).replace(".", ",")}
+                        </div>
+                      )}
                       {rows.map((s) => (
                         <div key={s.id} style={{ display: "flex", alignItems: "center", gap: 6, fontWeight: 700 }}>
                           <span style={{ width: 8, height: 8, borderRadius: 4, background: s.color, display: "inline-block" }} />
@@ -8653,7 +8658,8 @@ function MatchTrendChart({ title, unit = "", decimals = 0, domain, ticks, points
 // The measures Kampscore tracks per match: the coach's rating plus the same
 // five tracking stats the table shows as averages.
 const KAMP_TREND_CHARTS = [
-  { key: "score", title: "Kampscore (1-5)", domain: [1, 5], ticks: [1, 2, 3, 4, 5] },
+  // Weighted by the match's række, like the table's average, so 0-6 not 1-5.
+  { key: "score", title: "Kampscore (vægtet)", domain: [0, 6], ticks: [0, 1, 2, 3, 4, 5, 6], decimals: 1, weighted: true },
   { key: "passSuccessPct", title: "Pasningsfuldførelse", unit: "%", domain: [0, 100], ticks: [0, 50, 100] },
   { key: "highIntensityRuns", title: "High intensity runs" },
   { key: "distanceKm", title: "Km dækket", unit: " km", decimals: 1 },
@@ -8824,6 +8830,7 @@ function KampPerformanceView({ players }) {
   plans.forEach((pl) => {
     planById[pl.id] = pl;
   });
+  const divisionWeight = (division) => KAMPPLAN_DIVISION_WEIGHTS[division] ?? 1;
   const matchesFor = (playerId) => {
     const byId = {};
     ((statsById[playerId] && statsById[playerId].matches) || []).forEach((m) => {
@@ -8835,7 +8842,7 @@ function KampPerformanceView({ players }) {
         division: plan ? plan.division : "",
         score:
           plan && typeof (plan.performanceScores || {})[playerId] === "number"
-            ? plan.performanceScores[playerId]
+            ? plan.performanceScores[playerId] * divisionWeight(plan.division)
             : null,
         passSuccessPct: m.passSuccessPct,
         highIntensityRuns: m.highIntensityRuns,
@@ -8849,7 +8856,13 @@ function KampPerformanceView({ players }) {
     plans.forEach((pl) => {
       const score = (pl.performanceScores || {})[playerId];
       if (typeof score === "number" && !byId[pl.id]) {
-        byId[pl.id] = { id: pl.id, date: pl.date, opponent: pl.opponent, division: pl.division, score };
+        byId[pl.id] = {
+          id: pl.id,
+          date: pl.date,
+          opponent: pl.opponent,
+          division: pl.division,
+          score: score * divisionWeight(pl.division),
+        };
       }
     });
     return Object.values(byId);
@@ -8918,6 +8931,7 @@ function KampPerformanceView({ players }) {
         date: x.m.date,
         opponent: x.m.opponent,
         division: x.m.division,
+        weight: divisionWeight(x.m.division),
         ...x.vals,
       }));
 
@@ -9097,8 +9111,9 @@ function KampPerformanceView({ players }) {
           )}
           <p style={{ ...styles.subtext, margin: "0 0 12px" }}>
             {allMatches.length} kamp{allMatches.length === 1 ? "" : "e"} med score eller statistik. Punkterne står i den
-            rækkefølge, kampene blev spillet, med datoen under. Mangler en spiller en værdi i en kamp, springes den over
-            i hendes linje.
+            rækkefølge, kampene blev spillet, med datoen under. Kampscoren er vægtet efter kampens række (Division ×1,2,
+            Liga 1 ×1, Liga 2 ×0,8), ligesom gennemsnittet i tabellen. Mangler en spiller en værdi i en kamp,
+            springes den over i hendes linje.
           </p>
           {statsPending > 0 && <p style={styles.subtext}>Indlæser…</p>}
           {statsError && <div style={styles.errorBannerRow}>Kunne ikke hente en spillers statistik.</div>}
@@ -9129,6 +9144,7 @@ function KampPerformanceView({ players }) {
                     domain={c.domain}
                     ticks={c.ticks}
                     series={series}
+                    weighted={Boolean(c.weighted)}
                     points={chartPoints(c.key)}
                   />
                 ))}
