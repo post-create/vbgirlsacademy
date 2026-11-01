@@ -8527,7 +8527,17 @@ const KAMP_COMPARE_MAX = KAMP_COMPARE_COLORS.length;
 
 // A dropdown button with a checkbox list (optionally searchable) that stays
 // open while ticking. options: [{ value, label, color? }].
-function MultiSelectDropdown({ buttonText, options, selected, onToggle, onClear, searchable = false, minWidth = 190 }) {
+function MultiSelectDropdown({
+  buttonText,
+  options,
+  selected,
+  onToggle,
+  onClear,
+  clearLabel = "Ryd valg",
+  alwaysShowClear = false,
+  searchable = false,
+  minWidth = 190,
+}) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const ref = React.useRef(null);
@@ -8625,9 +8635,9 @@ function MultiSelectDropdown({ buttonText, options, selected, onToggle, onClear,
             })}
             {shown.length === 0 && <div style={{ ...styles.subtext, padding: 6 }}>Ingen</div>}
           </div>
-          {onClear && selected.length > 0 && (
+          {onClear && (alwaysShowClear || selected.length > 0) && (
             <button style={{ ...styles.linkBtn, marginTop: 6 }} onClick={onClear}>
-              Ryd valg
+              {clearLabel}
             </button>
           )}
         </div>
@@ -8810,17 +8820,34 @@ function PlayerStatsView({ players, config, withFilters = false }) {
   const [statsSummary, setStatsSummary] = useState({});
   const [statsById, setStatsById] = useState({}); // playerId -> { matches }
   const [sortMode, setSortMode] = useState("avg");
-  // Players in the details panel, in the order they were picked (decides colour).
-  const [selectedIds, setSelectedIds] = useState([]);
+  // Players picked by hand for the details panel, in pick order (decides the
+  // colour). null = nobody picked: on Statistik the charts then follow the
+  // filters (everyone they leave in the table); on Kampscore there are none.
+  const [manualIds, setManualIds] = useState(null);
   const [onlySelected, setOnlySelected] = useState(false);
-  const [limitHint, setLimitHint] = useState(false);
-  // "each" = one line per player, "avg" = one line averaging them per match.
-  const [chartMode, setChartMode] = useState("each");
+  // "each" = one line per player, "avg" = one line averaging them per match,
+  // "auto" = one line per player while there are few enough, else the average.
+  const [chartMode, setChartMode] = useState("auto");
   // Statistik filters (empty = no restriction).
   const [filterPlayers, setFilterPlayers] = useState([]);
   const [filterPositions, setFilterPositions] = useState([]);
   const [filterLevels, setFilterLevels] = useState([]);
+  // Statistik: which charts to draw, and this coach's saved setups.
+  const [visibleCharts, setVisibleCharts] = useState(KAMP_TREND_CHARTS.map((c) => c.key));
+  const [savedViews, setSavedViews] = useState([]);
+  const [appliedViewId, setAppliedViewId] = useState("");
+  const [saveNameOpen, setSaveNameOpen] = useState(false);
+  const [saveName, setSaveName] = useState("");
+  const [viewsMessage, setViewsMessage] = useState("");
   const panelRef = React.useRef(null);
+
+  useEffect(() => {
+    if (!withFilters) return;
+    api
+      .getStatisticsViews()
+      .then(setSavedViews)
+      .catch(() => setViewsMessage("Kunne ikke hente dine gemte opsætninger."));
+  }, [withFilters]);
 
   useEffect(() => {
     (async () => {
@@ -8852,43 +8879,6 @@ function PlayerStatsView({ players, config, withFilters = false }) {
     setTimeout(() => {
       if (panelRef.current) panelRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
     }, 50);
-  const cap = chartMode === "avg" ? Infinity : KAMP_COMPARE_MAX;
-
-  const toggleSelected = (playerId) => {
-    if (selectedIds.includes(playerId)) {
-      setLimitHint(false);
-      setSelectedIds(selectedIds.filter((id) => id !== playerId));
-      return;
-    }
-    if (selectedIds.length >= cap) {
-      setLimitHint(true);
-      return;
-    }
-    setLimitHint(false);
-    setSelectedIds([...selectedIds, playerId]);
-  };
-  const closePanel = () => {
-    setSelectedIds([]);
-    setOnlySelected(false);
-    setLimitHint(false);
-    setChartMode("each");
-  };
-  // A click on a table row opens the details for just that player; more
-  // players are added from the dropdown inside the panel.
-  const openPlayer = (playerId) => {
-    setLimitHint(false);
-    setSelectedIds([playerId]);
-    scrollToPanel();
-  };
-  const changeMode = (mode) => {
-    setChartMode(mode);
-    setLimitHint(false);
-    // Back to one line per player: keep as many as the palette has colours for.
-    if (mode === "each" && selectedIds.length > KAMP_COMPARE_MAX) {
-      setSelectedIds(selectedIds.slice(0, KAMP_COMPARE_MAX));
-      setLimitHint(true);
-    }
-  };
 
   const gamesByPlayer = {};
   plans.forEach((p) => {
@@ -8948,12 +8938,20 @@ function PlayerStatsView({ players, config, withFilters = false }) {
       filterPositions.includes(pl.primaryPosition) ||
       filterPositions.includes(pl.secondaryPosition)) &&
     (filterLevels.length === 0 || filterLevels.includes(pl.participationLevelId || KAMP_UNSET_LEVEL));
-  const toggleIn = (list, setList) => (value) =>
+  // Changing a filter hands the charts back to the filters (drops any hand-picked players).
+  const toggleIn = (list, setList) => (value) => {
     setList(list.includes(value) ? list.filter((v) => v !== value) : [...list, value]);
+    setManualIds(null);
+  };
+  const clearList = (setList) => () => {
+    setList([]);
+    setManualIds(null);
+  };
   const resetFilters = () => {
     setFilterPlayers([]);
     setFilterPositions([]);
     setFilterLevels([]);
+    setManualIds(null);
   };
   const playerOptions = [...players]
     .sort((a, b) => a.name.localeCompare(b.name, "da"))
@@ -8967,6 +8965,117 @@ function PlayerStatsView({ players, config, withFilters = false }) {
     if (selected.length === 0) return `${label}: alle`;
     if (selected.length === 1) return `${label}: ${(options.find((o) => o.value === selected[0]) || {}).label || ""}`;
     return `${label}: ${selected.length} valgt`;
+  };
+
+  const sortedRows =
+    sortMode === "avg"
+      ? [...rows].sort((a, b) => (b.avg ?? -Infinity) - (a.avg ?? -Infinity))
+      : [...rows].sort((a, b) => a.player.name.localeCompare(b.player.name, "da"));
+  const filteredRows = withFilters ? sortedRows.filter((r) => passesFilters(r.player)) : sortedRows;
+
+  // ---- who is in the charts
+  // Hand-picked players win; otherwise, on Statistik, everyone the filters
+  // leave in the table is charted automatically (nothing until a filter is set).
+  const autoIds = withFilters && filtersActive ? filteredRows.map((r) => r.player.id) : [];
+  const selectedIds = manualIds ?? autoIds;
+  const effectiveMode =
+    chartMode === "auto" ? (selectedIds.length > KAMP_COMPARE_MAX ? "avg" : "each") : chartMode;
+  // One line per player is limited to the palette; the rest still count in the table.
+  const chartIds = effectiveMode === "each" ? selectedIds.slice(0, KAMP_COMPARE_MAX) : selectedIds;
+  const truncated = effectiveMode === "each" && selectedIds.length > KAMP_COMPARE_MAX;
+
+  const toggleSelected = (playerId) =>
+    setManualIds(
+      selectedIds.includes(playerId) ? selectedIds.filter((id) => id !== playerId) : [...selectedIds, playerId]
+    );
+  // Luk closes the panel and keeps it closed until the filters change or
+  // "Vis udvikling for de viste" is pressed.
+  const closePanel = () => {
+    setManualIds([]);
+    setOnlySelected(false);
+  };
+  // A click on a table row opens the details for just that player; more
+  // players are added from the dropdown inside the panel.
+  const openPlayer = (playerId) => {
+    setManualIds([playerId]);
+    scrollToPanel();
+  };
+  // Open the details for everyone the table is showing right now.
+  const showShown = () => {
+    const ids = filteredRows.map((r) => r.player.id);
+    if (ids.length === 0) return;
+    setManualIds(ids);
+    setChartMode("auto");
+    scrollToPanel();
+  };
+
+  // ---- Statistik: which charts, and saved setups
+  const chartOptions = KAMP_TREND_CHARTS.map((c) => ({ value: c.key, label: c.title }));
+  const toggleChart = (key) =>
+    setVisibleCharts(
+      visibleCharts.includes(key) ? visibleCharts.filter((k) => k !== key) : KAMP_TREND_CHARTS.map((c) => c.key).filter((k) => k === key || visibleCharts.includes(k))
+    );
+  const shownCharts = withFilters ? KAMP_TREND_CHARTS.filter((c) => visibleCharts.includes(c.key)) : KAMP_TREND_CHARTS;
+  const appliedView = savedViews.find((v) => v.id === appliedViewId) || null;
+  const currentConfig = () => ({
+    filterPlayers,
+    filterPositions,
+    filterLevels,
+    charts: visibleCharts,
+    chartMode,
+    sortMode,
+    selectedIds: manualIds,
+  });
+  // Saved setups can mention players/levels/charts that no longer exist; drop those.
+  const applyView = (id) => {
+    setAppliedViewId(id);
+    setViewsMessage("");
+    const v = savedViews.find((x) => x.id === id);
+    if (!v) return;
+    const c = v.config || {};
+    const playerIds = new Set(players.map((pl) => pl.id));
+    const levelIds = new Set([...levels.map((l) => l.id), KAMP_UNSET_LEVEL]);
+    const positionIds = new Set(POSITION_CATALOG.map((pos) => pos.id));
+    const chartKeys = KAMP_TREND_CHARTS.map((ch) => ch.key);
+    setFilterPlayers((c.filterPlayers || []).filter((x) => playerIds.has(x)));
+    setFilterPositions((c.filterPositions || []).filter((x) => positionIds.has(x)));
+    setFilterLevels((c.filterLevels || []).filter((x) => levelIds.has(x)));
+    const charts = (c.charts || []).filter((k) => chartKeys.includes(k));
+    setVisibleCharts(charts.length ? charts : chartKeys);
+    setChartMode(c.chartMode || "auto");
+    setSortMode(c.sortMode || "avg");
+    setManualIds(Array.isArray(c.selectedIds) ? c.selectedIds.filter((x) => playerIds.has(x)) : null);
+    setOnlySelected(false);
+  };
+  const saveView = async () => {
+    const name = saveName.trim();
+    if (!name) {
+      setViewsMessage("Skriv et navn til opsætningen.");
+      return;
+    }
+    try {
+      const saved = await api.saveStatisticsView({ name, config: currentConfig() });
+      setSavedViews((list) =>
+        [...list.filter((v) => v.id !== saved.id), saved].sort((a, b) => a.name.localeCompare(b.name, "da"))
+      );
+      setAppliedViewId(saved.id);
+      setSaveNameOpen(false);
+      setViewsMessage(`Gemt som "${saved.name}".`);
+    } catch (e) {
+      setViewsMessage(e.message || "Kunne ikke gemme opsætningen.");
+    }
+  };
+  const deleteView = async () => {
+    if (!appliedView) return;
+    if (!window.confirm(`Slet opsætningen "${appliedView.name}"?`)) return;
+    try {
+      await api.deleteStatisticsView(appliedView.id);
+      setSavedViews((list) => list.filter((v) => v.id !== appliedView.id));
+      setAppliedViewId("");
+      setViewsMessage("Opsætningen er slettet.");
+    } catch (e) {
+      setViewsMessage("Kunne ikke slette opsætningen.");
+    }
   };
 
   // ---- per-match data for the charts
@@ -9027,7 +9136,7 @@ function PlayerStatsView({ players, config, withFilters = false }) {
     return v;
   };
 
-  const compare = selectedIds
+  const compare = chartIds
     .map((id, idx) => ({
       id,
       player: players.find((pl) => pl.id === id),
@@ -9035,7 +9144,7 @@ function PlayerStatsView({ players, config, withFilters = false }) {
     }))
     .filter((c) => c.player)
     .map((c) => ({ ...c, matches: matchesFor(c.id) }));
-  const averaging = chartMode === "avg" && compare.length > 0;
+  const averaging = effectiveMode === "avg" && compare.length > 0;
   const series = averaging
     ? [{ id: "avg", name: `Gennemsnit (${compare.length} spillere)`, color: "#1A1A1A" }]
     : compare.map((c) => ({ id: c.id, name: c.player.name, color: c.color }));
@@ -9093,11 +9202,6 @@ function PlayerStatsView({ players, config, withFilters = false }) {
         ...x.vals,
       }));
 
-  const sortedRows =
-    sortMode === "avg"
-      ? [...rows].sort((a, b) => (b.avg ?? -Infinity) - (a.avg ?? -Infinity))
-      : [...rows].sort((a, b) => a.player.name.localeCompare(b.player.name, "da"));
-  const filteredRows = withFilters ? sortedRows.filter((r) => passesFilters(r.player)) : sortedRows;
   const visibleRows =
     onlySelected && selectedIds.length > 0
       ? filteredRows.filter((r) => selectedIds.includes(r.player.id))
@@ -9113,22 +9217,6 @@ function PlayerStatsView({ players, config, withFilters = false }) {
       const idx = selectedIds.indexOf(o.value);
       return { ...o, color: idx >= 0 && !averaging ? KAMP_COMPARE_COLORS[idx % KAMP_COMPARE_COLORS.length] : undefined };
     });
-
-  // Open the details for everyone the table is showing right now.
-  const showShown = () => {
-    const ids = visibleRows.map((r) => r.player.id);
-    if (ids.length === 0) return;
-    if (ids.length > KAMP_COMPARE_MAX) {
-      setChartMode("avg");
-      setSelectedIds(ids);
-      setLimitHint(false);
-    } else {
-      setChartMode(ids.length > 1 ? chartMode : "each");
-      setSelectedIds(ids);
-      setLimitHint(false);
-    }
-    scrollToPanel();
-  };
 
   const title = withFilters ? "Statistik" : "Kampscore";
   const colCount = withFilters ? 9 : 7;
@@ -9159,7 +9247,7 @@ function PlayerStatsView({ players, config, withFilters = false }) {
               options={playerOptions}
               selected={filterPlayers}
               onToggle={toggleIn(filterPlayers, setFilterPlayers)}
-              onClear={() => setFilterPlayers([])}
+              onClear={clearList(setFilterPlayers)}
               searchable
             />
             <MultiSelectDropdown
@@ -9167,7 +9255,7 @@ function PlayerStatsView({ players, config, withFilters = false }) {
               options={positionOptions}
               selected={filterPositions}
               onToggle={toggleIn(filterPositions, setFilterPositions)}
-              onClear={() => setFilterPositions([])}
+              onClear={clearList(setFilterPositions)}
               minWidth={170}
             />
             <MultiSelectDropdown
@@ -9175,7 +9263,7 @@ function PlayerStatsView({ players, config, withFilters = false }) {
               options={levelOptions}
               selected={filterLevels}
               onToggle={toggleIn(filterLevels, setFilterLevels)}
-              onClear={() => setFilterLevels([])}
+              onClear={clearList(setFilterLevels)}
               minWidth={200}
             />
             {filtersActive && (
@@ -9184,9 +9272,83 @@ function PlayerStatsView({ players, config, withFilters = false }) {
               </button>
             )}
           </div>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginTop: 10 }}>
+            <span style={{ ...styles.fieldLabel, margin: 0 }}>Grafer</span>
+            <MultiSelectDropdown
+              buttonText={
+                visibleCharts.length === KAMP_TREND_CHARTS.length
+                  ? "Grafer: alle"
+                  : `Grafer: ${visibleCharts.length} af ${KAMP_TREND_CHARTS.length}`
+              }
+              options={chartOptions}
+              selected={visibleCharts}
+              onToggle={toggleChart}
+              onClear={() => setVisibleCharts(KAMP_TREND_CHARTS.map((c) => c.key))}
+              clearLabel="Vis alle grafer"
+              alwaysShowClear
+              minWidth={190}
+            />
+          </div>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginTop: 10 }}>
+            <span style={{ ...styles.fieldLabel, margin: 0 }}>Opsætning</span>
+            <select
+              style={{ ...styles.select, width: "auto", minWidth: 200 }}
+              value={appliedViewId}
+              onChange={(e) => applyView(e.target.value)}
+              aria-label="Gemte opsætninger"
+            >
+              <option value="">{savedViews.length ? "Vælg en gemt opsætning…" : "Ingen gemte opsætninger"}</option>
+              {savedViews.map((v) => (
+                <option key={v.id} value={v.id}>
+                  {v.name}
+                </option>
+              ))}
+            </select>
+            {saveNameOpen ? (
+              <>
+                <input
+                  style={{ ...styles.input, width: 200 }}
+                  placeholder="Navn på opsætning"
+                  value={saveName}
+                  maxLength={60}
+                  autoFocus
+                  onChange={(e) => setSaveName(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") saveView();
+                    if (e.key === "Escape") setSaveNameOpen(false);
+                  }}
+                />
+                <button style={styles.primaryBtnSm} onClick={saveView}>
+                  Gem
+                </button>
+                <button style={{ ...styles.ghostBtn, padding: "8px 14px", fontSize: 13 }} onClick={() => setSaveNameOpen(false)}>
+                  Annuller
+                </button>
+              </>
+            ) : (
+              <>
+                <button
+                  style={styles.teamFilterChip}
+                  onClick={() => {
+                    setSaveName(appliedView ? appliedView.name : "");
+                    setSaveNameOpen(true);
+                    setViewsMessage("");
+                  }}
+                >
+                  Gem opsætning
+                </button>
+                {appliedView && (
+                  <button style={{ ...styles.linkBtn, color: "#E2231A" }} onClick={deleteView}>
+                    <X size={12} /> Slet "{appliedView.name}"
+                  </button>
+                )}
+              </>
+            )}
+            {viewsMessage && <span style={{ ...styles.subtext, fontSize: 12 }}>{viewsMessage}</span>}
+          </div>
           <p style={{ ...styles.subtext, margin: "8px 0 0", fontSize: 12 }}>
             {filteredRows.length} af {rows.length} spillere vises. En spiller tæller med på en position, hvis det er
-            hendes primære eller sekundære position.
+            hendes primære eller sekundære position. De viste spillere tegnes automatisk i graferne.
           </p>
         </div>
       )}
@@ -9256,8 +9418,8 @@ function PlayerStatsView({ players, config, withFilters = false }) {
               ].map((m) => (
                 <button
                   key={m.key}
-                  style={{ ...styles.teamFilterChip, ...(chartMode === m.key ? styles.teamFilterChipActive : {}) }}
-                  onClick={() => changeMode(m.key)}
+                  style={{ ...styles.teamFilterChip, ...(effectiveMode === m.key ? styles.teamFilterChipActive : {}) }}
+                  onClick={() => setChartMode(m.key)}
                 >
                   {m.label}
                 </button>
@@ -9292,11 +9454,10 @@ function PlayerStatsView({ players, config, withFilters = false }) {
               ))}
             </div>
           )}
-          {limitHint && (
+          {truncated && (
             <p style={{ ...styles.subtext, color: "#7A4B00", margin: "0 0 8px" }}>
-              {withFilters
-                ? `Med én linje pr. spiller kan du højst vise ${KAMP_COMPARE_MAX} spillere. Skift til Gennemsnit for flere.`
-                : `Du kan sammenligne op til ${KAMP_COMPARE_MAX} spillere ad gangen. Fjern en, før du tilføjer en ny.`}
+              Med én linje pr. spiller vises de første {KAMP_COMPARE_MAX} af {selectedIds.length} spillere. Skift til
+              Gennemsnit for at få alle med.
             </p>
           )}
           <p style={{ ...styles.subtext, margin: averaging ? "10px 0 12px" : "0 0 12px" }}>
@@ -9322,9 +9483,11 @@ function PlayerStatsView({ players, config, withFilters = false }) {
             <p style={styles.noSkills}>
               Ingen kampe med score eller statistik for {selectedIds.length === 1 ? "denne spiller" : "de valgte spillere"} endnu.
             </p>
+          ) : shownCharts.length === 0 ? (
+            <p style={styles.noSkills}>Ingen grafer er valgt. Vælg dem under Grafer ovenfor.</p>
           ) : (
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(300px, 100%), 1fr))", gap: 12 }}>
-              {KAMP_TREND_CHARTS.map((c) => (
+              {shownCharts.map((c) => (
                 <MatchTrendChart
                   key={c.key}
                   title={c.title}

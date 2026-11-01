@@ -582,3 +582,16 @@ alter table players add column if not exists active boolean not null default tru
 -- keyed by player name like player_goals. Kept apart from player_goals so
 -- the goal stays a plain string everywhere that already reads it.
 alter table match_plans add column if not exists player_goal_notes jsonb not null default '{}';
+
+-- A coach's saved setups for the Statistik page (which filters are on, which
+-- charts are shown, ...), by name. config holds only what the page itself
+-- writes (see server/routes/statisticsViews.js); saving under an existing
+-- name replaces it, hence the unique index on the lowercased name.
+create table if not exists statistics_views (
+  id text primary key,
+  coach_id text not null references coaches(id) on delete cascade,
+  name text not null,
+  config jsonb not null default '{}',
+  created_at timestamptz not null default now()
+);
+create unique index if not exists idx_statistics_views_coach_name on statistics_views (coach_id, (lower(name)));

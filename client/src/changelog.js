@@ -10,6 +10,10 @@ export const CHANGELOG = [
     date: "2026-11-01",
     items: [
       {
+        kind: "forbedret",
+        text: "Statistik: de spillere, filtrene viser, tegnes nu automatisk i graferne uden at du skal klikke først. Under Grafer vælger du, hvilke af de seks grafer der skal vises, og med Gem opsætning kan du gemme dine filtre og grafvalg under et navn. Dine gemte opsætninger ligger på din egen bruger og kan hentes igen fra en rullemenu, også på andre enheder.",
+      },
+      {
         kind: "nyt",
         text: "Nyt menupunkt Statistik. Det virker som Kampscore, men har filtre til at vælge spillere, position og udviklingstrin (Trin 1-3). Tabellen viser også hver spillers position og trin. Med knappen Vis udvikling for de viste kan du se gruppens udvikling kamp for kamp, enten med en linje pr. spiller (op til 8) eller som et gennemsnit af hele gruppen.",
       },

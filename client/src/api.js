@@ -303,6 +303,18 @@ export function deleteDevelopmentPlan(playerId) {
   return request("DELETE", `/api/development-plans/${playerId}`);
 }
 
+export function getStatisticsViews() {
+  return request("GET", "/api/statistics-views");
+}
+
+export function saveStatisticsView({ name, config }) {
+  return request("POST", "/api/statistics-views", { name, config });
+}
+
+export function deleteStatisticsView(id) {
+  return request("DELETE", `/api/statistics-views/${id}`);
+}
+
 export function getFormations() {
   return request("GET", "/api/formations");
 }
