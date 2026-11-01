@@ -11,6 +11,10 @@ export const CHANGELOG = [
     items: [
       {
         kind: "nyt",
+        text: "Kampscore: klik på en spiller for at se udviklingen fra kamp til kamp. Der er en graf for kampscoren (din 1-5 vurdering) og for hver af de fem statistikker: pasningsfuldførelse, high intensity runs, km dækket, driblinger og taklinger. Datoen står under hvert punkt, og modstander og række ses ved at pege på punktet.",
+      },
+      {
+        kind: "nyt",
         text: "Versionshistorik under Indstillinger, så du kan se, hvad der er tilføjet og ændret.",
       },
       {

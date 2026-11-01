@@ -8511,6 +8511,127 @@ function KampplanList({ planIndex, onNew, onEdit, onCopy, onDelete, onPrint }) {
   );
 }
 
+// One measure for one player across the matches she has data for, as a line
+// from match to match. Points are evenly spaced in match order (not to scale
+// in time) so matches close together stay readable; the date is under each
+// point and the value above it, and hovering/tapping shows opponent and level.
+// `points` is oldest first: { i, label, value (number | null), date, opponent, division }.
+function MatchTrendChart({ title, unit = "", decimals = 0, domain, ticks, points }) {
+  const fmt = (v) => `${v.toFixed(decimals).replace(".", ",")}${unit}`;
+  const withValue = points.filter((pt) => typeof pt.value === "number");
+  const last = withValue[withValue.length - 1];
+  const prev = withValue[withValue.length - 2];
+  const delta = last && prev ? last.value - prev.value : null;
+  return (
+    <div
+      style={{
+        background: "#FFFFFF",
+        border: "1px solid #E3E3E3",
+        borderRadius: 12,
+        padding: "12px 12px 8px",
+        minWidth: 0,
+      }}
+    >
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 8, flexWrap: "wrap" }}>
+        <span style={{ fontFamily: "'Oswald', sans-serif", fontSize: 15, letterSpacing: 0.3 }}>{title}</span>
+        {last ? (
+          <span style={{ fontSize: 12, color: "#4A4A4A" }}>
+            Seneste: <strong>{fmt(last.value)}</strong>
+            {delta !== null && delta !== 0 && (
+              <span style={{ color: delta > 0 ? "#4D7B4D" : "#B3261E", marginLeft: 6 }}>
+                {delta > 0 ? "▲" : "▼"} {Math.abs(delta).toFixed(decimals).replace(".", ",")}
+                {unit.trim() === "%" ? " %-point" : ""}
+              </span>
+            )}
+          </span>
+        ) : (
+          <span style={{ fontSize: 12, color: "#8A8A8A" }}>Ingen data</span>
+        )}
+      </div>
+      <div style={{ width: "100%", height: 150, marginTop: 6 }}>
+        <ResponsiveContainer width="100%" height="100%">
+          <LineChart data={points} margin={{ top: 18, right: 14, bottom: 0, left: 0 }}>
+            <CartesianGrid stroke="#EEEBE3" vertical={false} />
+            <XAxis
+              dataKey="i"
+              interval={points.length > 6 ? "preserveStartEnd" : 0}
+              tickFormatter={(i) => (points[i] ? points[i].label : "")}
+              padding={{ left: 14, right: 14 }}
+              tick={{ fontSize: 10, fill: "#6B6B6B" }}
+              tickLine={false}
+              axisLine={{ stroke: "#D9D4C7" }}
+            />
+            <YAxis
+              domain={domain || [0, "auto"]}
+              ticks={ticks}
+              allowDecimals={decimals > 0}
+              width={34}
+              tick={{ fontSize: 10, fill: "#6B6B6B" }}
+              tickLine={false}
+              axisLine={false}
+            />
+            <ChartTooltip
+              isAnimationActive={false}
+              cursor={{ stroke: "#D9D4C7" }}
+              content={({ active, payload }) => {
+                if (!active || !payload || !payload.length) return null;
+                const pt = payload[0].payload;
+                if (typeof pt.value !== "number") return null;
+                return (
+                  <div
+                    style={{
+                      background: "#FFFFFF",
+                      border: "1px solid #D9D4C7",
+                      borderRadius: 8,
+                      padding: "6px 10px",
+                      fontSize: 12,
+                    }}
+                  >
+                    <div style={{ fontWeight: 700 }}>{fmt(pt.value)}</div>
+                    <div style={{ color: "#6B6B6B" }}>
+                      {formatDate(pt.date)}
+                      {pt.opponent ? ` · ${pt.opponent}` : ""}
+                    </div>
+                    {pt.division && <div style={{ color: "#6B6B6B" }}>{pt.division}</div>}
+                  </div>
+                );
+              }}
+            />
+            <Line
+              type="linear"
+              dataKey="value"
+              connectNulls
+              stroke="#1A1A1A"
+              strokeWidth={2}
+              dot={{ r: 4, fill: "#1A1A1A", stroke: "#FFFFFF", strokeWidth: 1.5 }}
+              activeDot={{ r: 6 }}
+              isAnimationActive={false}
+              label={{
+                position: "top",
+                fontSize: 11,
+                fontWeight: 700,
+                fill: "#1A1A1A",
+                formatter: (v) => (typeof v === "number" ? fmt(v) : ""),
+              }}
+            />
+          </LineChart>
+        </ResponsiveContainer>
+      </div>
+    </div>
+  );
+}
+
+// The measures Kampscore tracks per match: the coach's rating plus the same
+// five tracking stats the table shows as averages.
+const KAMP_TREND_CHARTS = [
+  { key: "score", title: "Kampscore (1-5)", domain: [1, 5], ticks: [1, 2, 3, 4, 5] },
+  { key: "passSuccessPct", title: "Pasningsfuldførelse", unit: "%", domain: [0, 100], ticks: [0, 50, 100] },
+  { key: "highIntensityRuns", title: "High intensity runs" },
+  { key: "distanceKm", title: "Km dækket", unit: " km", decimals: 1 },
+  { key: "dribbles", title: "Driblinger" },
+  { key: "tackles", title: "Taklinger" },
+];
+
 // Aggregates every match plan's per-player performance score (1-5, entered
 // on Kampplan after each game) plus their average tracking stats (from
 // match_stats — see server/routes/matchPlans.js's /stats-summary) into one
@@ -8522,6 +8643,44 @@ function KampPerformanceView({ players }) {
   const [plans, setPlans] = useState([]);
   const [statsSummary, setStatsSummary] = useState({});
   const [sortMode, setSortMode] = useState("avg");
+  // The player whose match-by-match development is open (null = none).
+  const [trendPlayerId, setTrendPlayerId] = useState(null);
+  const [trendStats, setTrendStats] = useState(null); // { matches } from /players/:id/stats
+  const [trendLoading, setTrendLoading] = useState(false);
+  const [trendError, setTrendError] = useState(false);
+  const trendPanelRef = React.useRef(null);
+
+  useEffect(() => {
+    if (!trendPlayerId) {
+      setTrendStats(null);
+      return undefined;
+    }
+    let cancelled = false;
+    setTrendLoading(true);
+    setTrendError(false);
+    api
+      .getPlayerStats(trendPlayerId)
+      .then((r) => {
+        if (!cancelled) setTrendStats(r);
+      })
+      .catch(() => {
+        if (!cancelled) setTrendError(true);
+      })
+      .finally(() => {
+        if (!cancelled) setTrendLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [trendPlayerId]);
+
+  const openTrend = (playerId) => {
+    setTrendPlayerId(playerId);
+    // After the panel has rendered above the table, bring it into view.
+    setTimeout(() => {
+      if (trendPanelRef.current) trendPanelRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 50);
+  };
 
   useEffect(() => {
     (async () => {
@@ -8584,6 +8743,46 @@ function KampPerformanceView({ players }) {
     };
   });
 
+  // One entry per match the selected player has a rating and/or tracking
+  // stats for, oldest first.
+  const trendPlayer = players.find((pl) => pl.id === trendPlayerId) || null;
+  const trendMatches = (() => {
+    if (!trendPlayerId) return [];
+    const planById = {};
+    plans.forEach((pl) => {
+      planById[pl.id] = pl;
+    });
+    const byId = {};
+    ((trendStats && trendStats.matches) || []).forEach((m) => {
+      const plan = planById[m.matchPlanId];
+      byId[m.matchPlanId] = {
+        id: m.matchPlanId,
+        date: m.matchDate,
+        opponent: m.opponent,
+        division: plan ? plan.division : "",
+        score: plan && typeof (plan.performanceScores || {})[trendPlayerId] === "number" ? plan.performanceScores[trendPlayerId] : null,
+        passSuccessPct: m.passSuccessPct,
+        highIntensityRuns: m.highIntensityRuns,
+        distanceKm: m.distanceKm,
+        dribbles: m.dribbles,
+        tackles: m.tackles,
+      };
+    });
+    plans.forEach((pl) => {
+      const score = (pl.performanceScores || {})[trendPlayerId];
+      if (typeof score === "number" && !byId[pl.id]) {
+        byId[pl.id] = { id: pl.id, date: pl.date, opponent: pl.opponent, division: pl.division, score };
+      }
+    });
+    return Object.values(byId).sort((a, b) => String(a.date).localeCompare(String(b.date)));
+  })();
+  const trendSpansYears = new Set(trendMatches.map((m) => String(m.date).slice(0, 4))).size > 1;
+  const trendLabel = (iso) => {
+    const dt = new Date(`${iso}T00:00:00`);
+    if (isNaN(dt.getTime())) return String(iso);
+    return dt.toLocaleDateString("da-DK", trendSpansYears ? { day: "numeric", month: "short", year: "2-digit" } : { day: "numeric", month: "short" });
+  };
+
   const sortedRows =
     sortMode === "avg"
       ? [...rows].sort((a, b) => (b.avg ?? -Infinity) - (a.avg ?? -Infinity))
@@ -8598,7 +8797,7 @@ function KampPerformanceView({ players }) {
             Spillernes kampindsats over tid, bedømt 1-5 efter hver kamp på Kampplan, sammen med
             gennemsnitlig sporingsstatistik fra kampene. Kampscoren vægtes efter kampens række
             (Division ×1,2, Liga 1 ×1, Liga 2 ×0,8). Bruges til at vurdere hvem der reelt præsterer
-            bedst lige nu.
+            bedst lige nu. Klik på en spiller for at se udviklingen fra kamp til kamp.
           </p>
         </div>
       </div>
@@ -8621,6 +8820,61 @@ function KampPerformanceView({ players }) {
       {loading && <p style={styles.subtext}>Indlæser…</p>}
       {error && <div style={styles.errorBannerRow}>Kunne ikke hente kampplaner.</div>}
 
+      {!loading && !error && trendPlayerId && (
+        <div ref={trendPanelRef} style={{ ...styles.categoryBlock, scrollMarginTop: 110 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 4 }}>
+            <span style={styles.categoryLabel}>Udvikling kamp for kamp</span>
+            <select
+              style={{ ...styles.select, width: "auto", minWidth: 200 }}
+              value={trendPlayerId}
+              onChange={(e) => setTrendPlayerId(e.target.value)}
+            >
+              {[...players]
+                .sort((a, b) => a.name.localeCompare(b.name, "da"))
+                .map((pl) => (
+                  <option key={pl.id} value={pl.id}>
+                    {pl.name}
+                  </option>
+                ))}
+            </select>
+            <button style={styles.iconBtnGhost} onClick={() => setTrendPlayerId(null)} title="Luk">
+              <X size={16} />
+            </button>
+          </div>
+          <p style={{ ...styles.subtext, margin: "0 0 12px" }}>
+            {trendPlayer ? trendPlayer.name : ""} — {trendMatches.length} kamp{trendMatches.length === 1 ? "" : "e"} med score
+            eller statistik. Punkterne står i den rækkefølge, kampene blev spillet, med datoen under.
+          </p>
+          {trendLoading && <p style={styles.subtext}>Indlæser…</p>}
+          {trendError && <div style={styles.errorBannerRow}>Kunne ikke hente spillerens statistik.</div>}
+          {!trendLoading && !trendError && trendMatches.length === 0 && (
+            <p style={styles.noSkills}>Ingen kampe med score eller statistik for denne spiller endnu.</p>
+          )}
+          {!trendLoading && !trendError && trendMatches.length > 0 && (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(300px, 100%), 1fr))", gap: 12 }}>
+              {KAMP_TREND_CHARTS.map((c) => (
+                <MatchTrendChart
+                  key={c.key}
+                  title={c.title}
+                  unit={c.unit}
+                  decimals={c.decimals || 0}
+                  domain={c.domain}
+                  ticks={c.ticks}
+                  points={trendMatches.map((m, i) => ({
+                    i,
+                    label: trendLabel(m.date),
+                    value: m[c.key] == null || m[c.key] === "" || isNaN(Number(m[c.key])) ? null : Number(m[c.key]),
+                    date: m.date,
+                    opponent: m.opponent,
+                    division: m.division,
+                  }))}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
       {!loading && !error && (
         <div style={{ ...styles.categoryBlock, padding: 0, overflowX: "auto" }}>
           <table style={styles.kpsTable}>
@@ -8637,7 +8891,16 @@ function KampPerformanceView({ players }) {
             </thead>
             <tbody>
               {sortedRows.map(({ player, gameCount, levelBreakdown, avg, stats }) => (
-                <tr key={player.id} style={styles.kpsRow}>
+                <tr
+                  key={player.id}
+                  style={{
+                    ...styles.kpsRow,
+                    cursor: "pointer",
+                    ...(trendPlayerId === player.id ? { background: "#F6F3EC" } : {}),
+                  }}
+                  onClick={() => openTrend(player.id)}
+                  title="Vis udviklingen kamp for kamp"
+                >
                   <td style={styles.kpsTd}>
                     <div style={{ fontWeight: 600 }}>{player.name}</div>
                     <div style={{ fontSize: 12, color: "#8A8A8A" }}>
