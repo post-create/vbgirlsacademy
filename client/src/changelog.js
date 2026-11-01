@@ -15,7 +15,7 @@ export const CHANGELOG = [
       },
       {
         kind: "nyt",
-        text: "På spillerens side vises alle spillerens selvevalueringer som en graf for hvert mål og hver periode, så udviklingen er let at se. Datoen står under hvert punkt, og det præcise tidspunkt ses ved at pege på punktet. Rettelser fra en træner står for sig.",
+        text: "På spillerens side vises alle spillerens selvevalueringer som en graf for hvert mål og hver periode, så udviklingen er let at se. Datoen står under hvert punkt, og det præcise tidspunkt ses ved at pege på punktet. Trænerens aktuelle vurdering af målet vises som en rød linje i grafen.",
       },
       {
         kind: "forbedret",

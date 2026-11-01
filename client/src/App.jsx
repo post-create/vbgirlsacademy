@@ -13,6 +13,7 @@ import {
   XAxis,
   YAxis,
   CartesianGrid,
+  ReferenceLine,
   Tooltip as ChartTooltip,
 } from "recharts";
 import {
@@ -2934,15 +2935,19 @@ function formatSelfEvalTime(createdAt) {
 // order they were submitted (not to scale in time) so close-together dates
 // stay readable, and each carries its date underneath and its value above;
 // hovering/tapping a point also shows the exact time. `entries` is oldest first.
-function SelfEvalChart({ entries }) {
+// `coachValue` (the goal's current progress, 0-10) is drawn as a red line
+// across the chart for the coach's current assessment.
+function SelfEvalChart({ entries, coachValue }) {
   const data = entries.map((e, i) => ({ i, progress: e.progress, createdAt: e.createdAt }));
   const shortDate = (i) => {
     const dt = new Date(entries[i] ? entries[i].createdAt : NaN);
     if (isNaN(dt.getTime())) return "";
     return dt.toLocaleDateString("da-DK", { day: "numeric", month: "short", year: "2-digit" });
   };
+  const hasCoach = typeof coachValue === "number";
   return (
-    <div style={{ width: "100%", height: 170, marginTop: 8 }}>
+    <div style={{ marginTop: 8 }}>
+    <div style={{ width: "100%", height: 170 }}>
       <ResponsiveContainer width="100%" height="100%">
         <LineChart data={data} margin={{ top: 20, right: 16, bottom: 0, left: 0 }}>
           <CartesianGrid stroke="#EEEBE3" vertical={false} />
@@ -2983,6 +2988,7 @@ function SelfEvalChart({ entries }) {
               ) : null
             }
           />
+          {hasCoach && <ReferenceLine y={coachValue} stroke="#E2231A" strokeWidth={2} ifOverflow="extendDomain" />}
           <Line
             type="linear"
             dataKey="progress"
@@ -2995,6 +3001,19 @@ function SelfEvalChart({ entries }) {
           />
         </LineChart>
       </ResponsiveContainer>
+    </div>
+    <div style={{ display: "flex", gap: 16, flexWrap: "wrap", fontSize: 12, color: "#4A4A4A", marginTop: 4 }}>
+      <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+        <span style={{ width: 16, height: 2, background: "#1A1A1A", display: "inline-block" }} />
+        Spillerens selvevaluering
+      </span>
+      {hasCoach && (
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+          <span style={{ width: 16, height: 2, background: "#E2231A", display: "inline-block" }} />
+          Trænerens aktuelle vurdering ({coachValue}/10)
+        </span>
+      )}
+    </div>
     </div>
   );
 }
@@ -3078,14 +3097,24 @@ function SelfEvalHistory({ config, goals, periods }) {
                       </div>
                     )}
                     {log.length === 0 ? (
-                      <div style={{ ...styles.subtext, marginTop: 6 }}>Ingen selvevaluering indsendt endnu.</div>
+                      <div style={{ ...styles.subtext, marginTop: 6 }}>
+                        Ingen selvevaluering indsendt endnu.
+                        {typeof goal.progress === "number" && (
+                          <span style={{ color: "#E2231A", fontWeight: 600 }}>
+                            {" "}
+                            Trænerens aktuelle vurdering: {goal.progress}/10
+                          </span>
+                        )}
+                      </div>
                     ) : (
-                      <SelfEvalChart entries={goal.progressLog} />
+                      <SelfEvalChart
+                        entries={goal.progressLog}
+                        coachValue={typeof goal.progress === "number" ? goal.progress : null}
+                      />
                     )}
-                    {currentDiffers && (
-                      <div style={{ ...styles.subtext, marginTop: 6, fontSize: 12 }}>
-                        Nuværende fremskridt i appen: {goal.progress}/10
-                        {last ? " (afviger fra seneste selvevaluering — rettet af en træner)" : " (sat af en træner)"}
+                    {currentDiffers && last && (
+                      <div style={{ ...styles.subtext, marginTop: 4, fontSize: 12 }}>
+                        Den røde linje afviger fra spillerens seneste selvevaluering ({last.progress}/10).
                       </div>
                     )}
                   </div>
