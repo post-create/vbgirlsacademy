@@ -9370,6 +9370,11 @@ function KampplanView({ data }) {
   );
 }
 
+// Width of the app's content column (header, menu bar, back bar and main all share it).
+// Wide enough to use a full-screen desktop browser without much scrolling; on a
+// phone the column simply fills the screen.
+const APP_MAX_WIDTH = 1280;
+
 const styles = {
   app: {
     minHeight: "100vh",
@@ -9439,7 +9444,7 @@ const styles = {
     borderBottom: "1px solid #E3E3E3",
   },
   headerTopRow: {
-    maxWidth: 900,
+    maxWidth: APP_MAX_WIDTH,
     margin: "0 auto",
     padding: "14px 20px",
     display: "flex",
@@ -9489,7 +9494,7 @@ const styles = {
     background: "#111111",
   },
   headerNavBarRow: {
-    maxWidth: 900,
+    maxWidth: APP_MAX_WIDTH,
     margin: "0 auto",
     padding: "8px 20px",
     display: "flex",
@@ -9555,7 +9560,7 @@ const styles = {
       "repeating-linear-gradient(90deg, #E2231A 0px, #E2231A 40px, #111111 40px, #111111 80px)",
   },
   main: {
-    maxWidth: 900,
+    maxWidth: APP_MAX_WIDTH,
     margin: "0 auto",
     padding: "28px 20px",
   },
@@ -9979,7 +9984,7 @@ const styles = {
     fontWeight: 600,
     fontSize: 14,
     cursor: "pointer",
-    maxWidth: 900,
+    maxWidth: APP_MAX_WIDTH,
     margin: "0 auto",
     padding: "10px 20px",
     boxSizing: "border-box",

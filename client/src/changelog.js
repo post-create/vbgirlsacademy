@@ -11,6 +11,10 @@ export const CHANGELOG = [
     items: [
       {
         kind: "forbedret",
+        text: "Appen bruger nu mere af bredden på en stor skærm (fx Chrome i fuld skærm), så der skal scrolles mindre. Der er fx plads til flere spillerkort ved siden af hinanden. På telefon og tablet er der ingen forskel.",
+      },
+      {
+        kind: "forbedret",
         text: "Kampscoren i graferne under Kampscore er nu vægtet efter kampens række (Division ×1,2, Liga 1 ×1, Liga 2 ×0,8), ligesom gennemsnittet i tabellen. Skalaen går derfor fra 0 til 6.",
       },
       {
