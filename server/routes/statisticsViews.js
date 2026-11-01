@@ -1,13 +1,16 @@
 const express = require("express");
 const crypto = require("crypto");
 const pool = require("../db");
+const { STAT_COLUMNS } = require("./matchStats");
 
 // Saved setups for the Statistik page (filters, which charts are shown, ...),
 // kept per coach so a coach's own setups follow them to any device and other
 // coaches' setups never show up in their list.
 const router = express.Router();
 
-const CHART_KEYS = new Set(["score", "passSuccessPct", "highIntensityRuns", "distanceKm", "dribbles", "tackles"]);
+// Keep in step with the chart keys in the client (KAMP_*_CHARTS in App.jsx):
+// "score" plus every tracked stat column (STAT_COLUMNS in matchStats.js).
+const CHART_KEYS = new Set(["score", ...STAT_COLUMNS]);
 const CHART_MODES = new Set(["auto", "each", "avg"]);
 const SORT_MODES = new Set(["avg", "alpha"]);
 

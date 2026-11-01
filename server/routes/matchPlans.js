@@ -1,6 +1,7 @@
 const express = require("express");
 const crypto = require("crypto");
 const pool = require("../db");
+const { STAT_COLUMNS, COLUMN_TO_DB } = require("./matchStats");
 
 const router = express.Router();
 
@@ -119,37 +120,35 @@ router.get("/stats-summary", async (req, res, next) => {
 // Registered before /:id like /stats-summary.
 router.get("/stats-matches", async (req, res, next) => {
   try {
+    // Every tracked stat column (see matchStats.js) plus, for each, the
+    // squad-wide maximum in that match. The column names come from that
+    // fixed list, never from the request.
+    const cols = STAT_COLUMNS.map((k) => COLUMN_TO_DB[k]);
     const { rows } = await pool.query(
       `select ms.player_id, ms.match_plan_id, to_char(mp.match_date, 'YYYY-MM-DD') as match_date, mp.opponent,
-              ms.pass_success_pct, ms.passes, ms.high_intensity_runs, ms.distance_km, ms.dribbles, ms.tackles,
-              max(ms.high_intensity_runs) over w as max_hir, max(ms.dribbles) over w as max_dribbles,
-              max(ms.tackles) over w as max_tackles, max(ms.distance_km) over w as max_distance_km,
-              max(ms.passes) over w as max_passes
+              ${cols.map((c) => `ms.${c}`).join(", ")},
+              ${cols.map((c) => `max(ms.${c}) over w as max_${c}`).join(", ")}
        from match_stats ms
        join match_plans mp on mp.id = ms.match_plan_id
        window w as (partition by ms.match_plan_id)
        order by mp.match_date`
     );
     res.json(
-      rows.map((r) => ({
-        playerId: r.player_id,
-        matchPlanId: r.match_plan_id,
-        matchDate: r.match_date,
-        opponent: r.opponent || "",
-        passSuccessPct: r.pass_success_pct,
-        passes: r.passes,
-        highIntensityRuns: r.high_intensity_runs,
-        distanceKm: r.distance_km,
-        dribbles: r.dribbles,
-        tackles: r.tackles,
-        teamMax: {
-          highIntensityRuns: r.max_hir,
-          dribbles: r.max_dribbles,
-          tackles: r.max_tackles,
-          distanceKm: r.max_distance_km == null ? null : Number(r.max_distance_km),
-          passes: r.max_passes,
-        },
-      }))
+      rows.map((r) => {
+        const out = {
+          playerId: r.player_id,
+          matchPlanId: r.match_plan_id,
+          matchDate: r.match_date,
+          opponent: r.opponent || "",
+          teamMax: {},
+        };
+        STAT_COLUMNS.forEach((k) => {
+          const c = COLUMN_TO_DB[k];
+          out[k] = r[c];
+          out.teamMax[k] = r[`max_${c}`] == null ? null : Number(r[`max_${c}`]);
+        });
+        return out;
+      })
     );
   } catch (err) {
     next(err);

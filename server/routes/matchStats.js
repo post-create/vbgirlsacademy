@@ -214,3 +214,6 @@ router.post("/commit", async (req, res, next) => {
 });
 
 module.exports = router;
+// Shared with the all-players stats feed in matchPlans.js (/stats-matches).
+module.exports.STAT_COLUMNS = STAT_COLUMNS;
+module.exports.COLUMN_TO_DB = COLUMN_TO_DB;

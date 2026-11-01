@@ -8607,30 +8607,43 @@ function MultiSelectDropdown({
             />
           )}
           <div role="listbox" aria-multiselectable="true" style={{ maxHeight: 280, overflowY: "auto" }}>
-            {shown.map((o) => {
+            {shown.map((o, i) => {
               const on = selected.includes(o.value);
+              const heading = o.group && (i === 0 || shown[i - 1].group !== o.group);
               return (
-                <label
-                  key={o.value}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 8,
-                    padding: "6px",
-                    borderRadius: 6,
-                    cursor: "pointer",
-                    fontSize: 14,
-                    background: on ? "#F6F3EC" : "transparent",
-                  }}
-                >
-                  <input
-                    type="checkbox"
-                    checked={on}
-                    onChange={() => onToggle(o.value)}
-                    style={on && o.color ? { accentColor: o.color } : undefined}
-                  />
-                  <span>{o.label}</span>
-                </label>
+                <React.Fragment key={o.value}>
+                  {heading && (
+                    <div
+                      style={{
+                        ...styles.fieldLabel,
+                        margin: "8px 0 2px 6px",
+                        fontSize: 11,
+                      }}
+                    >
+                      {o.group}
+                    </div>
+                  )}
+                  <label
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
+                      padding: "6px",
+                      borderRadius: 6,
+                      cursor: "pointer",
+                      fontSize: 14,
+                      background: on ? "#F6F3EC" : "transparent",
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={on}
+                      onChange={() => onToggle(o.value)}
+                      style={on && o.color ? { accentColor: o.color } : undefined}
+                    />
+                    <span>{o.label}</span>
+                  </label>
+                </React.Fragment>
               );
             })}
             {shown.length === 0 && <div style={{ ...styles.subtext, padding: 6 }}>Ingen</div>}
@@ -8802,6 +8815,56 @@ const KAMP_TREND_CHARTS = [
   { key: "tackles", title: "Taklinger" },
 ];
 
+// Every other tracked stat, offered under Grafer on Statistik (off until ticked).
+// Keys are the stat columns of the match statistics feed; "group" is the heading
+// they sit under in the dropdown. Counts are plain numbers, 0-1 stats (starter,
+// anfører, kampens spiller) just show as 0 or 1.
+const KAMP_EXTRA_CHARTS = [
+  { key: "minutes", title: "Minutter spillet", group: "Løb og fysik" },
+  { key: "avgSpeedKmh", title: "Gennemsnitsfart", unit: " km/t", decimals: 1, group: "Løb og fysik" },
+  { key: "topSpeedKmh", title: "Tophastighed", unit: " km/t", decimals: 1, group: "Løb og fysik" },
+  { key: "sprints", title: "Sprint", group: "Løb og fysik" },
+  { key: "passes", title: "Afleveringer", group: "Afleveringer" },
+  { key: "passesSuccessful", title: "Vellykkede afleveringer", group: "Afleveringer" },
+  { key: "passesUnsuccessful", title: "Mislykkede afleveringer", group: "Afleveringer" },
+  { key: "shots", title: "Skud", group: "Angreb" },
+  { key: "totalAttempts", title: "Afslutninger i alt", group: "Angreb" },
+  { key: "goals", title: "Mål", group: "Angreb" },
+  { key: "assists", title: "Assists", group: "Angreb" },
+  { key: "goalInvolvements", title: "Målinvolveringer", group: "Angreb" },
+  { key: "conversionRate", title: "Konverteringsrate", unit: "%", domain: [0, 100], ticks: [0, 50, 100], group: "Angreb" },
+  { key: "interceptions", title: "Opsnapninger", group: "Forsvar" },
+  { key: "looseBallRecoveries", title: "Generobringer af løs bold", group: "Forsvar" },
+  { key: "fouls", title: "Frispark begået", group: "Forsvar" },
+  { key: "saves", title: "Redninger", group: "Målmand" },
+  { key: "goalKicks", title: "Målspark", group: "Målmand" },
+  { key: "corners", title: "Hjørnespark", group: "Standardsituationer" },
+  { key: "freeKicks", title: "Frispark", group: "Standardsituationer" },
+  { key: "penaltyKicks", title: "Straffespark", group: "Standardsituationer" },
+  { key: "throwIns", title: "Indkast", group: "Standardsituationer" },
+  { key: "totalEvents", title: "Hændelser i alt", group: "Andet" },
+  { key: "starts", title: "Starter", group: "Andet" },
+  { key: "captaincies", title: "Anfører", group: "Andet" },
+  { key: "playerOfTheMatch", title: "Kampens spiller", group: "Andet" },
+];
+const KAMP_ALL_CHARTS = [
+  ...KAMP_TREND_CHARTS.map((c) => ({ ...c, group: "Standardgrafer" })),
+  ...KAMP_EXTRA_CHARTS,
+];
+const KAMP_DEFAULT_CHART_KEYS = KAMP_TREND_CHARTS.map((c) => c.key);
+const KAMP_ALL_CHART_KEYS = KAMP_ALL_CHARTS.map((c) => c.key);
+// The stat columns behind the charts (everything but the coach's rating).
+const KAMP_STAT_KEYS = KAMP_ALL_CHART_KEYS.filter((k) => k !== "score");
+
+// Stats where a 0 for the whole squad in a match is perfectly normal (a match
+// with no goals, no penalties, no keeper saves ...) — for these a squad-wide 0
+// is a real result. For every other stat a squad-wide 0 means the export
+// didn't record it, and the charts leave that match out instead.
+const KAMP_RARE_STATS = new Set([
+  "goals", "assists", "goalInvolvements", "penaltyKicks", "freeKicks", "corners", "saves",
+  "goalKicks", "captaincies", "playerOfTheMatch", "starts", "fouls",
+]);
+
 const KAMP_UNSET_LEVEL = "__unset";
 
 // Aggregates every match plan's per-player performance score (1-5, entered
@@ -8833,7 +8896,7 @@ function PlayerStatsView({ players, config, withFilters = false }) {
   const [filterPositions, setFilterPositions] = useState([]);
   const [filterLevels, setFilterLevels] = useState([]);
   // Statistik: which charts to draw, and this coach's saved setups.
-  const [visibleCharts, setVisibleCharts] = useState(KAMP_TREND_CHARTS.map((c) => c.key));
+  const [visibleCharts, setVisibleCharts] = useState(KAMP_DEFAULT_CHART_KEYS);
   const [savedViews, setSavedViews] = useState([]);
   const [appliedViewId, setAppliedViewId] = useState("");
   const [saveNameOpen, setSaveNameOpen] = useState(false);
@@ -9010,12 +9073,15 @@ function PlayerStatsView({ players, config, withFilters = false }) {
   };
 
   // ---- Statistik: which charts, and saved setups
-  const chartOptions = KAMP_TREND_CHARTS.map((c) => ({ value: c.key, label: c.title }));
+  const chartOptions = KAMP_ALL_CHARTS.map((c) => ({ value: c.key, label: c.title, group: c.group }));
+  // Keeps the charts in the dropdown's order, whatever order they were ticked in.
   const toggleChart = (key) =>
     setVisibleCharts(
-      visibleCharts.includes(key) ? visibleCharts.filter((k) => k !== key) : KAMP_TREND_CHARTS.map((c) => c.key).filter((k) => k === key || visibleCharts.includes(k))
+      visibleCharts.includes(key)
+        ? visibleCharts.filter((k) => k !== key)
+        : KAMP_ALL_CHART_KEYS.filter((k) => k === key || visibleCharts.includes(k))
     );
-  const shownCharts = withFilters ? KAMP_TREND_CHARTS.filter((c) => visibleCharts.includes(c.key)) : KAMP_TREND_CHARTS;
+  const shownCharts = withFilters ? KAMP_ALL_CHARTS.filter((c) => visibleCharts.includes(c.key)) : KAMP_TREND_CHARTS;
   const appliedView = savedViews.find((v) => v.id === appliedViewId) || null;
   const currentConfig = () => ({
     filterPlayers,
@@ -9036,12 +9102,12 @@ function PlayerStatsView({ players, config, withFilters = false }) {
     const playerIds = new Set(players.map((pl) => pl.id));
     const levelIds = new Set([...levels.map((l) => l.id), KAMP_UNSET_LEVEL]);
     const positionIds = new Set(POSITION_CATALOG.map((pos) => pos.id));
-    const chartKeys = KAMP_TREND_CHARTS.map((ch) => ch.key);
+    const chartKeys = KAMP_ALL_CHART_KEYS;
     setFilterPlayers((c.filterPlayers || []).filter((x) => playerIds.has(x)));
     setFilterPositions((c.filterPositions || []).filter((x) => positionIds.has(x)));
     setFilterLevels((c.filterLevels || []).filter((x) => levelIds.has(x)));
     const charts = (c.charts || []).filter((k) => chartKeys.includes(k));
-    setVisibleCharts(charts.length ? charts : chartKeys);
+    setVisibleCharts(charts.length ? chartKeys.filter((k) => charts.includes(k)) : KAMP_DEFAULT_CHART_KEYS);
     setChartMode(c.chartMode || "auto");
     setSortMode(c.sortMode || "avg");
     setManualIds(Array.isArray(c.selectedIds) ? c.selectedIds.filter((x) => playerIds.has(x)) : null);
@@ -9098,12 +9164,7 @@ function PlayerStatsView({ players, config, withFilters = false }) {
           plan && typeof (plan.performanceScores || {})[playerId] === "number"
             ? plan.performanceScores[playerId] * divisionWeight(plan.division)
             : null,
-        passSuccessPct: m.passSuccessPct,
-        highIntensityRuns: m.highIntensityRuns,
-        distanceKm: m.distanceKm,
-        dribbles: m.dribbles,
-        tackles: m.tackles,
-        passes: m.passes,
+        ...Object.fromEntries(KAMP_STAT_KEYS.map((k) => [k, m[k]])),
         teamMax: m.teamMax || {},
       };
     });
@@ -9130,9 +9191,11 @@ function PlayerStatsView({ players, config, withFilters = false }) {
     const raw = m[key];
     if (raw == null || raw === "" || isNaN(Number(raw))) return null;
     const v = Number(raw);
+    // A percentage with nothing behind it (no passes / no attempts) isn't 0%.
     if (key === "passSuccessPct") return Number(m.passes) > 0 ? v : null;
-    if (key === "distanceKm" && v === 0) return null;
-    if (key in (m.teamMax || {}) && v === 0 && Number(m.teamMax[key]) === 0) return null;
+    if (key === "conversionRate") return Number(m.totalAttempts) > 0 ? v : null;
+    if ((key === "distanceKm" || key === "minutes") && v === 0) return null;
+    if (v === 0 && !KAMP_RARE_STATS.has(key) && m.teamMax && Number(m.teamMax[key]) === 0) return null;
     return v;
   };
 
@@ -9275,17 +9338,14 @@ function PlayerStatsView({ players, config, withFilters = false }) {
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginTop: 10 }}>
             <span style={{ ...styles.fieldLabel, margin: 0 }}>Grafer</span>
             <MultiSelectDropdown
-              buttonText={
-                visibleCharts.length === KAMP_TREND_CHARTS.length
-                  ? "Grafer: alle"
-                  : `Grafer: ${visibleCharts.length} af ${KAMP_TREND_CHARTS.length}`
-              }
+              buttonText={`Grafer: ${visibleCharts.length} af ${KAMP_ALL_CHARTS.length}`}
               options={chartOptions}
               selected={visibleCharts}
               onToggle={toggleChart}
-              onClear={() => setVisibleCharts(KAMP_TREND_CHARTS.map((c) => c.key))}
-              clearLabel="Vis alle grafer"
+              onClear={() => setVisibleCharts(KAMP_DEFAULT_CHART_KEYS)}
+              clearLabel="Tilbage til standardgrafer"
               alwaysShowClear
+              searchable
               minWidth={190}
             />
           </div>

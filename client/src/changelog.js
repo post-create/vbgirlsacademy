@@ -10,6 +10,10 @@ export const CHANGELOG = [
     date: "2026-11-01",
     items: [
       {
+        kind: "nyt",
+        text: "Statistik: under Grafer kan du nu vælge mellem alle de tal, kampstatistikken indeholder, i alt 32 grafer, ordnet i grupper (løb og fysik, afleveringer, angreb, forsvar, målmand, standardsituationer m.m.) og med søgning. Fx tophastighed, sprint, skud, mål, assists, opsnapninger og hjørnespark. De seks kendte grafer er stadig dem, der vises som standard, og dine valg kan gemmes i en opsætning.",
+      },
+      {
         kind: "forbedret",
         text: "Statistik: de spillere, filtrene viser, tegnes nu automatisk i graferne uden at du skal klikke først. Under Grafer vælger du, hvilke af de seks grafer der skal vises, og med Gem opsætning kan du gemme dine filtre og grafvalg under et navn. Dine gemte opsætninger ligger på din egen bruger og kan hentes igen fra en rullemenu, også på andre enheder.",
       },
