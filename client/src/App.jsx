@@ -59,6 +59,7 @@ import {
   LogOut,
   Sparkles,
   Upload,
+  AlertTriangle,
 } from "lucide-react";
 import * as api from "./api.js";
 import { POSITION_CATALOG, formatPlayerPositions } from "./positions.js";
@@ -219,6 +220,30 @@ function getLatestSelfEval(data, playerId) {
     });
   });
   return latest;
+}
+
+// Goals, in the player's most recent period that has any, where the coach's
+// current value and the player's latest self-evaluation are more than 2
+// apart (on the 0-10 scale). Older periods are history, so they don't count.
+// A goal with no coach value or no self-evaluation has nothing to compare.
+const SELF_EVAL_GAP_LIMIT = 2;
+function getSelfEvalGaps(data, playerId) {
+  const byPeriod = data.goals[playerId] || {};
+  const withGoals = sortedPeriods(data.periods).filter((pd) => Object.keys(byPeriod[pd.id] || {}).length > 0);
+  const period = withGoals[withGoals.length - 1];
+  if (!period) return [];
+  const gaps = [];
+  Object.keys(byPeriod[period.id]).forEach((skillId) => {
+    const goal = byPeriod[period.id][skillId];
+    const log = goal.progressLog || [];
+    if (typeof goal.progress !== "number" || log.length === 0) return;
+    const player = log[log.length - 1].progress; // log is oldest first
+    if (Math.abs(goal.progress - player) > SELF_EVAL_GAP_LIMIT) {
+      const meta = findSkillMeta(data.config, skillId);
+      gaps.push({ name: meta ? meta.skill.name : "Mål", coach: goal.progress, player });
+    }
+  });
+  return gaps;
 }
 
 function getUrlToken() {
@@ -4084,7 +4109,8 @@ function RosterView({
     ).length;
     const level = levelById[p.participationLevelId] || null;
     const latestSelfEval = getLatestSelfEval(data, p.id);
-    return { player: p, scores, overall, goals, goalIds, goalsMet, latestPeriod, level, latestSelfEval };
+    const selfEvalGaps = getSelfEvalGaps(data, p.id);
+    return { player: p, scores, overall, goals, goalIds, goalsMet, latestPeriod, level, latestSelfEval, selfEvalGaps };
   });
 
   // Best score (or highest participation level) on top; players with no
@@ -4298,7 +4324,7 @@ function RosterView({
       )}
 
       <div style={styles.grid}>
-        {sortedPlayers.map(({ player: p, scores, overall, goals, goalIds, goalsMet, latestPeriod, level, latestSelfEval }) => {
+        {sortedPlayers.map(({ player: p, scores, overall, goals, goalIds, goalsMet, latestPeriod, level, latestSelfEval, selfEvalGaps }) => {
           const isSelected = selectedIds.includes(p.id);
           const inactive = p.active === false;
           const selectableDisabled = selectMode && (!p.email || inactive);
@@ -4396,6 +4422,32 @@ function RosterView({
                     )}`
                   : "Ingen selvevaluering endnu"}
               </div>
+              {selfEvalGaps.length > 0 && (
+                <div
+                  style={{
+                    marginTop: 10,
+                    padding: "6px 8px",
+                    borderRadius: 8,
+                    background: "#FFF1D6",
+                    border: "1px solid #E8C46A",
+                    color: "#7A4B00",
+                    fontSize: 12,
+                    lineHeight: 1.4,
+                  }}
+                  title="Trænerens vurdering og spillerens seneste selvevaluering er mere end 2 fra hinanden"
+                >
+                  <div style={{ display: "flex", alignItems: "center", gap: 5, fontWeight: 700 }}>
+                    <AlertTriangle size={12} />
+                    Vurderingerne afviger
+                  </div>
+                  {selfEvalGaps.slice(0, 2).map((g) => (
+                    <div key={g.name}>
+                      {g.name}: træner {g.coach} · spiller {g.player}
+                    </div>
+                  ))}
+                  {selfEvalGaps.length > 2 && <div>+{selfEvalGaps.length - 2} mere</div>}
+                </div>
+              )}
             </div>
           );
         })}

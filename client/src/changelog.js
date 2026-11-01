@@ -18,6 +18,10 @@ export const CHANGELOG = [
         text: "På spillerens side vises alle spillerens selvevalueringer som en graf for hvert mål og hver periode, så udviklingen er let at se. Datoen står under hvert punkt, og det præcise tidspunkt ses ved at pege på punktet. Trænerens aktuelle vurdering af målet vises som en rød linje i grafen.",
       },
       {
+        kind: "nyt",
+        text: "I Spillertrup markeres spillerens kort med en gul advarsel, når trænerens aktuelle vurdering af et mål og spillerens seneste selvevaluering er mere end 2 fra hinanden. Kortet viser, hvilke mål det gælder.",
+      },
+      {
         kind: "forbedret",
         text: "Tekstfelterne i kampplanen (fx Opbygningsspil, Målsætning for holdet og individuelle mål) vokser, så hele teksten kan ses uden at scrolle i feltet. Det virker på både pc og mobil.",
       },
