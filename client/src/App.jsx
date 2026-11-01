@@ -2908,6 +2908,151 @@ function ProgressTracker({ value, onChange, compact }) {
   );
 }
 
+function formatSelfEvalTime(createdAt) {
+  const dt = new Date(createdAt);
+  if (isNaN(dt.getTime())) return String(createdAt);
+  return dt.toLocaleString("da-DK", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+// Everything the player has answered through her self-evaluation link, per
+// goal and per period (newest period and newest answer first). The log is
+// append-only on the server (goal_progress_log), so this is the whole
+// history, not just the latest value that GoalsOverview's tracker shows.
+// goals.progress can also be set by a coach, which is not logged — so when
+// the current value differs from the last answer it's shown separately
+// rather than passed off as something the player said.
+function SelfEvalHistory({ config, goals, periods }) {
+  const [expanded, setExpanded] = useState(true);
+
+  const sections = [...periods]
+    .reverse()
+    .map((period) => {
+      const byPeriod = goals[period.id] || {};
+      const items = Object.keys(byPeriod)
+        .map((skillId) => ({ skillId, goal: byPeriod[skillId], meta: findSkillMeta(config, skillId) }))
+        .filter((x) => x.meta);
+      return { period, items };
+    })
+    .filter((sec) => sec.items.length > 0);
+
+  const total = sections.reduce(
+    (n, sec) => n + sec.items.reduce((m, it) => m + (it.goal.progressLog || []).length, 0),
+    0
+  );
+  if (sections.length === 0) return null;
+
+  return (
+    <div style={styles.categoryBlock}>
+      <div
+        className="category-head-row-collapsible"
+        style={styles.categoryHeadRow}
+        onClick={() => setExpanded((v) => !v)}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <button
+            type="button"
+            style={styles.iconBtnGhost}
+            onClick={(e) => {
+              e.stopPropagation();
+              setExpanded((v) => !v);
+            }}
+            title={expanded ? "Skjul" : "Vis"}
+          >
+            {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+          </button>
+          <span style={styles.categoryLabel}>Spillerens selvevalueringer</span>
+        </div>
+        <span style={styles.categoryAvg}>{total}</span>
+      </div>
+      {expanded && (
+        <div>
+          {total === 0 && (
+            <p style={styles.noSkills}>Spilleren har ikke indsendt nogen selvevaluering endnu.</p>
+          )}
+          {sections.map(({ period, items }) => (
+            <div key={period.id} style={{ marginTop: 14 }}>
+              <div style={{ ...styles.fieldLabel, marginBottom: 8 }}>{period.label}</div>
+              {items.map(({ skillId, goal, meta }) => {
+                const log = [...(goal.progressLog || [])].reverse(); // newest first
+                const last = log[0];
+                const currentDiffers =
+                  typeof goal.progress === "number" && (!last || last.progress !== goal.progress);
+                return (
+                  <div
+                    key={skillId}
+                    style={{ padding: "10px 0", borderTop: "1px solid #EEEBE3" }}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                      <div style={{ ...styles.dot, background: meta.category.accent }} />
+                      <span style={styles.skillName}>{meta.skill.name}</span>
+                      <span style={styles.goalOverviewCat}>Mål {goal.target}</span>
+                    </div>
+                    {goal.focusAreas && (
+                      <div style={{ ...styles.goalNote, marginTop: 4 }}>
+                        <strong>Fokusområder:</strong> {goal.focusAreas}
+                      </div>
+                    )}
+                    {log.length === 0 ? (
+                      <div style={{ ...styles.subtext, marginTop: 6 }}>Ingen selvevaluering indsendt endnu.</div>
+                    ) : (
+                      <div style={{ marginTop: 8 }}>
+                        {log.map((entry, i) => {
+                          const prev = log[i + 1];
+                          const delta = prev ? entry.progress - prev.progress : null;
+                          return (
+                            <div
+                              key={`${entry.createdAt}-${i}`}
+                              style={{ display: "flex", alignItems: "center", gap: 10, padding: "3px 0", flexWrap: "wrap" }}
+                            >
+                              <span style={{ fontSize: 12, color: "#6B6B6B", flex: "0 0 190px" }}>
+                                {formatSelfEvalTime(entry.createdAt)}
+                                {i === 0 ? " · seneste" : ""}
+                              </span>
+                              {/* Bar, value and change stay together: on a phone they drop under the date as one line. */}
+                              <div style={{ flex: "1 1 150px", display: "flex", alignItems: "center", gap: 10, maxWidth: 320 }}>
+                                <div style={{ flex: 1, minWidth: 60, height: 8, background: "#EEEBE3", borderRadius: 4 }}>
+                                  <div
+                                    style={{
+                                      width: `${(entry.progress / 10) * 100}%`,
+                                      height: "100%",
+                                      background: i === 0 ? "#1A1A1A" : "#8A8A8A",
+                                      borderRadius: 4,
+                                    }}
+                                  />
+                                </div>
+                                <span style={{ fontSize: 13, fontWeight: 700, minWidth: 44 }}>{entry.progress}/10</span>
+                                <span style={{ fontSize: 12, minWidth: 20, color: delta > 0 ? "#4D7B4D" : "#B3261E" }}>
+                                  {delta !== null && delta !== 0 ? `${delta > 0 ? "+" : ""}${delta}` : ""}
+                                </span>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                    {currentDiffers && (
+                      <div style={{ ...styles.subtext, marginTop: 6, fontSize: 12 }}>
+                        Nuværende fremskridt i appen: {goal.progress}/10
+                        {last ? " (afviger fra seneste selvevaluering — rettet af en træner)" : " (sat af en træner)"}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function getLatestFollowup(data, playerId) {
   const list = data.followups?.[playerId];
   if (!list || list.length === 0) return null;
@@ -4576,6 +4721,8 @@ function PlayerView({
           selectedPeriod && onSetGoalProgress(selectedPeriod.id, skillId, progress)
         }
       />
+
+      <SelfEvalHistory config={config} goals={goals} periods={periods} />
 
       <DevelopmentPlanCard player={player} plan={developmentPlan} onSave={onSaveDevelopmentPlan} />
 
