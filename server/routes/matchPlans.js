@@ -111,6 +111,51 @@ router.get("/stats-summary", async (req, res, next) => {
   }
 });
 
+// Every player's tracked stats for every match in one go — what the
+// Kampscore / Statistik charts draw from, so they don't need one request per
+// player. teamMax is the highest value anyone in the squad has for a stat in
+// that match: a stat the export didn't include is 0 for everyone, and the
+// charts read a squad-wide 0 as "not recorded" rather than a real zero.
+// Registered before /:id like /stats-summary.
+router.get("/stats-matches", async (req, res, next) => {
+  try {
+    const { rows } = await pool.query(
+      `select ms.player_id, ms.match_plan_id, to_char(mp.match_date, 'YYYY-MM-DD') as match_date, mp.opponent,
+              ms.pass_success_pct, ms.passes, ms.high_intensity_runs, ms.distance_km, ms.dribbles, ms.tackles,
+              max(ms.high_intensity_runs) over w as max_hir, max(ms.dribbles) over w as max_dribbles,
+              max(ms.tackles) over w as max_tackles, max(ms.distance_km) over w as max_distance_km,
+              max(ms.passes) over w as max_passes
+       from match_stats ms
+       join match_plans mp on mp.id = ms.match_plan_id
+       window w as (partition by ms.match_plan_id)
+       order by mp.match_date`
+    );
+    res.json(
+      rows.map((r) => ({
+        playerId: r.player_id,
+        matchPlanId: r.match_plan_id,
+        matchDate: r.match_date,
+        opponent: r.opponent || "",
+        passSuccessPct: r.pass_success_pct,
+        passes: r.passes,
+        highIntensityRuns: r.high_intensity_runs,
+        distanceKm: r.distance_km,
+        dribbles: r.dribbles,
+        tackles: r.tackles,
+        teamMax: {
+          highIntensityRuns: r.max_hir,
+          dribbles: r.max_dribbles,
+          tackles: r.max_tackles,
+          distanceKm: r.max_distance_km == null ? null : Number(r.max_distance_km),
+          passes: r.max_passes,
+        },
+      }))
+    );
+  } catch (err) {
+    next(err);
+  }
+});
+
 router.get("/:id", async (req, res, next) => {
   try {
     const { rows } = await pool.query(

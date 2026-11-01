@@ -10,6 +10,10 @@ export const CHANGELOG = [
     date: "2026-11-01",
     items: [
       {
+        kind: "nyt",
+        text: "Nyt menupunkt Statistik. Det virker som Kampscore, men har filtre til at vælge spillere, position og udviklingstrin (Trin 1-3). Tabellen viser også hver spillers position og trin. Med knappen Vis udvikling for de viste kan du se gruppens udvikling kamp for kamp, enten med en linje pr. spiller (op til 8) eller som et gennemsnit af hele gruppen.",
+      },
+      {
         kind: "forbedret",
         text: "Appen bruger nu mere af bredden på en stor skærm (fx Chrome i fuld skærm), så der skal scrolles mindre. Der er fx plads til flere spillerkort ved siden af hinanden. På telefon og tablet er der ingen forskel.",
       },

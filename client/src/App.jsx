@@ -443,6 +443,13 @@ const NAV_ITEMS = [
     select: (setView) => setView("kampScore"),
   },
   {
+    key: "statistik",
+    label: "Statistik",
+    icon: BarChart3,
+    isActive: (v) => v === "statistik",
+    select: (setView) => setView("statistik"),
+  },
+  {
     key: "positionOverview",
     label: "Positioner",
     icon: LayoutGrid,
@@ -1495,7 +1502,9 @@ export default function AcademyApp() {
 
         {view === "matchPlans" && <KampplanView data={activeData} />}
 
-        {view === "kampScore" && <KampPerformanceView players={activeData.players} />}
+        {view === "kampScore" && <PlayerStatsView players={activeData.players} config={activeData.config} />}
+
+        {view === "statistik" && <PlayerStatsView withFilters players={activeData.players} config={activeData.config} />}
 
         {view === "positionOverview" && <PositionOverviewView data={activeData} />}
 
@@ -6612,7 +6621,7 @@ const KP_EXTRAS_CATEGORIES = ["Preshøjde", "Hjørnespark højre", "Hjørnespark
 
 const KAMPPLAN_DIVISIONS = ["Division", "Liga 1", "Liga 2"];
 // How much a game's kampscore counts toward a player's weighted average
-// (see KampPerformanceView) — a higher level should count for more. Plans
+// (see PlayerStatsView) — a higher level should count for more. Plans
 // with no række set (or an older plan from before this field existed) fall
 // back to the neutral Liga 1 weight.
 const KAMPPLAN_DIVISION_WEIGHTS = { Division: 1.2, "Liga 1": 1, "Liga 2": 0.8 };
@@ -7614,7 +7623,7 @@ function KpStatsUpload({ planId, players }) {
 // Coach-entered 1-5 rating of how each player performed in this specific
 // match, keyed by player name (same convention as playerGoals). Screen-only —
 // deliberately never read by kpPrintPlan — used to build a per-player
-// performance-over-time report (KampPerformanceView) to help spot who's
+// performance-over-time report (PlayerStatsView) to help spot who's
 // ready to progress to the next level of training.
 // Same collapsed-by-default pattern as KpCategorySection — see that
 // component's comment. The count is ratings given so far (not roster size),
@@ -8516,13 +8525,124 @@ function KampplanList({ planIndex, onNew, onEdit, onCopy, onDelete, onPrint }) {
 const KAMP_COMPARE_COLORS = ["#1A1A1A", "#2D6CDF", "#E08A00", "#2E8B57", "#7B4FC9", "#D6457B", "#139AA0", "#8A6D3B"];
 const KAMP_COMPARE_MAX = KAMP_COMPARE_COLORS.length;
 
-// One measure across matches, one line per selected player. Points are evenly
-// spaced in match order (not to scale in time) so matches close together stay
-// readable, with the date under each point. With a single player the values
-// are printed above the points; with several, hover/tap shows everyone's
-// value for that match (plus opponent and level).
+// A dropdown button with a checkbox list (optionally searchable) that stays
+// open while ticking. options: [{ value, label, color? }].
+function MultiSelectDropdown({ buttonText, options, selected, onToggle, onClear, searchable = false, minWidth = 190 }) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const ref = React.useRef(null);
+
+  useEffect(() => {
+    if (!open) return undefined;
+    const onDown = (e) => {
+      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
+    };
+    const onKey = (e) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("pointerdown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("pointerdown", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  const shown = options.filter((o) => o.label.toLowerCase().includes(query.trim().toLowerCase()));
+  return (
+    <div ref={ref} style={{ position: "relative" }}>
+      <button
+        type="button"
+        style={{
+          ...styles.select,
+          width: "auto",
+          minWidth,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 10,
+          textAlign: "left",
+          cursor: "pointer",
+          ...(selected.length > 0 ? { borderColor: "#111111" } : {}),
+        }}
+        onClick={() => setOpen((v) => !v)}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+      >
+        <span>{buttonText}</span>
+        <ChevronDown size={14} />
+      </button>
+      {open && (
+        <div
+          style={{
+            position: "absolute",
+            left: 0,
+            top: "calc(100% + 4px)",
+            zIndex: 50,
+            width: 280,
+            maxWidth: "calc(100vw - 48px)",
+            background: "#FFFFFF",
+            border: "1px solid #D9D4C7",
+            borderRadius: 10,
+            boxShadow: "0 8px 24px rgba(0,0,0,0.15)",
+            padding: 8,
+          }}
+        >
+          {searchable && (
+            <input
+              style={{ ...styles.input, marginBottom: 6 }}
+              placeholder="Søg"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+            />
+          )}
+          <div role="listbox" aria-multiselectable="true" style={{ maxHeight: 280, overflowY: "auto" }}>
+            {shown.map((o) => {
+              const on = selected.includes(o.value);
+              return (
+                <label
+                  key={o.value}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    padding: "6px",
+                    borderRadius: 6,
+                    cursor: "pointer",
+                    fontSize: 14,
+                    background: on ? "#F6F3EC" : "transparent",
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={on}
+                    onChange={() => onToggle(o.value)}
+                    style={on && o.color ? { accentColor: o.color } : undefined}
+                  />
+                  <span>{o.label}</span>
+                </label>
+              );
+            })}
+            {shown.length === 0 && <div style={{ ...styles.subtext, padding: 6 }}>Ingen</div>}
+          </div>
+          {onClear && selected.length > 0 && (
+            <button style={{ ...styles.linkBtn, marginTop: 6 }} onClick={onClear}>
+              Ryd valg
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// One measure across matches, one line per series (a player, or the average of
+// a group). Points are evenly spaced in match order (not to scale in time) so
+// matches close together stay readable, with the date under each point. With a
+// single series the values are printed above the points; with several,
+// hover/tap shows everyone's value for that match (plus opponent and level).
 // series: [{ id, name, color }]; points (oldest first):
-// { i, label, date, opponent, division, [`v_${id}`]: number | null }.
+// { i, label, date, opponent, division, weight, [`v_${id}`]: number | null, [`n_${id}`]?: count }.
 function MatchTrendChart({ title, unit = "", decimals = 0, domain, ticks, points, series, weighted = false }) {
   const fmt = (v) => `${v.toFixed(decimals).replace(".", ",")}${unit}`;
   const single = series.length === 1;
@@ -8617,6 +8737,11 @@ function MatchTrendChart({ title, unit = "", decimals = 0, domain, ticks, points
                           <span style={{ width: 8, height: 8, borderRadius: 4, background: s.color, display: "inline-block" }} />
                           {!single && <span style={{ fontWeight: 500 }}>{s.name}</span>}
                           {fmt(pt[`v_${s.id}`])}
+                          {pt[`n_${s.id}`] != null && (
+                            <span style={{ fontWeight: 500, color: "#6B6B6B" }}>
+                              ({pt[`n_${s.id}`]} spiller{pt[`n_${s.id}`] === 1 ? "" : "e"})
+                            </span>
+                          )}
                         </div>
                       ))}
                     </div>
@@ -8655,8 +8780,8 @@ function MatchTrendChart({ title, unit = "", decimals = 0, domain, ticks, points
   );
 }
 
-// The measures Kampscore tracks per match: the coach's rating plus the same
-// five tracking stats the table shows as averages.
+// The measures the match statistics track per match: the coach's rating plus
+// the same five tracking stats the table shows as averages.
 const KAMP_TREND_CHARTS = [
   // Weighted by the match's række, like the table's average, so 0-6 not 1-5.
   { key: "score", title: "Kampscore (vægtet)", domain: [0, 6], ticks: [0, 1, 2, 3, 4, 5, 6], decimals: 1, weighted: true },
@@ -8667,113 +8792,53 @@ const KAMP_TREND_CHARTS = [
   { key: "tackles", title: "Taklinger" },
 ];
 
+const KAMP_UNSET_LEVEL = "__unset";
+
 // Aggregates every match plan's per-player performance score (1-5, entered
 // on Kampplan after each game) plus their average tracking stats (from
 // match_stats — see server/routes/matchPlans.js's /stats-summary) into one
 // row per player, to give a clear read on who's actually performing right
-// now rather than just who has the highest coach rating. Ticking one or more
-// players opens their match-by-match development (several = a comparison).
-function KampPerformanceView({ players }) {
+// now rather than just who has the highest coach rating. Clicking a player
+// opens their match-by-match development; the dropdown inside adds more
+// players for a comparison. Used for both Kampscore and Statistik — Statistik
+// (withFilters) adds filters on player, position and udviklingstrin, and a
+// "gennemsnit" view that averages the chosen players per match.
+function PlayerStatsView({ players, config, withFilters = false }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [plans, setPlans] = useState([]);
   const [statsSummary, setStatsSummary] = useState({});
+  const [statsById, setStatsById] = useState({}); // playerId -> { matches }
   const [sortMode, setSortMode] = useState("avg");
-  // Ticked players, in the order they were picked (decides their colour).
+  // Players in the details panel, in the order they were picked (decides colour).
   const [selectedIds, setSelectedIds] = useState([]);
   const [onlySelected, setOnlySelected] = useState(false);
   const [limitHint, setLimitHint] = useState(false);
-  const [statsById, setStatsById] = useState({}); // playerId -> { matches } from /players/:id/stats
-  const [statsPending, setStatsPending] = useState(0);
-  const [statsError, setStatsError] = useState(false);
-  const requestedRef = React.useRef(new Set());
+  // "each" = one line per player, "avg" = one line averaging them per match.
+  const [chartMode, setChartMode] = useState("each");
+  // Statistik filters (empty = no restriction).
+  const [filterPlayers, setFilterPlayers] = useState([]);
+  const [filterPositions, setFilterPositions] = useState([]);
+  const [filterLevels, setFilterLevels] = useState([]);
   const panelRef = React.useRef(null);
-  // The "Vælg spillere" dropdown inside the details panel.
-  const [pickerOpen, setPickerOpen] = useState(false);
-  const [pickerQuery, setPickerQuery] = useState("");
-  const pickerRef = React.useRef(null);
-
-  useEffect(() => {
-    if (!pickerOpen) return undefined;
-    const onDown = (e) => {
-      if (pickerRef.current && !pickerRef.current.contains(e.target)) setPickerOpen(false);
-    };
-    const onKey = (e) => {
-      if (e.key === "Escape") setPickerOpen(false);
-    };
-    document.addEventListener("pointerdown", onDown);
-    document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("pointerdown", onDown);
-      document.removeEventListener("keydown", onKey);
-    };
-  }, [pickerOpen]);
-
-  // Fetch each ticked player's per-match stats once; later ticks reuse it.
-  useEffect(() => {
-    selectedIds.forEach((id) => {
-      if (requestedRef.current.has(id)) return;
-      requestedRef.current.add(id);
-      setStatsPending((n) => n + 1);
-      api
-        .getPlayerStats(id)
-        .then((r) => setStatsById((m) => ({ ...m, [id]: r })))
-        .catch(() => {
-          requestedRef.current.delete(id); // allow a retry on the next tick
-          setStatsError(true);
-        })
-        .finally(() => setStatsPending((n) => n - 1));
-    });
-  }, [selectedIds]);
-
-  const toggleSelected = (playerId) => {
-    setStatsError(false);
-    if (selectedIds.includes(playerId)) {
-      setLimitHint(false);
-      setSelectedIds(selectedIds.filter((id) => id !== playerId));
-      return;
-    }
-    if (selectedIds.length >= KAMP_COMPARE_MAX) {
-      setLimitHint(true);
-      return;
-    }
-    setLimitHint(false);
-    setSelectedIds([...selectedIds, playerId]);
-    if (selectedIds.length === 0) {
-      // First pick: the panel appears above the table — bring it into view.
-      setTimeout(() => {
-        if (panelRef.current) panelRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
-      }, 50);
-    }
-  };
-  const closePanel = () => {
-    setSelectedIds([]);
-    setOnlySelected(false);
-    setLimitHint(false);
-    setPickerOpen(false);
-    setPickerQuery("");
-  };
-  // A click on a table row opens the details for just that player; more
-  // players are added from the dropdown inside the panel.
-  const openPlayer = (playerId) => {
-    setStatsError(false);
-    setLimitHint(false);
-    setSelectedIds([playerId]);
-    setTimeout(() => {
-      if (panelRef.current) panelRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
-    }, 50);
-  };
 
   useEffect(() => {
     (async () => {
       setLoading(true);
       try {
-        const [planList, summary] = await Promise.all([
+        const [planList, summary, matchRows] = await Promise.all([
           api.getMatchPlans(),
           api.getMatchStatsSummary(),
+          api.getMatchStatsByMatch(),
         ]);
+        const byPlayer = {};
+        matchRows.forEach((r) => {
+          if (!byPlayer[r.playerId]) byPlayer[r.playerId] = { matches: [] };
+          byPlayer[r.playerId].matches.push(r);
+        });
         setPlans(planList);
         setStatsSummary(summary);
+        setStatsById(byPlayer);
         setError(false);
       } catch (e) {
         setError(true);
@@ -8782,6 +8847,48 @@ function KampPerformanceView({ players }) {
       }
     })();
   }, []);
+
+  const scrollToPanel = () =>
+    setTimeout(() => {
+      if (panelRef.current) panelRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 50);
+  const cap = chartMode === "avg" ? Infinity : KAMP_COMPARE_MAX;
+
+  const toggleSelected = (playerId) => {
+    if (selectedIds.includes(playerId)) {
+      setLimitHint(false);
+      setSelectedIds(selectedIds.filter((id) => id !== playerId));
+      return;
+    }
+    if (selectedIds.length >= cap) {
+      setLimitHint(true);
+      return;
+    }
+    setLimitHint(false);
+    setSelectedIds([...selectedIds, playerId]);
+  };
+  const closePanel = () => {
+    setSelectedIds([]);
+    setOnlySelected(false);
+    setLimitHint(false);
+    setChartMode("each");
+  };
+  // A click on a table row opens the details for just that player; more
+  // players are added from the dropdown inside the panel.
+  const openPlayer = (playerId) => {
+    setLimitHint(false);
+    setSelectedIds([playerId]);
+    scrollToPanel();
+  };
+  const changeMode = (mode) => {
+    setChartMode(mode);
+    setLimitHint(false);
+    // Back to one line per player: keep as many as the palette has colours for.
+    if (mode === "each" && selectedIds.length > KAMP_COMPARE_MAX) {
+      setSelectedIds(selectedIds.slice(0, KAMP_COMPARE_MAX));
+      setLimitHint(true);
+    }
+  };
 
   const gamesByPlayer = {};
   plans.forEach((p) => {
@@ -8825,12 +8932,50 @@ function KampPerformanceView({ players }) {
     };
   });
 
-  // The matches one player has a rating and/or tracking stats for.
+  // ---- Statistik filters
+  const levels = [...((config && config.participationLevels) || [])].sort(
+    (a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0)
+  );
+  const levelName = (player) => {
+    const l = levels.find((x) => x.id === player.participationLevelId);
+    return l ? l.name : "";
+  };
+  const anyWithoutLevel = players.some((pl) => !pl.participationLevelId);
+  const filtersActive = filterPlayers.length + filterPositions.length + filterLevels.length > 0;
+  const passesFilters = (pl) =>
+    (filterPlayers.length === 0 || filterPlayers.includes(pl.id)) &&
+    (filterPositions.length === 0 ||
+      filterPositions.includes(pl.primaryPosition) ||
+      filterPositions.includes(pl.secondaryPosition)) &&
+    (filterLevels.length === 0 || filterLevels.includes(pl.participationLevelId || KAMP_UNSET_LEVEL));
+  const toggleIn = (list, setList) => (value) =>
+    setList(list.includes(value) ? list.filter((v) => v !== value) : [...list, value]);
+  const resetFilters = () => {
+    setFilterPlayers([]);
+    setFilterPositions([]);
+    setFilterLevels([]);
+  };
+  const playerOptions = [...players]
+    .sort((a, b) => a.name.localeCompare(b.name, "da"))
+    .map((pl) => ({ value: pl.id, label: pl.name }));
+  const positionOptions = POSITION_CATALOG.map((pos) => ({ value: pos.id, label: `${pos.id} · ${pos.label}` }));
+  const levelOptions = [
+    ...levels.map((l) => ({ value: l.id, label: l.name })),
+    ...(anyWithoutLevel ? [{ value: KAMP_UNSET_LEVEL, label: "Ikke angivet" }] : []),
+  ];
+  const filterText = (label, selected, options) => {
+    if (selected.length === 0) return `${label}: alle`;
+    if (selected.length === 1) return `${label}: ${(options.find((o) => o.value === selected[0]) || {}).label || ""}`;
+    return `${label}: ${selected.length} valgt`;
+  };
+
+  // ---- per-match data for the charts
   const planById = {};
   plans.forEach((pl) => {
     planById[pl.id] = pl;
   });
   const divisionWeight = (division) => KAMPPLAN_DIVISION_WEIGHTS[division] ?? 1;
+  // The matches one player has a rating and/or tracking stats for.
   const matchesFor = (playerId) => {
     const byId = {};
     ((statsById[playerId] && statsById[playerId].matches) || []).forEach((m) => {
@@ -8890,10 +9035,13 @@ function KampPerformanceView({ players }) {
     }))
     .filter((c) => c.player)
     .map((c) => ({ ...c, matches: matchesFor(c.id) }));
-  const series = compare.map((c) => ({ id: c.id, name: c.player.name, color: c.color }));
+  const averaging = chartMode === "avg" && compare.length > 0;
+  const series = averaging
+    ? [{ id: "avg", name: `Gennemsnit (${compare.length} spillere)`, color: "#1A1A1A" }]
+    : compare.map((c) => ({ id: c.id, name: c.player.name, color: c.color }));
 
-  // Every match any ticked player has data for, oldest first, so all the
-  // players' lines share one date axis.
+  // Every match any chosen player has data for, oldest first, so all lines
+  // share one date axis.
   const allMatchesById = {};
   compare.forEach((c) =>
     c.matches.forEach((m) => {
@@ -8912,19 +9060,29 @@ function KampPerformanceView({ players }) {
       spansYears ? { day: "numeric", month: "short", year: "2-digit" } : { day: "numeric", month: "short" }
     );
   };
-  // One chart's points: only the matches where at least one ticked player has
+  // One chart's points: only the matches where at least one chosen player has
   // a real value for that measure — a match with nothing is left out, not 0.
+  // In average mode each point is the mean of the players who have a value.
   const chartPoints = (key) =>
     allMatches
       .map((m) => {
-        const vals = {};
-        compare.forEach((c) => {
+        const perPlayer = compare.map((c) => {
           const pm = c.matches.find((x) => x.id === m.id);
-          vals[`v_${c.id}`] = pm ? trendValue(pm, key) : null;
+          return { id: c.id, value: pm ? trendValue(pm, key) : null };
         });
+        const vals = {};
+        if (averaging) {
+          const have = perPlayer.filter((x) => x.value !== null);
+          vals.v_avg = have.length ? have.reduce((sum, x) => sum + x.value, 0) / have.length : null;
+          vals.n_avg = have.length || null;
+        } else {
+          perPlayer.forEach((x) => {
+            vals[`v_${x.id}`] = x.value;
+          });
+        }
         return { m, vals };
       })
-      .filter((x) => Object.values(x.vals).some((v) => v !== null))
+      .filter((x) => Object.keys(x.vals).some((k) => k.startsWith("v_") && x.vals[k] !== null))
       .map((x, i) => ({
         i,
         label: matchLabel(x.m.date),
@@ -8939,28 +9097,99 @@ function KampPerformanceView({ players }) {
     sortMode === "avg"
       ? [...rows].sort((a, b) => (b.avg ?? -Infinity) - (a.avg ?? -Infinity))
       : [...rows].sort((a, b) => a.player.name.localeCompare(b.player.name, "da"));
-  const pickerPlayers = [...players]
-    .filter((pl) => pl.name.toLowerCase().includes(pickerQuery.trim().toLowerCase()))
-    .sort((a, b) => a.name.localeCompare(b.name, "da"));
+  const filteredRows = withFilters ? sortedRows.filter((r) => passesFilters(r.player)) : sortedRows;
   const visibleRows =
     onlySelected && selectedIds.length > 0
-      ? sortedRows.filter((r) => selectedIds.includes(r.player.id))
-      : sortedRows;
+      ? filteredRows.filter((r) => selectedIds.includes(r.player.id))
+      : filteredRows;
+  // The details dropdown offers the players that pass the filters (plus any
+  // already chosen, so nobody disappears from under the ticks).
+  const pickerOptions = playerOptions
+    .filter((o) => {
+      const pl = players.find((x) => x.id === o.value);
+      return selectedIds.includes(o.value) || !withFilters || (pl && passesFilters(pl));
+    })
+    .map((o) => {
+      const idx = selectedIds.indexOf(o.value);
+      return { ...o, color: idx >= 0 && !averaging ? KAMP_COMPARE_COLORS[idx % KAMP_COMPARE_COLORS.length] : undefined };
+    });
+
+  // Open the details for everyone the table is showing right now.
+  const showShown = () => {
+    const ids = visibleRows.map((r) => r.player.id);
+    if (ids.length === 0) return;
+    if (ids.length > KAMP_COMPARE_MAX) {
+      setChartMode("avg");
+      setSelectedIds(ids);
+      setLimitHint(false);
+    } else {
+      setChartMode(ids.length > 1 ? chartMode : "each");
+      setSelectedIds(ids);
+      setLimitHint(false);
+    }
+    scrollToPanel();
+  };
+
+  const title = withFilters ? "Statistik" : "Kampscore";
+  const colCount = withFilters ? 9 : 7;
 
   return (
     <div>
       <div style={styles.sectionHeadRow}>
         <div>
-          <h1 style={styles.h1}>Kampscore</h1>
+          <h1 style={styles.h1}>{title}</h1>
           <p style={styles.subtext}>
             Spillernes kampindsats over tid, bedømt 1-5 efter hver kamp på Kampplan, sammen med
             gennemsnitlig sporingsstatistik fra kampene. Kampscoren vægtes efter kampens række
             (Division ×1,2, Liga 1 ×1, Liga 2 ×0,8). Bruges til at vurdere hvem der reelt præsterer
             bedst lige nu. Klik på en spiller for at se udviklingen fra kamp til kamp. I detaljerne kan du
             tilføje flere spillere og sammenligne dem.
+            {withFilters &&
+              " Brug filtrene til at begrænse listen til bestemte spillere, positioner eller udviklingstrin, og se gruppens gennemsnit kamp for kamp."}
           </p>
         </div>
       </div>
+
+      {withFilters && (
+        <div style={{ ...styles.categoryBlock, padding: 12, marginBottom: 12 }}>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+            <span style={{ ...styles.fieldLabel, margin: 0 }}>Filter</span>
+            <MultiSelectDropdown
+              buttonText={filterText("Spillere", filterPlayers, playerOptions)}
+              options={playerOptions}
+              selected={filterPlayers}
+              onToggle={toggleIn(filterPlayers, setFilterPlayers)}
+              onClear={() => setFilterPlayers([])}
+              searchable
+            />
+            <MultiSelectDropdown
+              buttonText={filterText("Position", filterPositions, positionOptions)}
+              options={positionOptions}
+              selected={filterPositions}
+              onToggle={toggleIn(filterPositions, setFilterPositions)}
+              onClear={() => setFilterPositions([])}
+              minWidth={170}
+            />
+            <MultiSelectDropdown
+              buttonText={filterText("Udviklingstrin", filterLevels, levelOptions)}
+              options={levelOptions}
+              selected={filterLevels}
+              onToggle={toggleIn(filterLevels, setFilterLevels)}
+              onClear={() => setFilterLevels([])}
+              minWidth={200}
+            />
+            {filtersActive && (
+              <button style={styles.linkBtn} onClick={resetFilters}>
+                <X size={12} /> Nulstil filtre
+              </button>
+            )}
+          </div>
+          <p style={{ ...styles.subtext, margin: "8px 0 0", fontSize: 12 }}>
+            {filteredRows.length} af {rows.length} spillere vises. En spiller tæller med på en position, hvis det er
+            hendes primære eller sekundære position.
+          </p>
+        </div>
+      )}
 
       <div style={{ marginBottom: 12, display: "flex", gap: 8, flexWrap: "wrap" }}>
         <button
@@ -8983,6 +9212,11 @@ function KampPerformanceView({ players }) {
             <Check size={14} /> Vis kun valgte ({selectedIds.length})
           </button>
         )}
+        {withFilters && filteredRows.length > 0 && (
+          <button style={styles.teamFilterChip} onClick={showShown}>
+            <TrendingUp size={14} /> Vis udvikling for de viste ({filteredRows.length})
+          </button>
+        )}
       </div>
 
       {loading && <p style={styles.subtext}>Indlæser…</p>}
@@ -8992,84 +9226,20 @@ function KampPerformanceView({ players }) {
         <div ref={panelRef} style={{ ...styles.categoryBlock, scrollMarginTop: 110 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
             <span style={styles.categoryLabel}>
-              {selectedIds.length === 1 ? "Udvikling kamp for kamp" : "Sammenligning kamp for kamp"}
+              {averaging
+                ? "Gennemsnit kamp for kamp"
+                : selectedIds.length === 1
+                ? "Udvikling kamp for kamp"
+                : "Sammenligning kamp for kamp"}
             </span>
-            <div ref={pickerRef} style={{ position: "relative" }}>
-              <button
-                type="button"
-                style={{
-                  ...styles.select,
-                  width: "auto",
-                  minWidth: 210,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  gap: 10,
-                  textAlign: "left",
-                  cursor: "pointer",
-                }}
-                onClick={() => setPickerOpen((v) => !v)}
-                aria-haspopup="listbox"
-                aria-expanded={pickerOpen}
-              >
-                <span>Vælg spillere ({selectedIds.length} valgt)</span>
-                <ChevronDown size={14} />
-              </button>
-              {pickerOpen && (
-                <div
-                  style={{
-                    position: "absolute",
-                    left: 0,
-                    top: "calc(100% + 4px)",
-                    zIndex: 50,
-                    width: 280,
-                    maxWidth: "calc(100vw - 48px)",
-                    background: "#FFFFFF",
-                    border: "1px solid #D9D4C7",
-                    borderRadius: 10,
-                    boxShadow: "0 8px 24px rgba(0,0,0,0.15)",
-                    padding: 8,
-                  }}
-                >
-                  <input
-                    style={{ ...styles.input, marginBottom: 6 }}
-                    placeholder="Søg spiller"
-                    value={pickerQuery}
-                    onChange={(e) => setPickerQuery(e.target.value)}
-                  />
-                  <div role="listbox" aria-multiselectable="true" style={{ maxHeight: 280, overflowY: "auto" }}>
-                    {pickerPlayers.map((pl) => {
-                      const idx = selectedIds.indexOf(pl.id);
-                      const on = idx >= 0;
-                      return (
-                        <label
-                          key={pl.id}
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: 8,
-                            padding: "6px",
-                            borderRadius: 6,
-                            cursor: "pointer",
-                            fontSize: 14,
-                            background: on ? "#F6F3EC" : "transparent",
-                          }}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={on}
-                            onChange={() => toggleSelected(pl.id)}
-                            style={on ? { accentColor: KAMP_COMPARE_COLORS[idx % KAMP_COMPARE_COLORS.length] } : undefined}
-                          />
-                          <span>{pl.name}</span>
-                        </label>
-                      );
-                    })}
-                    {pickerPlayers.length === 0 && <div style={{ ...styles.subtext, padding: 6 }}>Ingen spillere</div>}
-                  </div>
-                </div>
-              )}
-            </div>
+            <MultiSelectDropdown
+              buttonText={`Vælg spillere (${selectedIds.length} valgt)`}
+              options={pickerOptions}
+              selected={selectedIds}
+              onToggle={toggleSelected}
+              searchable
+              minWidth={210}
+            />
             <button
               style={{ ...styles.ghostBtn, padding: "8px 14px", fontSize: 13, display: "inline-flex", alignItems: "center", gap: 4 }}
               onClick={closePanel}
@@ -9078,78 +9248,96 @@ function KampPerformanceView({ players }) {
               <X size={14} /> Luk
             </button>
           </div>
-          <div style={{ display: "flex", gap: 6, flexWrap: "wrap", margin: "10px 0" }}>
-            {compare.map((c) => (
-              <span
-                key={c.id}
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: 6,
-                  padding: "4px 6px 4px 10px",
-                  borderRadius: 16,
-                  border: `2px solid ${c.color}`,
-                  fontSize: 13,
-                  fontWeight: 600,
-                }}
-              >
-                {c.player.name}
+          {withFilters && selectedIds.length > 1 && (
+            <div style={{ display: "flex", gap: 6, marginTop: 10 }}>
+              {[
+                { key: "each", label: "Hver spiller" },
+                { key: "avg", label: "Gennemsnit" },
+              ].map((m) => (
                 <button
-                  style={{ ...styles.iconBtnGhost, padding: 2 }}
-                  onClick={() => toggleSelected(c.id)}
-                  title={`Fjern ${c.player.name}`}
+                  key={m.key}
+                  style={{ ...styles.teamFilterChip, ...(chartMode === m.key ? styles.teamFilterChipActive : {}) }}
+                  onClick={() => changeMode(m.key)}
                 >
-                  <X size={12} />
+                  {m.label}
                 </button>
-              </span>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
+          {!averaging && (
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap", margin: "10px 0" }}>
+              {compare.map((c) => (
+                <span
+                  key={c.id}
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 6,
+                    padding: "4px 6px 4px 10px",
+                    borderRadius: 16,
+                    border: `2px solid ${c.color}`,
+                    fontSize: 13,
+                    fontWeight: 600,
+                  }}
+                >
+                  {c.player.name}
+                  <button
+                    style={{ ...styles.iconBtnGhost, padding: 2 }}
+                    onClick={() => toggleSelected(c.id)}
+                    title={`Fjern ${c.player.name}`}
+                  >
+                    <X size={12} />
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
           {limitHint && (
             <p style={{ ...styles.subtext, color: "#7A4B00", margin: "0 0 8px" }}>
-              Du kan sammenligne op til {KAMP_COMPARE_MAX} spillere ad gangen. Fjern en, før du tilføjer en ny.
+              {withFilters
+                ? `Med én linje pr. spiller kan du højst vise ${KAMP_COMPARE_MAX} spillere. Skift til Gennemsnit for flere.`
+                : `Du kan sammenligne op til ${KAMP_COMPARE_MAX} spillere ad gangen. Fjern en, før du tilføjer en ny.`}
             </p>
           )}
-          <p style={{ ...styles.subtext, margin: "0 0 12px" }}>
+          <p style={{ ...styles.subtext, margin: averaging ? "10px 0 12px" : "0 0 12px" }}>
+            {averaging
+              ? `Gennemsnit af ${compare.length} spillere: ${compare.map((c) => c.player.name).join(", ")}. `
+              : ""}
             {allMatches.length} kamp{allMatches.length === 1 ? "" : "e"} med score eller statistik. Punkterne står i den
             rækkefølge, kampene blev spillet, med datoen under. Kampscoren er vægtet efter kampens række (Division ×1,2,
             Liga 1 ×1, Liga 2 ×0,8), ligesom gennemsnittet i tabellen. Mangler en spiller en værdi i en kamp,
-            springes den over i hendes linje.
+            {averaging ? " tæller hun ikke med i den kamps gennemsnit." : " springes den over i hendes linje."}
           </p>
-          {statsPending > 0 && <p style={styles.subtext}>Indlæser…</p>}
-          {statsError && <div style={styles.errorBannerRow}>Kunne ikke hente en spillers statistik.</div>}
-          {statsPending === 0 && !statsError && allMatches.length === 0 && (
+          {!averaging && series.length > 1 && (
+            <div style={{ display: "flex", gap: 14, flexWrap: "wrap", marginBottom: 10, fontSize: 12 }}>
+              {series.map((s) => (
+                <span key={s.id} style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                  <span style={{ width: 16, height: 3, background: s.color, display: "inline-block", borderRadius: 2 }} />
+                  {s.name}
+                </span>
+              ))}
+            </div>
+          )}
+          {allMatches.length === 0 ? (
             <p style={styles.noSkills}>
               Ingen kampe med score eller statistik for {selectedIds.length === 1 ? "denne spiller" : "de valgte spillere"} endnu.
             </p>
-          )}
-          {statsPending === 0 && !statsError && allMatches.length > 0 && (
-            <>
-              {series.length > 1 && (
-                <div style={{ display: "flex", gap: 14, flexWrap: "wrap", marginBottom: 10, fontSize: 12 }}>
-                  {series.map((s) => (
-                    <span key={s.id} style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-                      <span style={{ width: 16, height: 3, background: s.color, display: "inline-block", borderRadius: 2 }} />
-                      {s.name}
-                    </span>
-                  ))}
-                </div>
-              )}
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(300px, 100%), 1fr))", gap: 12 }}>
-                {KAMP_TREND_CHARTS.map((c) => (
-                  <MatchTrendChart
-                    key={c.key}
-                    title={c.title}
-                    unit={c.unit}
-                    decimals={c.decimals || 0}
-                    domain={c.domain}
-                    ticks={c.ticks}
-                    series={series}
-                    weighted={Boolean(c.weighted)}
-                    points={chartPoints(c.key)}
-                  />
-                ))}
-              </div>
-            </>
+          ) : (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(300px, 100%), 1fr))", gap: 12 }}>
+              {KAMP_TREND_CHARTS.map((c) => (
+                <MatchTrendChart
+                  key={c.key}
+                  title={c.title}
+                  unit={c.unit}
+                  decimals={c.decimals || 0}
+                  domain={c.domain}
+                  ticks={c.ticks}
+                  series={series}
+                  weighted={Boolean(c.weighted)}
+                  points={chartPoints(c.key)}
+                />
+              ))}
+            </div>
           )}
         </div>
       )}
@@ -9160,6 +9348,8 @@ function KampPerformanceView({ players }) {
             <thead>
               <tr>
                 <th style={styles.kpsTh}>Spiller</th>
+                {withFilters && <th style={styles.kpsTh}>Pos.</th>}
+                {withFilters && <th style={styles.kpsTh}>Trin</th>}
                 <th style={{ ...styles.kpsTh, textAlign: "center" }}>Kampscore</th>
                 <th style={{ ...styles.kpsTh, textAlign: "right" }}>Pasningsfuldførelse</th>
                 <th style={{ ...styles.kpsTh, textAlign: "right" }}>High intensity runs</th>
@@ -9190,6 +9380,12 @@ function KampPerformanceView({ players }) {
                           : levelBreakdown.map((l) => `${l.division}: ${l.count}`).join(", ")}
                       </div>
                     </td>
+                    {withFilters && (
+                      <td style={styles.kpsTd}>
+                        {[player.primaryPosition, player.secondaryPosition].filter(Boolean).join(" / ") || "—"}
+                      </td>
+                    )}
+                    {withFilters && <td style={styles.kpsTd}>{levelName(player) || "—"}</td>}
                     <td style={{ ...styles.kpsTd, textAlign: "center" }}>
                       <span
                         style={{
@@ -9224,6 +9420,13 @@ function KampPerformanceView({ players }) {
                   </tr>
                 );
               })}
+              {visibleRows.length === 0 && (
+                <tr>
+                  <td style={{ ...styles.kpsTd, color: "#6B6B6B" }} colSpan={colCount}>
+                    Ingen spillere matcher filtrene.
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>

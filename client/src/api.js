@@ -219,6 +219,11 @@ export function getMatchStatsSummary() {
   return request("GET", "/api/match-plans/stats-summary");
 }
 
+// Every player's per-match tracked stats, for the Kampscore / Statistik charts.
+export function getMatchStatsByMatch() {
+  return request("GET", "/api/match-plans/stats-matches");
+}
+
 export function generateMatchPlanShareLink(id) {
   return request("POST", `/api/match-plans/${id}/share`);
 }
