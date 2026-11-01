@@ -909,6 +909,7 @@ export default function AcademyApp() {
     try {
       await action();
       setSaveError(false);
+      return true;
     } catch (e) {
       // The session expired (or was revoked) mid-use — send the coach back
       // to the login screen instead of a generic save-failed banner they
@@ -916,9 +917,10 @@ export default function AcademyApp() {
       if (e.message === "Not authenticated") {
         setData(null);
         setAuthStatus({ setupNeeded: false, coach: null });
-        return;
+        return false;
       }
       setSaveError(true);
+      return false;
     }
   }, []);
 
@@ -1614,6 +1616,57 @@ export default function AcademyApp() {
 }
 
 /* ---------- Player self-evaluation (accessed only via a private link) ---------- */
+// The player's self-evaluation of one goal. Picking a value only changes the
+// draft here; it is written to the database (and logged as a self-evaluation)
+// when she presses Gem, so trying a few values before settling doesn't fill
+// the history with answers she never meant to give.
+function SelfProgressEditor({ goal, onSave }) {
+  const saved = typeof goal.progress === "number" ? goal.progress : null;
+  const [draft, setDraft] = useState(saved);
+  const [dirty, setDirty] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [justSaved, setJustSaved] = useState(false);
+  const log = goal.progressLog || [];
+  const last = log[log.length - 1]; // oldest first
+
+  const choose = (v) => {
+    setDraft(v);
+    setDirty(true);
+    setJustSaved(false);
+  };
+  const save = async () => {
+    setSaving(true);
+    const ok = await onSave(draft);
+    setSaving(false);
+    if (ok !== false) {
+      setDirty(false);
+      setJustSaved(true);
+    }
+  };
+
+  return (
+    <div>
+      <ProgressTracker value={draft} onChange={choose} />
+      <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginTop: 8 }}>
+        <button
+          style={{ ...styles.primaryBtnSm, opacity: dirty && !saving ? 1 : 0.45, cursor: dirty && !saving ? "pointer" : "default" }}
+          disabled={!dirty || saving}
+          onClick={save}
+        >
+          {saving ? "Gemmer…" : "Gem"}
+        </button>
+        {dirty && <span style={styles.subtext}>Ikke gemt endnu — tryk Gem for at sende din vurdering</span>}
+        {!dirty && justSaved && <span style={{ ...styles.subtext, color: "#4D7B4D" }}>Gemt.</span>}
+        {!dirty && !justSaved && last && (
+          <span style={styles.subtext}>
+            Sidst gemt: {last.progress}/10 · {formatDate(String(last.createdAt).slice(0, 10))}
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function PlayerSelfEvalApp({ player, config, periods, coachEvaluations, goals, developmentPlan, onSetGoalProgress }) {
   const [selectedPeriodId, setSelectedPeriodId] = useState(
     periods.length ? periods[periods.length - 1].id : null
@@ -1726,9 +1779,10 @@ function PlayerSelfEvalApp({ player, config, periods, coachEvaluations, goals, d
                       {achieved ? " ✓" : ""}
                     </span>
                   </div>
-                  <ProgressTracker
-                    value={goal.progress}
-                    onChange={(v) => selectedPeriod && onSetGoalProgress(selectedPeriod.id, skillId, v)}
+                  <SelfProgressEditor
+                    key={`${selectedPeriod ? selectedPeriod.id : ""}-${skillId}`}
+                    goal={goal}
+                    onSave={(v) => selectedPeriod && onSetGoalProgress(selectedPeriod.id, skillId, v)}
                   />
                 </div>
               );
