@@ -4216,11 +4216,13 @@ function RosterView({
 
   // Print udviklingsmål: the periods that have goals for the players shown
   // (inactive players are left out), newest first; the newest is the default.
-  const matrixPlayers = visiblePlayers.filter((p) => p.active !== false);
+  const matrixCandidates = visiblePlayers.filter((p) => p.active !== false);
+  const hasGoalsIn = (p, pd) => Object.keys(data.goals[p.id]?.[pd.id] || {}).length > 0;
   const matrixPeriods = sortedPeriods(data.periods)
-    .filter((pd) => matrixPlayers.some((p) => Object.keys(data.goals[p.id]?.[pd.id] || {}).length > 0))
+    .filter((pd) => matrixCandidates.some((p) => hasGoalsIn(p, pd)))
     .reverse();
   const matrixPeriod = matrixPeriods.find((pd) => pd.id === matrixPeriodId) || matrixPeriods[0] || null;
+  const matrixPlayers = matrixPeriod ? matrixCandidates.filter((p) => hasGoalsIn(p, matrixPeriod)) : [];
   const printMatrix = () => {
     if (!matrixPeriod) return;
     setMatrixBlocked(!printGoalMatrix(data, matrixPlayers, matrixPeriod));
@@ -4325,7 +4327,7 @@ function RosterView({
                 ))}
               </select>
               <span style={{ fontSize: 13, color: "#4A4A4A" }}>
-                {matrixPlayers.length} spiller{matrixPlayers.length !== 1 ? "e" : ""}
+                {matrixPlayers.length} spiller{matrixPlayers.length !== 1 ? "e" : ""} med udviklingsmål
                 {teamFilter !== "all" ? " (valgt hold)" : ""}
               </span>
               <button style={styles.primaryBtn} onClick={printMatrix}>
@@ -6273,14 +6275,19 @@ function printDevelopmentPlan(player, plan) {
   return true;
 }
 
-// Spillertrup -> "Print udviklingsmål": one page with the players across the
-// top and every area (Teknik, Fysisk ...) with its development goals down the
-// side; a cross where the player has a goal on that skill in the period.
+// Spillertrup -> "Print udviklingsmål": one landscape page with the players
+// that have a goal in the period down the side (their udviklingstrin in
+// brackets) and every area (Teknik, Fysisk ...) with its development goals
+// across the top; a cross where the player has a goal on that skill.
 // Opens its own window like the other standalone prints.
 function printGoalMatrix(data, players, period) {
   const printWindow = window.open("", "_blank");
   if (!printWindow) return false;
 
+  const levelById = {};
+  (data.config.participationLevels || []).forEach((l) => {
+    levelById[l.id] = l;
+  });
   const goalsOf = (playerId) => (data.goals[playerId] && data.goals[playerId][period.id]) || {};
   const hasGoal = (playerId, skillId) => goalsOf(playerId)[skillId] != null;
 
@@ -6292,38 +6299,48 @@ function printGoalMatrix(data, players, period) {
       (sk) => sk.enabled || players.some((pl) => hasGoal(pl.id, sk.id))
     ),
   })).filter((a) => a.skills.length > 0);
+  const skillCount = areas.reduce((m, a) => m + a.skills.length, 0);
 
   const n = players.length;
-  const colW = n > 0 ? Math.max(5.5, Math.min(11, 200 / n)) : 10;
-  const nameFont = n > 24 ? 9 : n > 16 ? 10 : 11;
-  // Squeezed to keep everything on one landscape page: ~125 mm is left for the rows.
-  const rowCount = areas.reduce((m, a) => m + a.skills.length + 1, 1);
-  const rowH = Math.max(3.2, Math.min(6.2, 125 / rowCount));
-  const rowFont = rowH < 4.4 ? 9 : rowH < 5.4 ? 10 : 11;
+  // Rows share the ~150 mm under the header; columns share the width left of the name column.
+  const rowH = Math.max(3.4, Math.min(7, 150 / (n + 1)));
+  const rowFont = rowH < 4.4 ? 9 : rowH < 5.4 ? 10 : 12;
+  const colW = Math.max(5, Math.min(11, 205 / Math.max(skillCount, 1)));
+  const skillFont = skillCount > 28 ? 9 : 10;
 
-  const head = players
-    .map((pl) => `<th class="pl"><div class="pn">${kpEscapeHtml(pl.name || "")}</div></th>`)
+  const areaHead = areas
+    .map(
+      ({ cat, skills }) =>
+        `<th class="area" colspan="${skills.length}" style="border-top:5px solid ${cat.accent}">${kpEscapeHtml(cat.label)}</th>`
+    )
     .join("");
-  const body = areas
-    .map(({ cat, skills }) => {
-      const rows = skills
-        .map((sk) => {
-          const cells = players
-            .map((pl) => `<td class="x">${hasGoal(pl.id, sk.id) ? "&#10005;" : ""}</td>`)
-            .join("");
-          const count = players.filter((pl) => hasGoal(pl.id, sk.id)).length;
-          return `<tr><td class="sk">${kpEscapeHtml(sk.name)}</td>${cells}<td class="sum">${count || ""}</td></tr>`;
-        })
-        .join("");
-      return `<tr class="cat"><td colspan="${n + 2}" style="border-left:6px solid ${cat.accent}">${kpEscapeHtml(cat.label)}</td></tr>${rows}`;
-    })
+  const skillHead = areas
+    .map(({ skills }) =>
+      skills.map((sk) => `<th class="sk"><div class="sn">${kpEscapeHtml(sk.name)}</div></th>`).join("")
+    )
     .join("");
-  const totals = players
+  const body = players
     .map((pl) => {
       const goals = goalsOf(pl.id);
+      const level = levelById[pl.participationLevelId];
+      const cells = areas
+        .map(({ skills }) =>
+          skills.map((sk) => `<td class="x">${goals[sk.id] != null ? "&#10005;" : ""}</td>`).join("")
+        )
+        .join("");
       const count = areas.reduce((m, a) => m + a.skills.filter((sk) => goals[sk.id] != null).length, 0);
-      return `<td class="x sum">${count || ""}</td>`;
+      return `<tr><td class="nm">${kpEscapeHtml(pl.name || "")}${level ? ` <span class="lv">(${kpEscapeHtml(level.name)})</span>` : ""}</td>${cells}<td class="sum">${count || ""}</td></tr>`;
     })
+    .join("");
+  const totals = areas
+    .map(({ skills }) =>
+      skills
+        .map((sk) => {
+          const count = players.filter((pl) => hasGoal(pl.id, sk.id)).length;
+          return `<td class="sum">${count || ""}</td>`;
+        })
+        .join("")
+    )
     .join("");
 
   const doc = `<!DOCTYPE html>
@@ -6341,15 +6358,16 @@ function printGoalMatrix(data, players, period) {
   .dp-sub { font-size: 12px; color: #4A4A4A; margin-top: 2px; }
   table { border-collapse: collapse; table-layout: fixed; width: 100%; }
   th, td { border: 1px solid #B9B4A7; padding: 0; }
-  th.corner { width: 52mm; border: none; }
-  th.pl { width: ${colW}mm; height: 32mm; vertical-align: bottom; background: #F6F3EC; }
-  th.pl .pn { writing-mode: vertical-rl; transform: rotate(180deg); white-space: nowrap; font-size: ${nameFont}px; font-weight: 700; padding: 4px 0; margin: 0 auto; }
-  th.sumh { width: 12mm; background: #F6F3EC; font-size: 9px; vertical-align: bottom; padding: 4px 2px; }
-  tr.cat td { background: #1A1A1A; color: #fff; font-weight: 700; font-size: ${rowFont}px; letter-spacing: 0.04em; text-transform: uppercase; padding: 0 6px; height: ${rowH}mm; }
-  td.sk { padding: 0 6px; height: ${rowH}mm; font-size: ${rowFont}px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  th.corner { width: 68mm; border: none; }
+  th.area { background: #F6F3EC; font-size: 10px; letter-spacing: 0.04em; text-transform: uppercase; padding: 3px 0; }
+  th.sk { width: ${colW}mm; height: 36mm; vertical-align: bottom; background: #fff; }
+  th.sk .sn { writing-mode: vertical-rl; transform: rotate(180deg); white-space: nowrap; font-size: ${skillFont}px; font-weight: 600; padding: 3px 0; margin: 0 auto; }
+  th.sumh { width: 11mm; background: #F6F3EC; font-size: 8px; vertical-align: bottom; padding: 3px 1px; }
+  td.nm { padding: 0 6px; height: ${rowH}mm; font-size: ${rowFont}px; font-weight: 700; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+  td.nm .lv { font-weight: 400; color: #4A4A4A; }
   td.x { text-align: center; font-size: ${rowH < 4.4 ? 10 : 13}px; line-height: 1; font-weight: 700; height: ${rowH}mm; }
-  td.sum { text-align: center; font-size: ${rowFont}px; font-weight: 700; background: #F6F3EC; color: #4A4A4A; }
-  tr.tot td.sk { font-weight: 700; background: #F6F3EC; }
+  td.sum { text-align: center; font-size: ${rowFont}px; font-weight: 700; background: #F6F3EC; color: #4A4A4A; height: ${rowH}mm; }
+  tr.tot td.nm { background: #F6F3EC; }
   tr { break-inside: avoid; }
   .print-bar { display: flex; justify-content: flex-end; margin-bottom: 12px; }
   .print-bar button {
@@ -6365,13 +6383,16 @@ function printGoalMatrix(data, players, period) {
     <img src="${LOGO_SRC}" alt="Klublogo">
     <div>
       <div class="dp-title">Udviklingsmål pr. spiller</div>
-      <div class="dp-sub">${kpEscapeHtml(period.label || "")} · ${n} spiller${n !== 1 ? "e" : ""} · &#10005; = spilleren har valgt målet</div>
+      <div class="dp-sub">${kpEscapeHtml(period.label || "")} · ${n} spiller${n !== 1 ? "e" : ""} med udviklingsmål · &#10005; = spilleren har valgt målet</div>
     </div>
   </div>
   <table>
-    <thead><tr><th class="corner"></th>${head}<th class="sumh">Antal spillere</th></tr></thead>
+    <thead>
+      <tr><th class="corner"></th>${areaHead}<th class="sumh" rowspan="2">Antal mål</th></tr>
+      <tr><th class="corner"></th>${skillHead}</tr>
+    </thead>
     <tbody>${body}
-      <tr class="tot"><td class="sk">Antal mål pr. spiller</td>${totals}<td class="sum"></td></tr>
+      <tr class="tot"><td class="nm">Antal spillere pr. mål</td>${totals}<td class="sum"></td></tr>
     </tbody>
   </table>
 </body>
