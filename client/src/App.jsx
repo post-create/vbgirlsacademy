@@ -817,6 +817,10 @@ export default function AcademyApp() {
   // player (a player page should always start at the top, never inherit
   // wherever the list happened to be scrolled to).
   const [playerOriginView, setPlayerOriginView] = useState("roster");
+  // Spillertrup's sort and team filter live here, not in RosterView, so they
+  // survive opening a player and coming back (RosterView unmounts meanwhile).
+  const [rosterSortMode, setRosterSortMode] = useState("alpha");
+  const [rosterTeamFilter, setRosterTeamFilter] = useState("all");
   const scrollPositionsRef = React.useRef({});
   const pendingScrollRestoreRef = React.useRef(null);
 
@@ -1531,6 +1535,10 @@ export default function AcademyApp() {
           <RosterView
             data={data}
             periods={periods}
+            sortMode={rosterSortMode}
+            setSortMode={setRosterSortMode}
+            teamFilter={rosterTeamFilter}
+            setTeamFilter={setRosterTeamFilter}
             onOpen={(id) => {
               scrollPositionsRef.current.roster = window.scrollY;
               pendingScrollRestoreRef.current = 0;
@@ -4108,6 +4116,10 @@ function TeamsView({ teams, players, onCreate, onRename, onDelete }) {
 function RosterView({
   data,
   periods,
+  sortMode,
+  setSortMode,
+  teamFilter,
+  setTeamFilter,
   onOpen,
   addingPlayer,
   setAddingPlayer,
@@ -4127,8 +4139,6 @@ function RosterView({
   setNewSkillGroupId,
   onAdd,
 }) {
-  const [teamFilter, setTeamFilter] = useState("all");
-  const [sortMode, setSortMode] = useState("alpha");
   const [selectMode, setSelectMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState([]);
   const [sending, setSending] = useState(false);
