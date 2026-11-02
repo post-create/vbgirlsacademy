@@ -4134,6 +4134,9 @@ function RosterView({
   const [sending, setSending] = useState(false);
   const [sendResult, setSendResult] = useState(null);
   const [emailsCopied, setEmailsCopied] = useState(false);
+  const [matrixOpen, setMatrixOpen] = useState(false);
+  const [matrixPeriodId, setMatrixPeriodId] = useState("");
+  const [matrixBlocked, setMatrixBlocked] = useState(false);
   const teams = data.teams || [];
 
   const toggleSelectMode = () => {
@@ -4211,6 +4214,18 @@ function RosterView({
     levelById[l.id] = l;
   });
 
+  // Print udviklingsmål: the periods that have goals for the players shown
+  // (inactive players are left out), newest first; the newest is the default.
+  const matrixPlayers = visiblePlayers.filter((p) => p.active !== false);
+  const matrixPeriods = sortedPeriods(data.periods)
+    .filter((pd) => matrixPlayers.some((p) => Object.keys(data.goals[p.id]?.[pd.id] || {}).length > 0))
+    .reverse();
+  const matrixPeriod = matrixPeriods.find((pd) => pd.id === matrixPeriodId) || matrixPeriods[0] || null;
+  const printMatrix = () => {
+    if (!matrixPeriod) return;
+    setMatrixBlocked(!printGoalMatrix(data, matrixPlayers, matrixPeriod));
+  };
+
   const playersWithStats = visiblePlayers.map((p) => {
     const latestPeriod = getLatestScoredPeriod(data, p.id);
     const scores = latestPeriod ? getPlayerScores(data, p.id, latestPeriod.id) : {};
@@ -4285,7 +4300,48 @@ function RosterView({
         >
           <Mail size={14} /> {selectMode ? "Annuller" : "Send selvevaluering"}
         </button>
+        <button
+          style={{ ...styles.teamFilterChip, ...(matrixOpen ? styles.teamFilterChipActive : {}) }}
+          onClick={() => setMatrixOpen((v) => !v)}
+        >
+          <Printer size={14} /> Print udviklingsmål
+        </button>
       </div>
+
+      {matrixOpen && (
+        <div style={styles.selectActionBar}>
+          {matrixPeriod ? (
+            <>
+              <span>Periode</span>
+              <select
+                style={{ ...styles.select, width: "auto", minWidth: 180 }}
+                value={matrixPeriod.id}
+                onChange={(e) => setMatrixPeriodId(e.target.value)}
+              >
+                {matrixPeriods.map((pd) => (
+                  <option key={pd.id} value={pd.id}>
+                    {pd.label} · {formatDate(pd.date)}
+                  </option>
+                ))}
+              </select>
+              <span style={{ fontSize: 13, color: "#4A4A4A" }}>
+                {matrixPlayers.length} spiller{matrixPlayers.length !== 1 ? "e" : ""}
+                {teamFilter !== "all" ? " (valgt hold)" : ""}
+              </span>
+              <button style={styles.primaryBtn} onClick={printMatrix}>
+                <Printer size={14} /> Åbn print / PDF
+              </button>
+            </>
+          ) : (
+            <span>Ingen af de viste spillere har udviklingsmål i en periode endnu.</span>
+          )}
+          {matrixBlocked && (
+            <span style={{ color: "#B5493F", fontSize: 13 }}>
+              Browseren blokerede det nye vindue — tillad pop op-vinduer for siden og prøv igen.
+            </span>
+          )}
+        </div>
+      )}
 
       {selectMode && (
         <div style={styles.selectActionBar}>
@@ -6207,6 +6263,117 @@ function printDevelopmentPlan(player, plan) {
     </div>
   </div>
   <div class="dp-body">${plan.contentHtml || ""}</div>
+</body>
+</html>`;
+
+  printWindow.document.open();
+  printWindow.document.write(doc);
+  printWindow.document.close();
+  printWindow.focus();
+  return true;
+}
+
+// Spillertrup -> "Print udviklingsmål": one page with the players across the
+// top and every area (Teknik, Fysisk ...) with its development goals down the
+// side; a cross where the player has a goal on that skill in the period.
+// Opens its own window like the other standalone prints.
+function printGoalMatrix(data, players, period) {
+  const printWindow = window.open("", "_blank");
+  if (!printWindow) return false;
+
+  const goalsOf = (playerId) => (data.goals[playerId] && data.goals[playerId][period.id]) || {};
+  const hasGoal = (playerId, skillId) => goalsOf(playerId)[skillId] != null;
+
+  // Every enabled skill, plus any disabled one that still has a goal this
+  // period, so a cross never goes missing from the print.
+  const areas = CATEGORY_META.map((cat) => ({
+    cat,
+    skills: (data.config[cat.key] || []).filter(
+      (sk) => sk.enabled || players.some((pl) => hasGoal(pl.id, sk.id))
+    ),
+  })).filter((a) => a.skills.length > 0);
+
+  const n = players.length;
+  const colW = n > 0 ? Math.max(5.5, Math.min(11, 200 / n)) : 10;
+  const nameFont = n > 24 ? 9 : n > 16 ? 10 : 11;
+  // Squeezed to keep everything on one landscape page: ~125 mm is left for the rows.
+  const rowCount = areas.reduce((m, a) => m + a.skills.length + 1, 1);
+  const rowH = Math.max(3.2, Math.min(6.2, 125 / rowCount));
+  const rowFont = rowH < 4.4 ? 9 : rowH < 5.4 ? 10 : 11;
+
+  const head = players
+    .map((pl) => `<th class="pl"><div class="pn">${kpEscapeHtml(pl.name || "")}</div></th>`)
+    .join("");
+  const body = areas
+    .map(({ cat, skills }) => {
+      const rows = skills
+        .map((sk) => {
+          const cells = players
+            .map((pl) => `<td class="x">${hasGoal(pl.id, sk.id) ? "&#10005;" : ""}</td>`)
+            .join("");
+          const count = players.filter((pl) => hasGoal(pl.id, sk.id)).length;
+          return `<tr><td class="sk">${kpEscapeHtml(sk.name)}</td>${cells}<td class="sum">${count || ""}</td></tr>`;
+        })
+        .join("");
+      return `<tr class="cat"><td colspan="${n + 2}" style="border-left:6px solid ${cat.accent}">${kpEscapeHtml(cat.label)}</td></tr>${rows}`;
+    })
+    .join("");
+  const totals = players
+    .map((pl) => {
+      const goals = goalsOf(pl.id);
+      const count = areas.reduce((m, a) => m + a.skills.filter((sk) => goals[sk.id] != null).length, 0);
+      return `<td class="x sum">${count || ""}</td>`;
+    })
+    .join("");
+
+  const doc = `<!DOCTYPE html>
+<html lang="da">
+<head>
+<meta charset="UTF-8">
+<title>Udviklingsmål – ${kpEscapeHtml(period.label || "")}</title>
+<style>
+  @page { size: A4 landscape; margin: 8mm; }
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 20px; background: #fff; font-family: Arial, sans-serif; color: #111111; }
+  .dp-head { display: flex; align-items: center; gap: 14px; border-bottom: 2px solid #111111; padding-bottom: 8px; margin-bottom: 12px; }
+  .dp-head img { width: 36px; height: 36px; object-fit: contain; }
+  .dp-title { font-size: 18px; font-weight: 700; }
+  .dp-sub { font-size: 12px; color: #4A4A4A; margin-top: 2px; }
+  table { border-collapse: collapse; table-layout: fixed; width: 100%; }
+  th, td { border: 1px solid #B9B4A7; padding: 0; }
+  th.corner { width: 52mm; border: none; }
+  th.pl { width: ${colW}mm; height: 32mm; vertical-align: bottom; background: #F6F3EC; }
+  th.pl .pn { writing-mode: vertical-rl; transform: rotate(180deg); white-space: nowrap; font-size: ${nameFont}px; font-weight: 700; padding: 4px 0; margin: 0 auto; }
+  th.sumh { width: 12mm; background: #F6F3EC; font-size: 9px; vertical-align: bottom; padding: 4px 2px; }
+  tr.cat td { background: #1A1A1A; color: #fff; font-weight: 700; font-size: ${rowFont}px; letter-spacing: 0.04em; text-transform: uppercase; padding: 0 6px; height: ${rowH}mm; }
+  td.sk { padding: 0 6px; height: ${rowH}mm; font-size: ${rowFont}px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  td.x { text-align: center; font-size: ${rowH < 4.4 ? 10 : 13}px; line-height: 1; font-weight: 700; height: ${rowH}mm; }
+  td.sum { text-align: center; font-size: ${rowFont}px; font-weight: 700; background: #F6F3EC; color: #4A4A4A; }
+  tr.tot td.sk { font-weight: 700; background: #F6F3EC; }
+  tr { break-inside: avoid; }
+  .print-bar { display: flex; justify-content: flex-end; margin-bottom: 12px; }
+  .print-bar button {
+    font-weight: 600; font-size: 13px; padding: 8px 16px; border-radius: 6px;
+    border: 1.5px solid #1B4332; background: #1B4332; color: #fff; cursor: pointer;
+  }
+  @media print { .print-bar { display: none; } body { padding: 0; } * { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
+</style>
+</head>
+<body>
+  <div class="print-bar"><button onclick="window.print()">Print</button></div>
+  <div class="dp-head">
+    <img src="${LOGO_SRC}" alt="Klublogo">
+    <div>
+      <div class="dp-title">Udviklingsmål pr. spiller</div>
+      <div class="dp-sub">${kpEscapeHtml(period.label || "")} · ${n} spiller${n !== 1 ? "e" : ""} · &#10005; = spilleren har valgt målet</div>
+    </div>
+  </div>
+  <table>
+    <thead><tr><th class="corner"></th>${head}<th class="sumh">Antal spillere</th></tr></thead>
+    <tbody>${body}
+      <tr class="tot"><td class="sk">Antal mål pr. spiller</td>${totals}<td class="sum"></td></tr>
+    </tbody>
+  </table>
 </body>
 </html>`;
 

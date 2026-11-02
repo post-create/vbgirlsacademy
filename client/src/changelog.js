@@ -7,6 +7,15 @@
 // change goes live; `date` is the day it was released (YYYY-MM-DD).
 export const CHANGELOG = [
   {
+    date: "2026-11-02",
+    items: [
+      {
+        kind: "nyt",
+        text: "Spillertrup: knappen Print udviklingsmål laver en liggende A4-side (som kan gemmes som PDF) med alle spillere på tværs og alle områder (Teknik, Fysisk, Taktik, Mentalt) med deres udviklingsmål ned ad siden. Der sættes et kryds, hvor spilleren har valgt målet. Du vælger periode (som standard den nyeste), og den følger holdfilteret øverst. Inaktive spillere er ikke med. Til sidst står antal spillere pr. mål og antal mål pr. spiller.",
+      },
+    ],
+  },
+  {
     date: "2026-11-01",
     items: [
       {
