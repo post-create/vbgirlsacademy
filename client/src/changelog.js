@@ -11,7 +11,7 @@ export const CHANGELOG = [
     items: [
       {
         kind: "nyt",
-        text: "Spillertrup: knappen Print udviklingsmål laver en liggende A4-side (som kan gemmes som PDF) med spillerne ned ad siden (med udviklingstrin i parentes efter navnet) og alle områder (Teknik, Fysisk, Taktik, Mentalt) med deres udviklingsmål på tværs. Der sættes et kryds, hvor spilleren har valgt målet. Kun spillere med udviklingsmål i perioden er med. Du vælger periode (som standard den nyeste), og den følger holdfilteret øverst. Inaktive spillere er ikke med. Nederst står antal spillere pr. mål, og yderst til højre antal mål pr. spiller.",
+        text: "Spillertrup: knappen Print udviklingsmål laver en liggende A4-side (som kan gemmes som PDF) med spillerne ned ad siden (med udviklingstrin i parentes efter navnet) og alle områder (Teknik, Fysisk, Taktik, Mentalt) med deres udviklingsmål på tværs. Feltet er udfyldt med sort, hvor spilleren har valgt målet. Kun spillere med udviklingsmål i perioden er med. Du vælger periode (som standard den nyeste), og den følger holdfilteret øverst. Inaktive spillere er ikke med. Nederst står antal spillere pr. mål, og yderst til højre antal mål pr. spiller.",
       },
     ],
   },

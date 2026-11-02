@@ -6278,7 +6278,7 @@ function printDevelopmentPlan(player, plan) {
 // Spillertrup -> "Print udviklingsmål": one landscape page with the players
 // that have a goal in the period down the side (their udviklingstrin in
 // brackets) and every area (Teknik, Fysisk ...) with its development goals
-// across the top; a cross where the player has a goal on that skill.
+// across the top; a black cell where the player has a goal on that skill.
 // Opens its own window like the other standalone prints.
 function printGoalMatrix(data, players, period) {
   const printWindow = window.open("", "_blank");
@@ -6325,7 +6325,7 @@ function printGoalMatrix(data, players, period) {
       const level = levelById[pl.participationLevelId];
       const cells = areas
         .map(({ skills }) =>
-          skills.map((sk) => `<td class="x">${goals[sk.id] != null ? "&#10005;" : ""}</td>`).join("")
+          skills.map((sk) => `<td class="x${goals[sk.id] != null ? " on" : ""}"></td>`).join("")
         )
         .join("");
       const count = areas.reduce((m, a) => m + a.skills.filter((sk) => goals[sk.id] != null).length, 0);
@@ -6365,7 +6365,8 @@ function printGoalMatrix(data, players, period) {
   th.sumh { width: 11mm; background: #F6F3EC; font-size: 8px; vertical-align: bottom; padding: 3px 1px; }
   td.nm { padding: 0 6px; height: ${rowH}mm; font-size: ${rowFont}px; font-weight: 700; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
   td.nm .lv { font-weight: 400; color: #4A4A4A; }
-  td.x { text-align: center; font-size: ${rowH < 4.4 ? 10 : 13}px; line-height: 1; font-weight: 700; height: ${rowH}mm; }
+  td.x { height: ${rowH}mm; }
+  td.x.on { background: #111111; }
   td.sum { text-align: center; font-size: ${rowFont}px; font-weight: 700; background: #F6F3EC; color: #4A4A4A; height: ${rowH}mm; }
   tr.tot td.nm { background: #F6F3EC; }
   tr { break-inside: avoid; }
@@ -6383,7 +6384,7 @@ function printGoalMatrix(data, players, period) {
     <img src="${LOGO_SRC}" alt="Klublogo">
     <div>
       <div class="dp-title">Udviklingsmål pr. spiller</div>
-      <div class="dp-sub">${kpEscapeHtml(period.label || "")} · ${n} spiller${n !== 1 ? "e" : ""} med udviklingsmål · &#10005; = spilleren har valgt målet</div>
+      <div class="dp-sub">${kpEscapeHtml(period.label || "")} · ${n} spiller${n !== 1 ? "e" : ""} med udviklingsmål · &#9632; = spilleren har valgt målet</div>
     </div>
   </div>
   <table>
