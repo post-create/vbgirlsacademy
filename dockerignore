@@ -1,9 +1,12 @@
 node_modules
-.next
+client/node_modules
+client/dist
 .git
 .gitignore
 .env
 .env.*
+client/.env
+client/.env.*
 npm-debug.log*
 Dockerfile
 .dockerignore
