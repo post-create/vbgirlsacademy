@@ -1,36 +1,29 @@
-# VB Academy - Next.js production image
-# Requires `output: "standalone"` in next.config.js / next.config.ts
+# VB Pige Akademi - Node.js server + Vite/React client (in /client)
 
-# ---------- Stage 1: install dependencies ----------
-FROM node:22-alpine AS deps
-RUN apk add --no-cache libc6-compat
-WORKDIR /app
-COPY package.json package-lock.json* ./
-RUN npm ci
-
-# ---------- Stage 2: build the app ----------
+# ---------- Stage 1: install and build ----------
 FROM node:22-alpine AS builder
 WORKDIR /app
-COPY --from=deps /app/node_modules ./node_modules
-COPY . .
-ENV NEXT_TELEMETRY_DISABLED=1
-# If you use Prisma, uncomment the next line:
-# RUN npx prisma generate
-RUN npm run build
 
-# ---------- Stage 3: the image that actually runs ----------
+# Install server and client dependencies (cached unless package files change)
+COPY package.json package-lock.json* ./
+COPY client/package.json client/package-lock.json* ./client/
+RUN npm ci && npm ci --prefix client
+
+# Copy the rest of the code and build the client (Vite -> client/dist)
+COPY . .
+RUN npm --prefix client run build
+
+# Keep only production dependencies for the server
+RUN npm prune --omit=dev && rm -rf client/node_modules
+
+# ---------- Stage 2: the image that actually runs ----------
 FROM node:22-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
-ENV NEXT_TELEMETRY_DISABLED=1
-RUN addgroup -S app && adduser -S app -G app
-
-COPY --from=builder /app/public ./public
-COPY --from=builder --chown=app:app /app/.next/standalone ./
-COPY --from=builder --chown=app:app /app/.next/static ./.next/static
-
-USER app
-EXPOSE 3000
 ENV PORT=3000
-ENV HOSTNAME=0.0.0.0
-CMD ["node", "server.js"]
+
+COPY --from=builder --chown=node:node /app ./
+
+USER node
+EXPOSE 3000
+CMD ["npm", "start"]
